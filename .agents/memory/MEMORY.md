@@ -1,0 +1,1 @@
+- [POS backend patterns](pos-backend-patterns.md) — critical patterns for Express 5 routes, transactions, and auth in this project.

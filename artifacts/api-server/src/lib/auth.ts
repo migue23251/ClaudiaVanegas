@@ -1,10 +1,11 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
+const _rawSecret = process.env.JWT_SECRET;
+if (!_rawSecret) {
   throw new Error("JWT_SECRET environment variable is required but was not provided.");
 }
+const JWT_SECRET: string = _rawSecret;
 
 export interface JwtPayload {
   userId: number;

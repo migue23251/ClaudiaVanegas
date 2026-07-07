@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and, gte, lte, type SQL } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
-import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -79,45 +79,67 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  // Validate all products exist and have enough stock before writing anything
+  for (const item of items) {
+    if (item.qty <= 0 || item.unitPrice < 0) {
+      res.status(400).json({ error: `Cantidad o precio inválido para el producto ${item.productId}` });
+      return;
+    }
+    const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
+    if (!product) {
+      res.status(400).json({ error: `Producto con ID ${item.productId} no existe` });
+      return;
+    }
+    if (product.stock < item.qty) {
+      res.status(400).json({ error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` });
+      return;
+    }
+  }
+
   const total = items.reduce((sum, i) => sum + i.qty * i.unitPrice, 0);
 
-  const [sale] = await db.insert(salesTable).values({
-    userId: req.user!.userId,
-    customerId: customerId ?? null,
-    paymentType,
-    total: String(total),
-    notes,
-  }).returning();
-
-  await db.insert(saleItemsTable).values(
-    items.map(i => ({
-      saleId: sale.id,
-      productId: i.productId,
-      qty: i.qty,
-      unitPrice: String(i.unitPrice),
-      subtotal: String(i.qty * i.unitPrice),
-    }))
-  );
-
-  // Reduce stock for each product
-  for (const item of items) {
-    await db.update(productsTable)
-      .set({ stock: sql`${productsTable.stock} - ${item.qty}` })
-      .where(eq(productsTable.id, item.productId));
-  }
-
-  // For credit sales, create an accounts receivable entry
-  if (paymentType === "credito") {
-    await db.insert(accountsReceivableTable).values({
-      saleId: sale.id,
+  // Wrap all writes in a transaction for atomicity
+  const saleId = await db.transaction(async (tx) => {
+    const [sale] = await tx.insert(salesTable).values({
+      userId: req.user!.userId,
       customerId: customerId ?? null,
-      totalAmount: String(total),
-      paidAmount: "0",
-      status: "pending",
-    });
-  }
+      paymentType,
+      total: String(total),
+      notes,
+    }).returning();
 
-  const result = await buildSaleResponse(sale.id);
+    await tx.insert(saleItemsTable).values(
+      items.map(i => ({
+        saleId: sale.id,
+        productId: i.productId,
+        qty: i.qty,
+        unitPrice: String(i.unitPrice),
+        subtotal: String(i.qty * i.unitPrice),
+      }))
+    );
+
+    // Reduce stock for each product
+    for (const item of items) {
+      await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} - ${item.qty}` })
+        .where(eq(productsTable.id, item.productId));
+    }
+
+    // For credit sales, create an accounts receivable entry
+    if (paymentType === "credito") {
+      await tx.insert(accountsReceivableTable).values({
+        saleId: sale.id,
+        customerId: customerId ?? null,
+        totalAmount: String(total),
+        paidAmount: "0",
+        status: "pending",
+      });
+    }
+
+    return sale.id;
+  });
+
+  const result = await buildSaleResponse(saleId);
   res.status(201).json(result);
 });
 

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, lt, type SQL } from "drizzle-orm";
 import { db, accountsReceivableTable, arPaymentsTable, salesTable, customersTable } from "@workspace/db";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -21,7 +21,7 @@ async function buildARResponse(arId: number) {
   };
 }
 
-router.get("/accounts-receivable", requireAuth, async (req, res): Promise<void> => {
+router.get("/accounts-receivable", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const { status, overdue } = req.query;
   const conditions: SQL[] = [];
   if (status && typeof status === "string") {
@@ -39,14 +39,14 @@ router.get("/accounts-receivable", requireAuth, async (req, res): Promise<void> 
   res.json(results.filter(Boolean));
 });
 
-router.get("/accounts-receivable/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/accounts-receivable/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const result = await buildARResponse(id);
   if (!result) { res.status(404).json({ error: "Cuenta por cobrar no encontrada" }); return; }
   res.json(result);
 });
 
-router.post("/accounts-receivable/:id/payments", requireAuth, async (req, res): Promise<void> => {
+router.post("/accounts-receivable/:id/payments", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { amount, notes } = req.body;
   if (!amount || amount <= 0) { res.status(400).json({ error: "Monto inválido" }); return; }

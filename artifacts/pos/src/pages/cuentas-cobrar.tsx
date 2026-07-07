@@ -119,7 +119,7 @@ export default function CuentasCobrar() {
                     <TableCell className="text-right font-serif">{formatCurrency(ar.totalAmount)}</TableCell>
                     <TableCell className="text-right text-emerald-600">{formatCurrency(ar.paidAmount)}</TableCell>
                     <TableCell className="text-right font-bold text-destructive">{formatCurrency(balance)}</TableCell>
-                    <TableCell>{getStatusBadge(ar.status, ar.dueDate)}</TableCell>
+                    <TableCell>{getStatusBadge(ar.status, ar.dueDate ?? null)}</TableCell>
                     <TableCell className="text-right">
                       {balance > 0 && (
                         <Button variant="outline" size="sm" className="h-8 border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => { setSelectedAr(ar); setIsPaymentOpen(true); }}>

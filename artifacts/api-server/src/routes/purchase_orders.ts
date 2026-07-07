@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and, type SQL } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db, purchaseOrdersTable, purchaseOrderItemsTable, productsTable, suppliersTable, accountsPayableTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
-import { sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -53,34 +53,59 @@ router.post("/purchase-orders", requireAuth, requireAdmin, async (req, res): Pro
     res.status(400).json({ error: "Campos requeridos faltantes" });
     return;
   }
+
+  // Validate supplier exists
+  const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, supplierId));
+  if (!supplier) {
+    res.status(400).json({ error: "Proveedor no encontrado" });
+    return;
+  }
+
+  // Validate all products exist
+  for (const item of items) {
+    const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
+    if (!product) {
+      res.status(400).json({ error: `Producto con ID ${item.productId} no existe` });
+      return;
+    }
+    if (item.qtyOrdered <= 0 || item.unitCost < 0) {
+      res.status(400).json({ error: `Cantidad o costo inválido para el producto ${item.productId}` });
+      return;
+    }
+  }
+
   const total = items.reduce((sum: number, i: { qtyOrdered: number; unitCost: number }) =>
     sum + i.qtyOrdered * i.unitCost, 0);
 
-  const [po] = await db.insert(purchaseOrdersTable).values({
-    supplierId, guideNumber, paymentType, notes, total: String(total),
-  }).returning();
+  const poId = await db.transaction(async (tx) => {
+    const [po] = await tx.insert(purchaseOrdersTable).values({
+      supplierId, guideNumber, paymentType, notes, total: String(total),
+    }).returning();
 
-  await db.insert(purchaseOrderItemsTable).values(
-    items.map((i: { productId: number; qtyOrdered: number; unitCost: number }) => ({
-      purchaseOrderId: po.id,
-      productId: i.productId,
-      qtyOrdered: i.qtyOrdered,
-      qtyReceived: 0,
-      unitCost: String(i.unitCost),
-    }))
-  );
+    await tx.insert(purchaseOrderItemsTable).values(
+      items.map((i: { productId: number; qtyOrdered: number; unitCost: number }) => ({
+        purchaseOrderId: po.id,
+        productId: i.productId,
+        qtyOrdered: i.qtyOrdered,
+        qtyReceived: 0,
+        unitCost: String(i.unitCost),
+      }))
+    );
 
-  // For credit orders, create an accounts payable entry
-  if (paymentType === "credito") {
-    await db.insert(accountsPayableTable).values({
-      purchaseOrderId: po.id,
-      totalAmount: String(total),
-      paidAmount: "0",
-      status: "pending",
-    });
-  }
+    // For credit orders, create an accounts payable entry
+    if (paymentType === "credito") {
+      await tx.insert(accountsPayableTable).values({
+        purchaseOrderId: po.id,
+        totalAmount: String(total),
+        paidAmount: "0",
+        status: "pending",
+      });
+    }
 
-  const result = await buildPOResponse(po.id);
+    return po.id;
+  });
+
+  const result = await buildPOResponse(poId);
   res.status(201).json(result);
 });
 
@@ -110,25 +135,28 @@ router.post("/purchase-orders/:id/receive", requireAuth, requireAdmin, async (re
   const { items } = req.body as { items: { purchaseOrderItemId: number; qtyReceived: number }[] };
   if (!items?.length) { res.status(400).json({ error: "Items requeridos" }); return; }
 
-  for (const item of items) {
-    const [poItem] = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.id, item.purchaseOrderItemId));
-    if (!poItem) continue;
-    const newReceived = Math.min(poItem.qtyReceived + item.qtyReceived, poItem.qtyOrdered);
-    await db.update(purchaseOrderItemsTable)
-      .set({ qtyReceived: newReceived })
-      .where(eq(purchaseOrderItemsTable.id, item.purchaseOrderItemId));
-    // Update product stock
-    await db.update(productsTable)
-      .set({ stock: sql`${productsTable.stock} + ${item.qtyReceived}` })
-      .where(eq(productsTable.id, poItem.productId));
-  }
+  await db.transaction(async (tx) => {
+    for (const item of items) {
+      const [poItem] = await tx.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.id, item.purchaseOrderItemId));
+      if (!poItem) continue;
+      if (item.qtyReceived <= 0) continue;
+      const newReceived = Math.min(poItem.qtyReceived + item.qtyReceived, poItem.qtyOrdered);
+      await tx.update(purchaseOrderItemsTable)
+        .set({ qtyReceived: newReceived })
+        .where(eq(purchaseOrderItemsTable.id, item.purchaseOrderItemId));
+      // Update product stock
+      await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} + ${item.qtyReceived}` })
+        .where(eq(productsTable.id, poItem.productId));
+    }
 
-  // Determine new PO status
-  const allItems = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
-  const allReceived = allItems.every(i => i.qtyReceived >= i.qtyOrdered);
-  const anyReceived = allItems.some(i => i.qtyReceived > 0);
-  const newStatus = allReceived ? "received" : anyReceived ? "partial" : "pending";
-  await db.update(purchaseOrdersTable).set({ status: newStatus }).where(eq(purchaseOrdersTable.id, id));
+    // Determine new PO status
+    const allItems = await tx.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
+    const allReceived = allItems.every(i => i.qtyReceived >= i.qtyOrdered);
+    const anyReceived = allItems.some(i => i.qtyReceived > 0);
+    const newStatus = allReceived ? "received" : anyReceived ? "partial" : "pending";
+    await tx.update(purchaseOrdersTable).set({ status: newStatus }).where(eq(purchaseOrdersTable.id, id));
+  });
 
   const result = await buildPOResponse(id);
   res.json(result);
