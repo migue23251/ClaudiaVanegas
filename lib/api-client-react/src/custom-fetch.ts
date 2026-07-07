@@ -356,6 +356,16 @@ export async function customFetch<T = unknown>(
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
     }
+  } else if (!headers.has("authorization")) {
+    // POS App: Always try to get token from localStorage if not configured via getter
+    try {
+      const posToken = localStorage.getItem("pos_token");
+      if (posToken) {
+        headers.set("authorization", `Bearer ${posToken}`);
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   const requestInfo = { method, url: resolveUrl(input) };

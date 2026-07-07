@@ -1,0 +1,77 @@
+Crea una aplicación web completa de **Punto de Venta (POS)** para una tienda de ropa, zapatos y accesorios usando **React + Vite** en el frontend y **Node.js + Express + PostgreSQL** en el backend.
+
+La aplicación debe ser **100% responsive** (mobile-first) y tener un diseño moderno, limpio y profesional (usa Tailwind CSS).
+
+### Requisitos técnicos:
+- Frontend: React 18 + Vite + React Router v6 + Tailwind CSS + React Icons + Axios + Recharts
+- Backend: Node.js + Express + PostgreSQL + JWT + Nodemailer + Multer (para subir imágenes)
+- Autenticación con JWT y **roles de usuario**: Administrador y Cajero
+
+### Permisos por rol:
+- **Administrador**: Acceso total a toda la aplicación (inventario, informes, configuración, usuarios, etc.)
+- **Cajero**: Solo acceso a Dashboard, Punto de Venta, Clientes y ver su propio historial de ventas. No puede crear/editar productos ni ver informes completos.
+
+### Módulos requeridos:
+
+**1. Autenticación**
+- Login con email y contraseña
+- Sistema de roles (Administrador / Cajero)
+
+**2. Dashboard**
+- Tarjetas con información del mes en curso:
+  - Ventas totales (facturación)
+  - Recaudo del mes (dinero realmente ingresado)
+  - **Nueva tarjeta**: Gráfica comparativa Facturación $ vs Recaudo $ (ventas de contado + cobros de crédito del mes)
+  - Productos más vendidos
+  - Clientes nuevos
+
+**3. Control de Inventario**
+- CRUD completo de productos
+- Al crear o editar un producto se debe poder **subir múltiples imágenes** (principal + adicionales)
+- Campos: código, nombre, descripción, precio de costo, stock, categoría (ropa, zapatos, accesorios), imágenes
+
+- **Órdenes de Compra a Proveedores**:
+  - Crear órdenes con guía de envío y tipo de pago (Contado / Crédito)
+  - **Recepción parcial** de mercancía (recibir cantidades por producto y actualizar stock)
+
+**4. Cuentas por Pagar**
+- Gestión de órdenes de compra pendientes de pago
+- Registro de pagos totales o parciales
+
+**5. Gestión de Clientes**
+- CRUD de clientes
+- Campos: cédula, nombres, apellidos, correo electrónico
+
+**6. Cuentas por Cobrar**
+- Registro automático de ventas a crédito
+- Registro de pagos parciales o totales
+
+**7. Punto de Venta (POS)**
+- Interfaz rápida y moderna tipo caja
+- Buscador de productos con imágenes
+- Al agregar producto se puede modificar el precio de venta
+- Tipo de pago: Contado o Crédito
+- Al facturar: descontar stock, generar factura digital, enviar por correo y registrar en cuentas por cobrar si aplica
+
+**8. Configuración**
+- Configuración SMTP para envío de facturas
+- Gestión de usuarios (solo Administrador)
+
+**9. Módulo de Informes**
+- Gráficas detalladas (ventas por mes, productos más vendidos, por categoría, contado vs crédito, etc.)
+
+### Requerimientos generales:
+- Las imágenes de productos se guardan en carpeta `/uploads` y se sirven estáticamente
+- Buen manejo de permisos según rol
+- Alertas visuales para vencimientos de cuentas
+- Código limpio, modular y bien comentado
+
+### Estructura del proyecto:
+- `/client` → Frontend React
+- `/server` → Backend (Express + PostgreSQL)
+- Carpeta `/uploads` para imágenes
+- Usa Concurrently para desarrollo
+
+Primero genera la estructura completa del proyecto con los modelos de base de datos (incluyendo tabla de usuarios con rol, productos con array de imágenes, etc.). Luego implementa módulo por módulo empezando por autenticación y roles.
+
+¿Comenzamos la implementación?
