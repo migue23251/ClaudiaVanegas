@@ -1,1 +1,2 @@
 - [POS backend patterns](pos-backend-patterns.md) — critical patterns for Express 5 routes, transactions, and auth in this project.
+- [POS environment setup](pos-environment-setup.md) — JWT_SECRET/seed-user handling when (re)provisioning this project after import.

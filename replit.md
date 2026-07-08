@@ -9,7 +9,7 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — Postgres connection string, `JWT_SECRET` — signing key for auth tokens (both pre-provisioned in this environment)
 
 ## Default Credentials
 

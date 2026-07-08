@@ -1,0 +1,21 @@
+Agrega a la pagina principal del dashboard una tarjeta con la utilidad neta del mes en curso, agrega a la grafica de Facturación vs. Recaudo la utilidad neta por mes, agrega una tarjeta con la suma total de los créditos que están pendientes por recaudar. La utilidad neta es la diferencia del recaudo - todos los pagos realizados en el mes.
+
+El login en dispositivos con pantallas verticales como celulares, que el diseño sea similar al que se ve en pc, la parte donde está el logo, que sea el fondo del color principal de la marca, así como se ve en computador con unos círculos que se hacen con una paleta de colores que nace del color principal.
+
+El modulo de punto de venta no esta en diseño responsive, se visualiza mal desde celular porque la orden actual (carrito) ocupa toda la pantalla y no deja ver los productos, corrige eso.
+
+En el modulo de punto de venta si al buscar un usuario no existe, debe haber un botón para crearlo y completar la información requerida desde ahí para no tener que cambiar de modulo.
+
+Desde el módulo historial de ventas debe haber una opción para anular venta con un campo de observación cuando se haga y se debe de tener esto presente para no sumar la venta a las gráficos de la pagina principal de la dashboard, a devolver la cantidad de ítems a los productos de esa factura y a restarle la deuda al cliente en dado caso que sea a crédito porque fue anulada.
+
+Las ordenes de compra pueden tener varios ítems, elimina el campo de guía al crear o modificar la orden.
+
+En el modulo de inventario, cada producto debe tener un botón que abra un modal para ver el historial de ingresos (proveedor y costo) y salidas (cliente, costo y precio de venta).
+
+El modulo historial de ventas: Agrega un barra de búsqueda por cliente. También al abrir el detalle de una venta, cambia la leyenda Total PAGADO por solo TOTAL, agrega a ese detalle si fue a crédito o contado.
+
+Cambia en este orden los botones de la barra de navegación vertical del dashboard: Panel, Punto de Venta, Historial de Ventas, Clientes, Inventario, Proveedores, Ordenes de Compra, Cuentas por Cobrar, Cuentas por Pagar, Configuración, Usuarios.
+
+En el modulo de Cuentas por Pagar: agrega un botón para crear cuentas como son los gastos fijos (servicios, arriendo, etc) y un campo para poner la fecha de pago.
+
+Crea un usuario con rol de administrador con contraseña 123
