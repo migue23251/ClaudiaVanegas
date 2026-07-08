@@ -3,6 +3,10 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Router as WouterRouter } from 'wouter';
 import { AppRouter } from './AppRouter';
+import { initBrandColor } from '@/lib/brand-color';
+
+// Apply saved brand color immediately before first render
+initBrandColor();
 
 const queryClient = new QueryClient({
   defaultOptions: {

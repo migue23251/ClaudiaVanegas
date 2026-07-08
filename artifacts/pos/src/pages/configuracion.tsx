@@ -1,24 +1,92 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGetSettings, getGetSettingsQueryKey, useUpdateSettings, SettingsInput } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import { Store, Mail } from "lucide-react";
+import { Store, Mail, ImagePlus, Trash2, Palette, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { applyBrandColor, hexToHsl, hslStringToHex } from "@/lib/brand-color";
+
+// Preset palette for quick selection
+const PRESETS = [
+  { label: "Rosa Claudia",  hex: "#c06070" },
+  { label: "Coral",         hex: "#e05c4a" },
+  { label: "Morado",        hex: "#7c5cbf" },
+  { label: "Teal",          hex: "#0d9488" },
+  { label: "Azul",          hex: "#2563eb" },
+  { label: "Verde",         hex: "#16a34a" },
+  { label: "Índigo",        hex: "#4f46e5" },
+  { label: "Ámbar",         hex: "#d97706" },
+];
+
+const DEFAULT_HEX = "#c06070";
 
 export default function Configuracion() {
   const { data: settings, isLoading } = useGetSettings({ query: { queryKey: getGetSettingsQueryKey() } });
   const updateSettings = useUpdateSettings();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Logo state ──────────────────────────────────────────────────
+  const [logo, setLogo] = useState<string | null>(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null
+  );
+
+  // ── Brand color state ────────────────────────────────────────────
+  const [colorHex, setColorHex] = useState<string>(() => {
+    const stored = localStorage.getItem("pos_brand_color");
+    if (stored) return stored;
+    // Derive from current CSS var if not stored
+    try {
+      const hsl = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
+      if (hsl) return hslStringToHex(hsl);
+    } catch {}
+    return DEFAULT_HEX;
+  });
+  const [hexInput, setHexInput] = useState(colorHex);
+
+  // Sync text input when colorHex changes (e.g. preset click)
+  useEffect(() => { setHexInput(colorHex); }, [colorHex]);
+
+  const applyAndSave = (hex: string) => {
+    const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
+    if (!valid) return;
+    applyBrandColor(hex);
+    localStorage.setItem("pos_brand_color", hex);
+    setColorHex(hex);
+    toast({ title: "Color de marca actualizado" });
+  };
+
+  const handleHexInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.trim();
+    if (!val.startsWith("#")) val = "#" + val;
+    setHexInput(val);
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      applyBrandColor(val);
+      setColorHex(val);
+    }
+  };
+
+  const commitHex = () => {
+    const val = hexInput.startsWith("#") ? hexInput : "#" + hexInput;
+    if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+      applyAndSave(val);
+    } else {
+      toast({ title: "Código inválido", description: "Usa el formato #RRGGBB", variant: "destructive" });
+      setHexInput(colorHex);
+    }
+  };
+
+  const resetColor = () => applyAndSave(DEFAULT_HEX);
+
+  // ── Settings form ────────────────────────────────────────────────
   const { register, handleSubmit, reset } = useForm<SettingsInput>();
 
   useEffect(() => {
     if (settings) {
-      // Convert null to undefined to satisfy form types
       const formValues = Object.fromEntries(
         Object.entries(settings).map(([k, v]) => [k, v === null ? undefined : v])
       ) as SettingsInput;
@@ -26,30 +94,178 @@ export default function Configuracion() {
     }
   }, [settings, reset]);
 
+  // ── Logo handlers ────────────────────────────────────────────────
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "Imagen muy grande", description: "El logo no puede superar 2 MB", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      localStorage.setItem("pos_logo", base64);
+      setLogo(base64);
+      toast({ title: "Logo actualizado" });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleRemoveLogo = () => {
+    localStorage.removeItem("pos_logo");
+    setLogo(null);
+    toast({ title: "Logo eliminado" });
+  };
+
   const onSubmit = (data: SettingsInput) => {
-    // Convert string port to number if provided
-    if (data.smtpPort && typeof data.smtpPort === 'string') {
+    if (data.smtpPort && typeof data.smtpPort === "string") {
       data.smtpPort = Number(data.smtpPort);
     }
-
     updateSettings.mutate({ data }, {
       onSuccess: () => {
         toast({ title: "Configuración guardada exitosamente" });
         queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
-      }
+      },
     });
   };
 
-  if (isLoading) return <div>Cargando...</div>;
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Cargando configuración…</div>
+  );
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-3xl font-serif font-bold">Configuración</h1>
-        <p className="text-muted-foreground mt-1">Ajustes globales del sistema</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Configuración</h1>
+        <p className="text-muted-foreground text-sm mt-0.5">Ajustes globales del sistema</p>
       </div>
 
+      {/* ── Color de Marca ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Palette className="h-5 w-5 text-primary" />
+            <CardTitle>Color de Marca</CardTitle>
+          </div>
+          <CardDescription>
+            Define el color principal del sistema. Se aplica a botones, íconos activos y elementos destacados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Preview + inputs row */}
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Native color picker */}
+            <label className="relative cursor-pointer group" title="Abrir selector de color">
+              <div
+                className="h-12 w-12 rounded-xl border-2 border-white shadow-md ring-1 ring-border transition-transform group-hover:scale-105"
+                style={{ background: colorHex }}
+              />
+              <input
+                type="color"
+                value={colorHex}
+                onChange={(e) => {
+                  const hex = e.target.value;
+                  applyBrandColor(hex);
+                  localStorage.setItem("pos_brand_color", hex);
+                  setColorHex(hex);
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+            </label>
+
+            {/* Hex text input */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Input
+                  value={hexInput}
+                  onChange={handleHexInput}
+                  onBlur={commitHex}
+                  onKeyDown={(e) => e.key === "Enter" && commitHex()}
+                  placeholder="#c06070"
+                  className="w-32 font-mono text-sm h-10 uppercase"
+                  maxLength={7}
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={resetColor} title="Restaurar color por defecto" className="h-10 w-10 text-muted-foreground">
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Live preview pill */}
+            <div className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm" style={{ background: colorHex }}>
+              Vista previa
+            </div>
+          </div>
+
+          {/* Preset swatches */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">Colores rápidos</p>
+            <div className="flex flex-wrap gap-2">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.hex}
+                  type="button"
+                  onClick={() => applyAndSave(p.hex)}
+                  title={p.label}
+                  className={`h-8 w-8 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 shadow-sm ${
+                    colorHex.toLowerCase() === p.hex.toLowerCase()
+                      ? "border-foreground scale-110 shadow-md"
+                      : "border-white/80 hover:border-foreground/40"
+                  }`}
+                  style={{ background: p.hex }}
+                />
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Logo de la Tienda ── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ImagePlus className="h-5 w-5 text-primary" />
+            <CardTitle>Logo de la Tienda</CardTitle>
+          </div>
+          <CardDescription>
+            Se muestra en el login y la barra de navegación. Se guarda localmente en este dispositivo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-6">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/40 overflow-hidden">
+              {logo ? (
+                <img src={logo} alt="Logo actual" className="h-full w-full object-contain p-2" />
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                  <Store className="h-8 w-8" />
+                  <span className="text-xs">Sin logo</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-3">
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
+                <ImagePlus className="h-4 w-4" />
+                {logo ? "Cambiar logo" : "Subir logo"}
+              </Button>
+              {logo && (
+                <Button type="button" variant="ghost" onClick={handleRemoveLogo}
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar logo
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground">PNG, JPG o SVG · máx. 2 MB</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* ── Información de la Tienda ── */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -59,27 +275,28 @@ export default function Configuracion() {
             <CardDescription>Datos que aparecerán en los tickets y recibos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Nombre de la Tienda</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Nombre de la Tienda</label>
                 <Input {...register("storeName")} required />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Correo Electrónico</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Correo Electrónico</label>
                 <Input {...register("storeEmail")} type="email" />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Dirección Física</label>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Dirección Física</label>
               <Input {...register("storeAddress")} />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Teléfono</label>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Teléfono</label>
               <Input {...register("storePhone")} />
             </div>
           </CardContent>
         </Card>
 
+        {/* ── SMTP ── */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -89,28 +306,28 @@ export default function Configuracion() {
             <CardDescription>Configuración para el envío de correos y reportes</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Servidor Host</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Servidor Host</label>
                 <Input {...register("smtpHost")} placeholder="smtp.gmail.com" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Puerto</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Puerto</label>
                 <Input {...register("smtpPort")} type="number" placeholder="587" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Usuario SMTP</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Usuario SMTP</label>
                 <Input {...register("smtpUser")} />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Contraseña SMTP</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Contraseña SMTP</label>
                 <Input {...register("smtpPass")} type="password" />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Remitente (From)</label>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Remitente (From)</label>
               <Input {...register("smtpFrom")} placeholder="noreply@claudiavanegas.com" />
             </div>
           </CardContent>
@@ -118,7 +335,7 @@ export default function Configuracion() {
 
         <div className="flex justify-end">
           <Button type="submit" size="lg" disabled={updateSettings.isPending}>
-            Guardar Cambios
+            {updateSettings.isPending ? "Guardando…" : "Guardar Cambios"}
           </Button>
         </div>
       </form>
