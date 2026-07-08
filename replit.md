@@ -18,7 +18,7 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
+- pnpm workspaces, Node.js 20 (this environment), TypeScript 5.9
 - **Frontend**: React 19 + Vite + Wouter + TanStack Query + Tailwind CSS + Recharts + Zustand
 - **API**: Express 5 + JWT auth (jsonwebtoken + bcryptjs)
 - **DB**: PostgreSQL + Drizzle ORM
