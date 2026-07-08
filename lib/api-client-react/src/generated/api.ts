@@ -28,9 +28,12 @@ import type {
   CustomerInput,
   CustomerUpdate,
   DashboardSummary,
+  ExpensesVsIncomePoint,
+  GetDashboardBillingVsCollectionParams,
   GetReportSalesByMonthParams,
   GetReportTopProductsParams,
   HealthStatus,
+  InventoryCostPoint,
   ListAccountsPayableParams,
   ListAccountsReceivableParams,
   ListCustomersParams,
@@ -2926,20 +2929,27 @@ export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDash
 
 
 
-export const getGetDashboardBillingVsCollectionUrl = () => {
+export const getGetDashboardBillingVsCollectionUrl = (params?: GetDashboardBillingVsCollectionParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/dashboard/billing-vs-collection`
+  return stringifiedParams.length > 0 ? `/api/dashboard/billing-vs-collection?${stringifiedParams}` : `/api/dashboard/billing-vs-collection`
 }
 
 /**
  * @summary Monthly billing vs. collection comparison chart data
  */
-export const getDashboardBillingVsCollection = async ( options?: RequestInit): Promise<BillingVsCollectionPoint[]> => {
+export const getDashboardBillingVsCollection = async (params?: GetDashboardBillingVsCollectionParams, options?: RequestInit): Promise<BillingVsCollectionPoint[]> => {
 
-  return customFetch<BillingVsCollectionPoint[]>(getGetDashboardBillingVsCollectionUrl(),
+  return customFetch<BillingVsCollectionPoint[]>(getGetDashboardBillingVsCollectionUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2952,23 +2962,23 @@ export const getDashboardBillingVsCollection = async ( options?: RequestInit): P
 
 
 
-export const getGetDashboardBillingVsCollectionQueryKey = () => {
+export const getGetDashboardBillingVsCollectionQueryKey = (params?: GetDashboardBillingVsCollectionParams,) => {
     return [
-    `/api/dashboard/billing-vs-collection`
+    `/api/dashboard/billing-vs-collection`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardBillingVsCollectionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardBillingVsCollectionQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError = ErrorType<unknown>>(params?: GetDashboardBillingVsCollectionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardBillingVsCollectionQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardBillingVsCollectionQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardBillingVsCollection>>> = ({ signal }) => getDashboardBillingVsCollection({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardBillingVsCollection>>> = ({ signal }) => getDashboardBillingVsCollection(params, { signal, ...requestOptions });
 
 
 
@@ -2986,11 +2996,319 @@ export type GetDashboardBillingVsCollectionQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardBillingVsCollection<TData = Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetDashboardBillingVsCollectionParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardBillingVsCollection>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardBillingVsCollectionQueryOptions(options)
+  const queryOptions = getGetDashboardBillingVsCollectionQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDashboardSalesByCategoryUrl = () => {
+
+
+
+
+  return `/api/dashboard/sales-by-category`
+}
+
+/**
+ * @summary Sales totals grouped by product category (all time)
+ */
+export const getDashboardSalesByCategory = async ( options?: RequestInit): Promise<SalesByCategoryPoint[]> => {
+
+  return customFetch<SalesByCategoryPoint[]>(getGetDashboardSalesByCategoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardSalesByCategoryQueryKey = () => {
+    return [
+    `/api/dashboard/sales-by-category`
+    ] as const;
+    }
+
+
+export const getGetDashboardSalesByCategoryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSalesByCategory>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSalesByCategory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSalesByCategoryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSalesByCategory>>> = ({ signal }) => getDashboardSalesByCategory({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardSalesByCategory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardSalesByCategoryQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardSalesByCategory>>>
+export type GetDashboardSalesByCategoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Sales totals grouped by product category (all time)
+ */
+
+export function useGetDashboardSalesByCategory<TData = Awaited<ReturnType<typeof getDashboardSalesByCategory>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSalesByCategory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardSalesByCategoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDashboardPaymentTypeBreakdownUrl = () => {
+
+
+
+
+  return `/api/dashboard/payment-type-breakdown`
+}
+
+/**
+ * @summary Sales breakdown by payment type
+ */
+export const getDashboardPaymentTypeBreakdown = async ( options?: RequestInit): Promise<PaymentTypePoint[]> => {
+
+  return customFetch<PaymentTypePoint[]>(getGetDashboardPaymentTypeBreakdownUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardPaymentTypeBreakdownQueryKey = () => {
+    return [
+    `/api/dashboard/payment-type-breakdown`
+    ] as const;
+    }
+
+
+export const getGetDashboardPaymentTypeBreakdownQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardPaymentTypeBreakdownQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>> = ({ signal }) => getDashboardPaymentTypeBreakdown({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardPaymentTypeBreakdownQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>>
+export type GetDashboardPaymentTypeBreakdownQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Sales breakdown by payment type
+ */
+
+export function useGetDashboardPaymentTypeBreakdown<TData = Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardPaymentTypeBreakdown>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardPaymentTypeBreakdownQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDashboardInventoryCostByCategoryUrl = () => {
+
+
+
+
+  return `/api/dashboard/inventory-cost-by-category`
+}
+
+/**
+ * @summary Current inventory cost grouped by category
+ */
+export const getDashboardInventoryCostByCategory = async ( options?: RequestInit): Promise<InventoryCostPoint[]> => {
+
+  return customFetch<InventoryCostPoint[]>(getGetDashboardInventoryCostByCategoryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardInventoryCostByCategoryQueryKey = () => {
+    return [
+    `/api/dashboard/inventory-cost-by-category`
+    ] as const;
+    }
+
+
+export const getGetDashboardInventoryCostByCategoryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardInventoryCostByCategoryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>> = ({ signal }) => getDashboardInventoryCostByCategory({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardInventoryCostByCategoryQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>>
+export type GetDashboardInventoryCostByCategoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current inventory cost grouped by category
+ */
+
+export function useGetDashboardInventoryCostByCategory<TData = Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardInventoryCostByCategory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardInventoryCostByCategoryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDashboardExpensesVsIncomeUrl = () => {
+
+
+
+
+  return `/api/dashboard/expenses-vs-income`
+}
+
+/**
+ * @summary Monthly expenses (purchase orders) vs income (cash + AR payments) — last 6 months
+ */
+export const getDashboardExpensesVsIncome = async ( options?: RequestInit): Promise<ExpensesVsIncomePoint[]> => {
+
+  return customFetch<ExpensesVsIncomePoint[]>(getGetDashboardExpensesVsIncomeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardExpensesVsIncomeQueryKey = () => {
+    return [
+    `/api/dashboard/expenses-vs-income`
+    ] as const;
+    }
+
+
+export const getGetDashboardExpensesVsIncomeQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardExpensesVsIncomeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>> = ({ signal }) => getDashboardExpensesVsIncome({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardExpensesVsIncomeQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>>
+export type GetDashboardExpensesVsIncomeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Monthly expenses (purchase orders) vs income (cash + AR payments) — last 6 months
+ */
+
+export function useGetDashboardExpensesVsIncome<TData = Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardExpensesVsIncome>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardExpensesVsIncomeQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -792,6 +792,19 @@ paths:
       operationId: getDashboardBillingVsCollection
       tags: [dashboard]
       summary: Monthly billing vs. collection comparison chart data
+      parameters:
+        - name: from
+          in: query
+          description: Start date (ISO 8601, e.g. 2025-01-01)
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: End date (ISO 8601, e.g. 2025-12-31)
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Billing vs. collection data
@@ -801,6 +814,66 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BillingVsCollectionPoint"
+
+  /dashboard/sales-by-category:
+    get:
+      operationId: getDashboardSalesByCategory
+      tags: [dashboard]
+      summary: Sales totals grouped by product category (all time)
+      responses:
+        "200":
+          description: Sales by category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SalesByCategoryPoint"
+
+  /dashboard/payment-type-breakdown:
+    get:
+      operationId: getDashboardPaymentTypeBreakdown
+      tags: [dashboard]
+      summary: Sales breakdown by payment type
+      responses:
+        "200":
+          description: Payment type breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentTypePoint"
+
+  /dashboard/inventory-cost-by-category:
+    get:
+      operationId: getDashboardInventoryCostByCategory
+      tags: [dashboard]
+      summary: Current inventory cost grouped by category
+      responses:
+        "200":
+          description: Inventory cost by category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryCostPoint"
+
+  /dashboard/expenses-vs-income:
+    get:
+      operationId: getDashboardExpensesVsIncome
+      tags: [dashboard]
+      summary: Monthly expenses (purchase orders) vs income (cash + AR payments) — last 6 months
+      responses:
+        "200":
+          description: Expenses vs income data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExpensesVsIncomePoint"
 
   /dashboard/top-products:
     get:
@@ -1467,6 +1540,28 @@ components:
         totalQty:
           type: integer
         totalRevenue:
+          type: number
+
+    InventoryCostPoint:
+      type: object
+      required: [category, totalCost, totalUnits]
+      properties:
+        category:
+          type: string
+        totalCost:
+          type: number
+        totalUnits:
+          type: integer
+
+    ExpensesVsIncomePoint:
+      type: object
+      required: [month, expenses, income]
+      properties:
+        month:
+          type: string
+        expenses:
+          type: number
+        income:
           type: number
 
     # ─── REPORTS ─────────────────────────────────────────────────────────────

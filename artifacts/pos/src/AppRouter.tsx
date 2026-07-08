@@ -11,7 +11,6 @@ import OrdenesCompra from "@/pages/ordenes-compra";
 import CuentasPagar from "@/pages/cuentas-pagar";
 import Ventas from "@/pages/ventas";
 import CuentasCobrar from "@/pages/cuentas-cobrar";
-import Informes from "@/pages/informes";
 import Configuracion from "@/pages/configuracion";
 import Usuarios from "@/pages/usuarios";
 import NotFound from "@/pages/not-found";
@@ -64,7 +63,6 @@ export function AppRouter() {
       <Route path="/ordenes-compra"><ProtectedRoute component={OrdenesCompra} adminOnly /></Route>
       <Route path="/cuentas-pagar"><ProtectedRoute component={CuentasPagar} adminOnly /></Route>
       <Route path="/cuentas-cobrar"><ProtectedRoute component={CuentasCobrar} adminOnly /></Route>
-      <Route path="/informes"><ProtectedRoute component={Informes} adminOnly /></Route>
       <Route path="/configuracion"><ProtectedRoute component={Configuracion} adminOnly /></Route>
       <Route path="/usuarios"><ProtectedRoute component={Usuarios} adminOnly /></Route>
 

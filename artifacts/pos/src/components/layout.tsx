@@ -9,7 +9,6 @@ import {
   FileText,
   DollarSign,
   Briefcase,
-  BarChart3,
   Settings,
   UserCog,
   LogOut,
@@ -19,18 +18,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Panel", href: "/dashboard", roles: ["admin", "cajero"] },
-  { icon: ShoppingCart,   label: "Punto de Venta", href: "/pos",    roles: ["admin", "cajero"] },
-  { icon: Users,          label: "Clientes",        href: "/clientes", roles: ["admin", "cajero"] },
-  { icon: FileText,       label: "Historial Ventas", href: "/ventas", roles: ["admin", "cajero"] },
-  { icon: Briefcase,      label: "Cuentas por Cobrar", href: "/cuentas-cobrar", roles: ["admin"] },
-  { icon: Package,        label: "Inventario",      href: "/inventario", roles: ["admin"] },
-  { icon: Truck,          label: "Proveedores",     href: "/proveedores", roles: ["admin"] },
-  { icon: FileText,       label: "Órdenes de Compra", href: "/ordenes-compra", roles: ["admin"] },
-  { icon: DollarSign,     label: "Cuentas por Pagar", href: "/cuentas-pagar", roles: ["admin"] },
-  { icon: BarChart3,      label: "Informes",        href: "/informes", roles: ["admin"] },
-  { icon: Settings,       label: "Configuración",   href: "/configuracion", roles: ["admin"] },
-  { icon: UserCog,        label: "Usuarios",        href: "/usuarios", roles: ["admin"] },
+  { icon: LayoutDashboard, label: "Panel",            href: "/dashboard",       roles: ["admin", "cajero"] },
+  { icon: ShoppingCart,   label: "Punto de Venta",   href: "/pos",              roles: ["admin", "cajero"] },
+  { icon: Users,          label: "Clientes",          href: "/clientes",         roles: ["admin", "cajero"] },
+  { icon: FileText,       label: "Historial Ventas",  href: "/ventas",           roles: ["admin", "cajero"] },
+  { icon: Briefcase,      label: "Cuentas por Cobrar",href: "/cuentas-cobrar",   roles: ["admin"] },
+  { icon: Package,        label: "Inventario",        href: "/inventario",       roles: ["admin"] },
+  { icon: Truck,          label: "Proveedores",       href: "/proveedores",      roles: ["admin"] },
+  { icon: FileText,       label: "Órdenes de Compra", href: "/ordenes-compra",   roles: ["admin"] },
+  { icon: DollarSign,     label: "Cuentas por Pagar", href: "/cuentas-pagar",    roles: ["admin"] },
+  { icon: Settings,       label: "Configuración",     href: "/configuracion",    roles: ["admin"] },
+  { icon: UserCog,        label: "Usuarios",          href: "/usuarios",         roles: ["admin"] },
 ];
 
 interface SidebarProps {
@@ -63,7 +61,6 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
             Claudia Vanegas
           </span>
         </div>
-        {/* Close button — only on mobile */}
         {onClose && (
           <button
             onClick={onClose}
@@ -94,7 +91,9 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
               <item.icon
                 className={cn(
                   "h-4 w-4 shrink-0 transition-transform duration-150",
-                  isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground group-hover:scale-110"
+                  isActive
+                    ? "text-primary-foreground"
+                    : "text-muted-foreground group-hover:text-foreground group-hover:scale-110"
                 )}
               />
               <span className="truncate">{item.label}</span>

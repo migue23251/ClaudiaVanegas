@@ -857,12 +857,61 @@ export const GetDashboardSummaryResponse = zod.object({
 /**
  * @summary Monthly billing vs. collection comparison chart data
  */
+export const GetDashboardBillingVsCollectionQueryParams = zod.object({
+  "from": zod.date().optional().describe('Start date (ISO 8601, e.g. 2025-01-01)'),
+  "to": zod.date().optional().describe('End date (ISO 8601, e.g. 2025-12-31)')
+})
+
 export const GetDashboardBillingVsCollectionResponseItem = zod.object({
   "month": zod.string(),
   "billing": zod.number(),
   "collection": zod.number()
 })
 export const GetDashboardBillingVsCollectionResponse = zod.array(GetDashboardBillingVsCollectionResponseItem)
+
+
+/**
+ * @summary Sales totals grouped by product category (all time)
+ */
+export const GetDashboardSalesByCategoryResponseItem = zod.object({
+  "category": zod.string(),
+  "total": zod.number(),
+  "count": zod.number()
+})
+export const GetDashboardSalesByCategoryResponse = zod.array(GetDashboardSalesByCategoryResponseItem)
+
+
+/**
+ * @summary Sales breakdown by payment type
+ */
+export const GetDashboardPaymentTypeBreakdownResponseItem = zod.object({
+  "paymentType": zod.string(),
+  "total": zod.number(),
+  "count": zod.number()
+})
+export const GetDashboardPaymentTypeBreakdownResponse = zod.array(GetDashboardPaymentTypeBreakdownResponseItem)
+
+
+/**
+ * @summary Current inventory cost grouped by category
+ */
+export const GetDashboardInventoryCostByCategoryResponseItem = zod.object({
+  "category": zod.string(),
+  "totalCost": zod.number(),
+  "totalUnits": zod.number()
+})
+export const GetDashboardInventoryCostByCategoryResponse = zod.array(GetDashboardInventoryCostByCategoryResponseItem)
+
+
+/**
+ * @summary Monthly expenses (purchase orders) vs income (cash + AR payments) — last 6 months
+ */
+export const GetDashboardExpensesVsIncomeResponseItem = zod.object({
+  "month": zod.string(),
+  "expenses": zod.number(),
+  "income": zod.number()
+})
+export const GetDashboardExpensesVsIncomeResponse = zod.array(GetDashboardExpensesVsIncomeResponseItem)
 
 
 /**

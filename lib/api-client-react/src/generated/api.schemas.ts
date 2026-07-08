@@ -411,6 +411,18 @@ export interface TopProduct {
   totalRevenue: number;
 }
 
+export interface InventoryCostPoint {
+  category: string;
+  totalCost: number;
+  totalUnits: number;
+}
+
+export interface ExpensesVsIncomePoint {
+  month: string;
+  expenses: number;
+  income: number;
+}
+
 export interface SalesByMonthPoint {
   month: string;
   total: number;
@@ -536,6 +548,17 @@ export const ListAccountsReceivableStatus = {
   partial: 'partial',
   paid: 'paid',
 } as const;
+
+export type GetDashboardBillingVsCollectionParams = {
+/**
+ * Start date (ISO 8601, e.g. 2025-01-01)
+ */
+from?: string;
+/**
+ * End date (ISO 8601, e.g. 2025-12-31)
+ */
+to?: string;
+};
 
 export type GetReportSalesByMonthParams = {
 year?: number;
