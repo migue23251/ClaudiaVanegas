@@ -1,0 +1,31 @@
+En el punto de venta, cuando se seleccione el cliente, abajo de la cedula que también aparezca el correo electrónico y se pueda modificar la información del cliente también desde ahí, así se puede eliminar la pagina de Clientes.
+
+En el historial de ventas que en cliente también aparezca la cedula del cliente y que desde la barra buscadora también se pueda buscar por cedula o nombre.
+Que en las ventas el Ticket ID solo tengan números consecutivos, elimina las letras y el guion.
+
+En Ordenes de compra, agrega una barra para buscar por proveedor.
+
+En inventario, cuando se cree un nuevo producto que el código se cree automáticamente de manera consecutiva, debe de empezar en 1 el primer item creado y así 1+.
+
+En el login y en la dashboard hay que corregir las scrollbar en computador, porque cuando se baja hay una barra para bajar hasta abajo después de la barra de navegación y una barra para bajar el div donde esta toda la información de la pagina seleccionada del sidebar.
+
+En Proveedores, al lado de cada proveedor agrega un botón para ver el historial de ordenes de compra que se le han realizado.
+
+Al crear ordenes de compra debe tener más espacios para varios ítems y no solo uno.
+
+Para las ventas con tipo de pago a crédito es una venta donde se da un anticipo y se cobra lo restante en 15 días de recibir el anticipo, el anticipo se puede dar durante la venta al momento de facturarse o después de facturarse y se entrega el pedido. se debe de tener en cuenta en el apartado de cuentas por cobrar para tener claras las fechas.
+
+Vamos a modificar las categorías de los productos, elimínalas todas y vamos a crear las siguientes: Blusas, Jeans, Vestidos, Conjuntos, Faldas, Chaquetas, Zapatos, Bolsos, Accesorios.
+
+La factura que se envía al correo del cliente debe tener el logo y el nombre de la marca.
+
+A la grafica Ventas por Categoría que muestre el mes actual pero agregale un filtro para seleccionar el rango de tiempo personalizado que se quiere revisar.
+A la grafica Tipos de Pago que muestre el mes actual pero agregale un filtro para seleccionar el rango de tiempo personalizado que se quiere revisar.
+A la grafica Productos más vendidos que muestre el mes actual pero agregale un filtro para seleccionar el rango de tiempo personalizado que se quiere revisar.
+A la grafica Gastos vs. Ingresos agrega un filtro igual que la grafica Facturación vs. Recaudo para seleccionar rangos de tiempo.
+
+En la pagina principal de la dashboard, hay que agregar una grafica de productos que llevan más días en stock desde su ingreso, al lado la cantidad de días desde la última venta y cada cuanto rotan en promedio.
+
+Cuando se cambie el color de la marca y el logo, se debe modificar para que sea visible para todos los usuarios que entren a la web.
+
+Hay que paginar el Historial de ventas cada 15 ventas, pagina la lista de la pagina Inventario cada 15 productos, pagina la lista de la pagina Proveedores cada 15 proveedores, pagina la lista de ordenes de compra cada 15 ordenes de compra, pagina la lista de cuentas por cobrar y cuentas por pagar cada 15 cuentas.
