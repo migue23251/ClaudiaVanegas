@@ -2,6 +2,16 @@
 
 Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y accesorios "Claudia Vanegas" (Bogotá, Colombia).
 
+## First-time bootstrap (after cloning / importing)
+
+1. `pnpm install` — install all workspace dependencies
+2. Set secrets in Replit Secrets (never in files):
+   - `JWT_SECRET` — generate with `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` and paste the output
+   - `DATABASE_URL` is auto-provisioned by Replit; do not set it manually
+3. `pnpm --filter @workspace/db run push` — apply schema to the database
+4. `pnpm --filter @workspace/db run seed` — insert default admin + cajero accounts (idempotent; safe to run again)
+5. Start workflows via the Replit UI (or `pnpm --filter @workspace/api-server run dev` + `pnpm --filter @workspace/pos run dev`)
+
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — API server (port via workflow, proxied at `/api`)
@@ -9,7 +19,8 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string, `JWT_SECRET` — signing key for auth tokens (both pre-provisioned in this environment)
+- `pnpm --filter @workspace/db run seed` — re-seed default users (idempotent)
+- Required env: `DATABASE_URL` (auto-provisioned by Replit), `JWT_SECRET` (set manually in Replit Secrets)
 
 ## Default Credentials
 
