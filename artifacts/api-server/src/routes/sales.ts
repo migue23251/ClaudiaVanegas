@@ -155,7 +155,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
       const initialPaid = advance;
       const status = initialPaid >= total ? "paid" : initialPaid > 0 ? "partial" : "pending";
 
-      await tx.insert(accountsReceivableTable).values({
+      const [ar] = await tx.insert(accountsReceivableTable).values({
         saleId: sale.id,
         customerId: customerId ?? null,
         totalAmount: String(total),
@@ -163,7 +163,18 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
         advanceAmount: String(advance),
         dueDate: dueDateStr,
         status,
-      });
+      }).returning();
+
+      // Record the advance as an actual ar_payments row so it's counted in
+      // collection/recaudo reporting (dashboard sums ar_payments, not the
+      // accounts_receivable.paidAmount field directly).
+      if (advance > 0) {
+        await tx.insert(arPaymentsTable).values({
+          accountReceivableId: ar.id,
+          amount: String(advance),
+          notes: "Anticipo inicial de la venta",
+        });
+      }
     }
 
     return sale.id;
