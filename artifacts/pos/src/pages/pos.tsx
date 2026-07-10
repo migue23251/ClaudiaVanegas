@@ -169,8 +169,8 @@ export default function Pos() {
         cedula: formData.get("cedula") as string,
         firstName: formData.get("firstName") as string,
         lastName: formData.get("lastName") as string,
-        email: formData.get("email") as string || undefined,
-        phone: formData.get("phone") as string || undefined,
+        email: formData.get("email") as string,
+        phone: formData.get("phone") as string,
       } as CustomerInput
     }, {
       onSuccess: (created) => {
@@ -218,7 +218,8 @@ export default function Pos() {
             </div>
             <CardContent className="p-2.5">
               <div className="text-[10px] text-muted-foreground mb-0.5 font-mono leading-none">{product.code}</div>
-              <h3 className="font-semibold text-xs line-clamp-2 leading-tight mb-1.5 min-h-[2rem]">{product.name}</h3>
+              <h3 className="font-semibold text-xs line-clamp-2 leading-tight mb-0.5 min-h-[2rem]">{product.name}</h3>
+              {product.description && <p className="text-[10px] text-muted-foreground line-clamp-1 mb-1 leading-tight">{product.description}</p>}
               <div className="flex justify-between items-end gap-1">
                 <span className="font-serif font-bold text-primary text-sm leading-none">{formatCurrency(product.salePrice)}</span>
                 <span className={`text-[10px] shrink-0 ${product.stock > 0 ? "text-muted-foreground" : "text-destructive font-semibold"}`}>
@@ -330,6 +331,7 @@ export default function Pos() {
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-sm leading-tight truncate">{item.name}</p>
+                  {item.description && <p className="text-xs text-muted-foreground line-clamp-1 leading-tight">{item.description}</p>}
                   <p className="text-xs text-muted-foreground font-mono">{item.code}</p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFromCart(item.id)}>
