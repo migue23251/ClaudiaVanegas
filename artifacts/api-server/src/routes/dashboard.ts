@@ -338,14 +338,15 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
   const rangeStart = months[0].start;
   const rangeEnd = months[months.length - 1].end;
 
-  // 3 aggregate queries instead of 3-per-month loop
-  const [poRows, cashRows, arRows] = await Promise.all([
+  // Expenses = actual cash paid out (PO payments + fixed expense payments),
+  // not the full PO total at creation time. Income = cash sales + AR payments.
+  const [apRows, cashRows, arRows] = await Promise.all([
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${purchaseOrdersTable.createdAt})`,
-      total: sql<string>`COALESCE(SUM(${purchaseOrdersTable.total}), 0)`,
-    }).from(purchaseOrdersTable)
-      .where(and(gte(purchaseOrdersTable.createdAt, rangeStart), lte(purchaseOrdersTable.createdAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${purchaseOrdersTable.createdAt})`),
+      month: sql<string>`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`,
+      total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
+    }).from(apPaymentsTable)
+      .where(and(gte(apPaymentsTable.paidAt, rangeStart), lte(apPaymentsTable.paidAt, rangeEnd)))
+      .groupBy(sql`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`),
 
     db.select({
       month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
@@ -371,7 +372,7 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
     const date = new Date(d);
     return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
   };
-  const poMap = Object.fromEntries(poRows.map(r => [toKey(r.month), parseFloat(r.total)]));
+  const apMap = Object.fromEntries(apRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const cashMap = Object.fromEntries(cashRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const arMap = Object.fromEntries(arRows.map(r => [toKey(r.month), parseFloat(r.total)]));
 
@@ -379,7 +380,7 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
     const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
     return {
       month: label,
-      expenses: poMap[key] ?? 0,
+      expenses: apMap[key] ?? 0,
       income: (cashMap[key] ?? 0) + (arMap[key] ?? 0),
     };
   });
