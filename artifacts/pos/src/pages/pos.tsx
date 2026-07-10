@@ -252,9 +252,7 @@ export default function Pos() {
               <div className="min-w-0">
                 <p className="font-medium text-sm">{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
                 <p className="text-xs text-muted-foreground font-mono">CC: {selectedCustomer.cedula}</p>
-                {selectedCustomer.phone && (
-                  <p className="text-xs text-muted-foreground font-mono">📱 {selectedCustomer.phone}</p>
-                )}
+                <p className="text-xs text-muted-foreground font-mono">📱 {selectedCustomer.phone ?? "—"}</p>
                 {selectedCustomer.email && (
                   <p className="text-xs text-muted-foreground truncate">{selectedCustomer.email}</p>
                 )}
