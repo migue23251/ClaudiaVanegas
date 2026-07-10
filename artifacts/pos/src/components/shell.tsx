@@ -51,7 +51,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-dvh overflow-hidden bg-background">
       {/* ── Desktop sidebar (always visible ≥1024px) ── */}
       <div className="hidden lg:flex lg:shrink-0 lg:h-full">
         <Sidebar />
@@ -78,7 +78,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {/* ── Main content area ── */}
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         {/* Mobile top bar */}
-        <header className="lg:hidden flex h-[62px] shrink-0 items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 shadow-sm z-10">
+        <header className="lg:hidden flex h-[62px] shrink-0 items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 shadow-sm z-10 sticky top-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent/80 transition-all duration-150"
@@ -108,7 +108,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto overscroll-contain">
           <div className="mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
             {children}
           </div>

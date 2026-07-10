@@ -70,11 +70,12 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
 
   const [billingResult] = await db.select({
     total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
-  }).from(salesTable).where(and(gte(salesTable.createdAt, startOfMonth), lte(salesTable.createdAt, endOfMonth)));
+  }).from(salesTable).where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, startOfMonth), lte(salesTable.createdAt, endOfMonth)));
 
   const [cashResult] = await db.select({
     total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
   }).from(salesTable).where(and(
+    eq(salesTable.voided, false),
     eq(salesTable.paymentType, "contado"),
     gte(salesTable.createdAt, startOfMonth),
     lte(salesTable.createdAt, endOfMonth),
@@ -97,6 +98,7 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
   const [salesCountResult] = await db.select({
     count: sql<number>`COUNT(*)`,
   }).from(salesTable).where(and(
+    eq(salesTable.voided, false),
     gte(salesTable.createdAt, startOfMonth),
     lte(salesTable.createdAt, endOfMonth),
   ));
@@ -164,7 +166,7 @@ router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Pr
       month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
-      .where(and(gte(salesTable.createdAt, rangeStart), lte(salesTable.createdAt, rangeEnd)))
+      .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, rangeStart), lte(salesTable.createdAt, rangeEnd)))
       .groupBy(sql`DATE_TRUNC('month', ${salesTable.createdAt})`),
 
     db.select({
@@ -172,6 +174,7 @@ router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Pr
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(
+        eq(salesTable.voided, false),
         eq(salesTable.paymentType, "contado"),
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
@@ -224,7 +227,7 @@ router.get("/dashboard/top-products", requireAuth, async (req, res): Promise<voi
   }).from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .leftJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
-    .where(and(gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
+    .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
     .groupBy(saleItemsTable.productId, productsTable.name, productsTable.category)
     .orderBy(sql`SUM(${saleItemsTable.qty}) DESC`)
     .limit(10);
@@ -254,7 +257,7 @@ router.get("/dashboard/sales-by-category", requireAuth, async (req, res): Promis
   }).from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .leftJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
-    .where(and(gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
+    .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
     .groupBy(productsTable.category);
 
   res.json(result.map(r => ({
@@ -278,7 +281,7 @@ router.get("/dashboard/payment-type-breakdown", requireAuth, async (req, res): P
     total: sql<number>`SUM(${salesTable.total})`,
     count: sql<number>`COUNT(*)`,
   }).from(salesTable)
-    .where(and(gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
+    .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
     .groupBy(salesTable.paymentType);
 
   res.json(result.map(r => ({
@@ -338,6 +341,7 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(
+        eq(salesTable.voided, false),
         eq(salesTable.paymentType, "contado"),
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
@@ -398,6 +402,7 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(
+        eq(salesTable.voided, false),
         eq(salesTable.paymentType, "contado"),
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
@@ -462,7 +467,7 @@ router.get("/dashboard/slow-moving-products", requireAuth, async (_req, res): Pr
       COUNT(si.id)::int AS sale_count
     FROM ${productsTable} p
     LEFT JOIN ${saleItemsTable} si ON si.product_id = p.id
-    LEFT JOIN ${salesTable} s ON s.id = si.sale_id
+    LEFT JOIN ${salesTable} s ON s.id = si.sale_id AND s.voided = false
     WHERE p.stock > 0
     GROUP BY p.id, p.name, p.code, p.category, p.stock, p.created_at
     ORDER BY days_in_stock DESC

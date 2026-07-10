@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useListAccountsPayable, getListAccountsPayableQueryKey, useCreateApPayment } from "@workspace/api-client-react";
+import { useListAccountsPayable, getListAccountsPayableQueryKey, useCreateApPayment, useCreateFixedExpense } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign } from "lucide-react";
+import { DollarSign, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -33,6 +33,7 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 export default function CuentasPagar() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedAp, setSelectedAp] = useState<any>(null);
   const [page, setPage] = useState(1);
 
@@ -48,6 +49,30 @@ export default function CuentasPagar() {
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
 
   const createPayment = useCreateApPayment();
+  const createFixedExpense = useCreateFixedExpense();
+
+  const handleCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const description = (formData.get("description") as string).trim();
+    const totalAmount = Number(formData.get("totalAmount"));
+    const dueDate = formData.get("dueDate") as string;
+
+    if (!description || totalAmount <= 0) {
+      toast({ title: "Complete la descripción y un monto válido", variant: "destructive" });
+      return;
+    }
+
+    createFixedExpense.mutate({
+      data: { description, totalAmount, dueDate: dueDate || undefined },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Cuenta por pagar creada" });
+        queryClient.invalidateQueries({ queryKey: getListAccountsPayableQueryKey() });
+        setIsCreateOpen(false);
+      },
+    });
+  };
 
   const handlePaymentSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -88,8 +113,11 @@ export default function CuentasPagar() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-serif font-bold">Cuentas por Pagar</h1>
-          <p className="text-muted-foreground mt-1">Obligaciones con proveedores</p>
+          <p className="text-muted-foreground mt-1">Obligaciones con proveedores y gastos fijos</p>
         </div>
+        <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" /> Nueva Cuenta
+        </Button>
       </div>
 
       <div className="flex items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
@@ -131,8 +159,14 @@ export default function CuentasPagar() {
                   <TableRow key={ap.id}>
                     <TableCell className="text-muted-foreground text-sm">{format(new Date(ap.createdAt), "dd/MM/yyyy")}</TableCell>
                     <TableCell>
-                      <div className="font-medium">{ap.supplierName}</div>
-                      <div className="text-xs text-muted-foreground font-mono">Ref: {ap.guideNumber}</div>
+                      <div className="font-medium">{ap.type === "fixed_expense" ? ap.description : ap.supplierName}</div>
+                      {ap.type === "fixed_expense" ? (
+                        <div className="text-xs text-muted-foreground">
+                          Gasto fijo{ap.dueDate ? ` · Vence ${format(new Date(ap.dueDate), "dd/MM/yyyy")}` : ""}
+                        </div>
+                      ) : (
+                        ap.guideNumber && <div className="text-xs text-muted-foreground font-mono">Ref: {ap.guideNumber}</div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-serif">{formatCurrency(ap.totalAmount)}</TableCell>
                     <TableCell className="text-right text-emerald-600">{formatCurrency(ap.paidAmount)}</TableCell>
@@ -204,6 +238,35 @@ export default function CuentasPagar() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Nueva Cuenta por Pagar</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Descripción</label>
+              <Input name="description" placeholder="Ej: Arriendo local, Servicios públicos..." required />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Monto</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input name="totalAmount" type="number" step="0.01" min="1" required className="pl-9" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Fecha de Pago</label>
+              <Input name="dueDate" type="date" />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createFixedExpense.isPending}>Crear</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

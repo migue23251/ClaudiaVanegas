@@ -1,13 +1,19 @@
 import { useState } from "react";
-import { useListSales, getListSalesQueryKey, useGetSale, getGetSaleQueryKey } from "@workspace/api-client-react";
+import {
+  useListSales, getListSalesQueryKey, useGetSale, getGetSaleQueryKey, useVoidSale,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eye, Receipt, Search } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Eye, Receipt, Search, Ban } from "lucide-react";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 15;
 
@@ -33,6 +39,13 @@ export default function Ventas() {
   const [search, setSearch] = useState("");
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
+  const [voidingSaleId, setVoidingSaleId] = useState<number | null>(null);
+  const [voidReason, setVoidReason] = useState("");
+
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const voidSale = useVoidSale();
 
   const queryParams = {
     paymentType: paymentType !== "all" ? paymentType as any : undefined,
@@ -55,6 +68,28 @@ export default function Ventas() {
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
 
   const paginated = (sales ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleVoid = () => {
+    if (!voidingSaleId || !voidReason.trim()) return;
+    voidSale.mutate({ id: voidingSaleId, data: { reason: voidReason.trim() } }, {
+      onSuccess: () => {
+        toast({ title: "Venta anulada" });
+        queryClient.invalidateQueries({ queryKey: getListSalesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetSaleQueryKey(voidingSaleId) });
+        queryClient.invalidateQueries({
+          predicate: (q) => {
+            const key = q.queryKey[0];
+            return typeof key === "string" && (key.startsWith("/api/dashboard") || key.startsWith("/api/products") || key.startsWith("/api/accounts-receivable"));
+          },
+        });
+        setVoidingSaleId(null);
+        setVoidReason("");
+      },
+      onError: (err: any) => {
+        toast({ title: "No se pudo anular la venta", description: err?.response?.data?.error ?? "Intenta de nuevo", variant: "destructive" });
+      },
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -100,7 +135,7 @@ export default function Ventas() {
               <TableHead>Cajero</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Detalle</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -110,22 +145,30 @@ export default function Ventas() {
               <TableRow><TableCell colSpan={8} className="text-center py-8">No hay ventas registradas</TableCell></TableRow>
             ) : (
               paginated.map((sale) => (
-                <TableRow key={sale.id}>
+                <TableRow key={sale.id} className={sale.voided ? "opacity-60" : undefined}>
                   <TableCell className="font-mono text-xs font-bold text-muted-foreground">{sale.id}</TableCell>
                   <TableCell className="text-sm">{format(new Date(sale.createdAt), "dd/MM/yyyy HH:mm")}</TableCell>
                   <TableCell className="font-medium">{sale.customerName || "Cliente Final"}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{(sale as any).customerCedula || "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{sale.userName}</TableCell>
-                  <TableCell>
+                  <TableCell className="space-y-1">
                     <Badge variant={sale.paymentType === 'contado' ? "outline" : "secondary"}>
                       {sale.paymentType === 'contado' ? 'Contado' : 'Crédito'}
                     </Badge>
+                    {sale.voided && (
+                      <Badge variant="destructive" className="block w-fit">Anulada</Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-serif font-bold text-primary">{formatCurrency(sale.total)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => setSelectedSaleId(sale.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
+                    {user?.role === "admin" && !sale.voided && (
+                      <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" title="Anular venta" onClick={() => setVoidingSaleId(sale.id)}>
+                        <Ban className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -177,6 +220,16 @@ export default function Ventas() {
                 </div>
               </div>
 
+              {saleDetail.voided && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm">
+                  <p className="font-semibold text-destructive mb-1">Venta Anulada</p>
+                  {saleDetail.voidedAt && (
+                    <p className="text-muted-foreground">Fecha: {format(new Date(saleDetail.voidedAt), "dd/MM/yyyy HH:mm")}</p>
+                  )}
+                  {saleDetail.voidReason && <p className="text-muted-foreground">Motivo: {saleDetail.voidReason}</p>}
+                </div>
+              )}
+
               <div>
                 <h4 className="font-serif font-semibold mb-3">Artículos</h4>
                 <div className="space-y-3">
@@ -200,6 +253,40 @@ export default function Ventas() {
           ) : (
             <div className="py-12 text-center text-muted-foreground">Cargando detalle...</div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!voidingSaleId} onOpenChange={(open) => { if (!open) { setVoidingSaleId(null); setVoidReason(""); } }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Anular Venta #{voidingSaleId}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Esta acción restaurará el stock de los productos vendidos y, si la venta tenía crédito asociado,
+              eliminará la deuda del cliente. No se puede deshacer.
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo de la anulación</label>
+              <Textarea
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                placeholder="Describe el motivo..."
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { setVoidingSaleId(null); setVoidReason(""); }}>Cancelar</Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!voidReason.trim() || voidSale.isPending}
+              onClick={handleVoid}
+            >
+              Anular Venta
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

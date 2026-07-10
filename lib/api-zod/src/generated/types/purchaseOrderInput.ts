@@ -10,7 +10,7 @@ import type { PurchaseOrderItemInput } from './purchaseOrderItemInput';
 
 export interface PurchaseOrderInput {
   supplierId: number;
-  guideNumber: string;
+  guideNumber?: string;
   paymentType: PurchaseOrderInputPaymentType;
   notes?: string;
   items: PurchaseOrderItemInput[];

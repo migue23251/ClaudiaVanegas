@@ -8,7 +8,6 @@
 import type { ProductInputCategory } from './productInputCategory';
 
 export interface ProductInput {
-  code?: string;
   name: string;
   description?: string;
   costPrice: number;

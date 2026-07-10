@@ -210,6 +210,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/Product"
 
+  /products/{id}/movements:
+    get:
+      operationId: getProductMovements
+      tags: [products]
+      summary: Get the entry/exit movement history (kardex) for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product movement history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductMovements"
+        "404":
+          description: Not found
+
   /products/{id}:
     get:
       operationId: getProduct
@@ -541,6 +562,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PurchaseOrder"
+        "400":
+          description: Cannot be edited or cancelled in its current state
 
   /purchase-orders/{id}/receive:
     post:
@@ -588,6 +611,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AccountPayable"
+    post:
+      operationId: createFixedExpense
+      tags: [accountsPayable]
+      summary: Create a manual/fixed-expense account payable not tied to a purchase order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FixedExpenseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountPayable"
 
   /accounts-payable/{id}:
     get:
@@ -710,6 +750,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sale"
+        "404":
+          description: Not found
+
+  /sales/{id}/void:
+    post:
+      operationId: voidSale
+      tags: [sales]
+      summary: Void/annul a sale, restoring stock and reversing any related debt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoidSaleInput"
+      responses:
+        "200":
+          description: Sale voided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "400":
+          description: Invalid request or sale already voided
         "404":
           description: Not found
 
@@ -1199,8 +1268,6 @@ components:
       type: object
       required: [name, costPrice, salePrice, stock, category]
       properties:
-        code:
-          type: string
         name:
           type: string
         description:
@@ -1222,8 +1289,6 @@ components:
     ProductUpdate:
       type: object
       properties:
-        code:
-          type: string
         name:
           type: string
         description:
@@ -1241,6 +1306,57 @@ components:
           type: array
           items:
             type: string
+
+    ProductMovementIn:
+      type: object
+      required: [id, purchaseOrderId, supplierName, qtyOrdered, qtyReceived, unitCost, date]
+      properties:
+        id:
+          type: integer
+        purchaseOrderId:
+          type: integer
+        supplierName:
+          type: string
+        qtyOrdered:
+          type: integer
+        qtyReceived:
+          type: integer
+        unitCost:
+          type: number
+        date:
+          type: string
+          format: date-time
+
+    ProductMovementOut:
+      type: object
+      required: [id, saleId, customerName, qty, unitPrice, date]
+      properties:
+        id:
+          type: integer
+        saleId:
+          type: integer
+        customerName:
+          type: string
+        qty:
+          type: integer
+        unitPrice:
+          type: number
+        date:
+          type: string
+          format: date-time
+
+    ProductMovements:
+      type: object
+      required: [incoming, outgoing]
+      properties:
+        incoming:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductMovementIn"
+        outgoing:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductMovementOut"
 
     # ─── CUSTOMER ────────────────────────────────────────────────────────────
     Customer:
@@ -1361,7 +1477,7 @@ components:
 
     PurchaseOrder:
       type: object
-      required: [id, supplierId, supplierName, guideNumber, paymentType, status, total, items, createdAt]
+      required: [id, supplierId, supplierName, paymentType, status, total, items, createdAt]
       properties:
         id:
           type: integer
@@ -1370,7 +1486,7 @@ components:
         supplierName:
           type: string
         guideNumber:
-          type: string
+          type: ["string", "null"]
         paymentType:
           type: string
           enum: [contado, credito]
@@ -1391,7 +1507,7 @@ components:
 
     PurchaseOrderInput:
       type: object
-      required: [supplierId, guideNumber, paymentType, items]
+      required: [supplierId, paymentType, items]
       properties:
         supplierId:
           type: integer
@@ -1412,6 +1528,8 @@ components:
       properties:
         guideNumber:
           type: string
+        supplierId:
+          type: integer
         paymentType:
           type: string
           enum: [contado, credito]
@@ -1420,6 +1538,10 @@ components:
           enum: [pending, partial, received, cancelled]
         notes:
           type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseOrderItemInput"
 
     ReceiveItemInput:
       type: object
@@ -1456,16 +1578,21 @@ components:
 
     AccountPayable:
       type: object
-      required: [id, purchaseOrderId, supplierName, guideNumber, totalAmount, paidAmount, status, payments, createdAt]
+      required: [id, type, totalAmount, paidAmount, status, payments, createdAt]
       properties:
         id:
           type: integer
         purchaseOrderId:
-          type: integer
+          type: ["integer", "null"]
+        type:
+          type: string
+          enum: [purchase_order, fixed_expense]
+        description:
+          type: ["string", "null"]
         supplierName:
-          type: string
+          type: ["string", "null"]
         guideNumber:
-          type: string
+          type: ["string", "null"]
         totalAmount:
           type: number
         paidAmount:
@@ -1483,6 +1610,18 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    FixedExpenseInput:
+      type: object
+      required: [description, totalAmount]
+      properties:
+        description:
+          type: string
+        totalAmount:
+          type: number
+        dueDate:
+          type: string
+          format: date
 
     # ─── SALE ────────────────────────────────────────────────────────────────
     SaleItem:
@@ -1515,7 +1654,7 @@ components:
 
     Sale:
       type: object
-      required: [id, userId, paymentType, total, items, createdAt]
+      required: [id, userId, paymentType, total, voided, items, createdAt]
       properties:
         id:
           type: integer
@@ -1536,6 +1675,13 @@ components:
           type: number
         notes:
           type: ["string", "null"]
+        voided:
+          type: boolean
+        voidedAt:
+          type: ["string", "null"]
+          format: date-time
+        voidReason:
+          type: ["string", "null"]
         items:
           type: array
           items:
@@ -1543,6 +1689,13 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    VoidSaleInput:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
 
     SaleInput:
       type: object

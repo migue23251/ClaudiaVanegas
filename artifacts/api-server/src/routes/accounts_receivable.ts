@@ -66,7 +66,9 @@ router.post("/accounts-receivable/:id/payments", requireAuth, requireAdmin, asyn
   await db.insert(arPaymentsTable).values({ accountReceivableId: id, amount: String(amount), notes });
 
   const newPaid = alreadyPaid + payAmount;
-  const newStatus = newPaid >= total ? "paid" : "partial";
+  // "partial" is no longer surfaced as a distinct category: an advance/partial
+  // payment still leaves the account "pending" until fully paid.
+  const newStatus = newPaid >= total ? "paid" : "pending";
   await db.update(accountsReceivableTable).set({ paidAmount: String(newPaid), status: newStatus }).where(eq(accountsReceivableTable.id, id));
 
   const result = await buildARResponse(id);

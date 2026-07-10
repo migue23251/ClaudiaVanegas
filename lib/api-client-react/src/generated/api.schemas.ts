@@ -110,7 +110,6 @@ export const ProductInputCategory = {
 } as const;
 
 export interface ProductInput {
-  code?: string;
   name: string;
   description?: string;
   costPrice: number;
@@ -136,7 +135,6 @@ export const ProductUpdateCategory = {
 } as const;
 
 export interface ProductUpdate {
-  code?: string;
   name?: string;
   description?: string;
   costPrice?: number;
@@ -144,6 +142,30 @@ export interface ProductUpdate {
   stock?: number;
   category?: ProductUpdateCategory;
   images?: string[];
+}
+
+export interface ProductMovementIn {
+  id: number;
+  purchaseOrderId: number;
+  supplierName: string;
+  qtyOrdered: number;
+  qtyReceived: number;
+  unitCost: number;
+  date: string;
+}
+
+export interface ProductMovementOut {
+  id: number;
+  saleId: number;
+  customerName: string;
+  qty: number;
+  unitPrice: number;
+  date: string;
+}
+
+export interface ProductMovements {
+  incoming: ProductMovementIn[];
+  outgoing: ProductMovementOut[];
 }
 
 export interface Customer {
@@ -232,7 +254,8 @@ export interface PurchaseOrder {
   id: number;
   supplierId: number;
   supplierName: string;
-  guideNumber: string;
+  /** @nullable */
+  guideNumber?: string | null;
   paymentType: PurchaseOrderPaymentType;
   status: PurchaseOrderStatus;
   total: number;
@@ -252,7 +275,7 @@ export const PurchaseOrderInputPaymentType = {
 
 export interface PurchaseOrderInput {
   supplierId: number;
-  guideNumber: string;
+  guideNumber?: string;
   paymentType: PurchaseOrderInputPaymentType;
   notes?: string;
   items: PurchaseOrderItemInput[];
@@ -278,9 +301,11 @@ export const PurchaseOrderUpdateStatus = {
 
 export interface PurchaseOrderUpdate {
   guideNumber?: string;
+  supplierId?: number;
   paymentType?: PurchaseOrderUpdatePaymentType;
   status?: PurchaseOrderUpdateStatus;
   notes?: string;
+  items?: PurchaseOrderItemInput[];
 }
 
 export interface ReceiveItemInput {
@@ -300,6 +325,14 @@ export interface LedgerPayment {
   paidAt: string;
 }
 
+export type AccountPayableType = typeof AccountPayableType[keyof typeof AccountPayableType];
+
+
+export const AccountPayableType = {
+  purchase_order: 'purchase_order',
+  fixed_expense: 'fixed_expense',
+} as const;
+
 export type AccountPayableStatus = typeof AccountPayableStatus[keyof typeof AccountPayableStatus];
 
 
@@ -311,9 +344,15 @@ export const AccountPayableStatus = {
 
 export interface AccountPayable {
   id: number;
-  purchaseOrderId: number;
-  supplierName: string;
-  guideNumber: string;
+  /** @nullable */
+  purchaseOrderId?: number | null;
+  type: AccountPayableType;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  supplierName?: string | null;
+  /** @nullable */
+  guideNumber?: string | null;
   totalAmount: number;
   paidAmount: number;
   /** @nullable */
@@ -321,6 +360,12 @@ export interface AccountPayable {
   status: AccountPayableStatus;
   payments: LedgerPayment[];
   createdAt: string;
+}
+
+export interface FixedExpenseInput {
+  description: string;
+  totalAmount: number;
+  dueDate?: string;
 }
 
 export interface SaleItem {
@@ -361,8 +406,17 @@ export interface Sale {
   total: number;
   /** @nullable */
   notes?: string | null;
+  voided: boolean;
+  /** @nullable */
+  voidedAt?: string | null;
+  /** @nullable */
+  voidReason?: string | null;
   items: SaleItem[];
   createdAt: string;
+}
+
+export interface VoidSaleInput {
+  reason: string;
 }
 
 export type SaleInputPaymentType = typeof SaleInputPaymentType[keyof typeof SaleInputPaymentType];

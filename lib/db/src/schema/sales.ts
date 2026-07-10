@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -11,6 +11,9 @@ export const salesTable = pgTable("sales", {
   paymentType: text("payment_type", { enum: ["contado", "credito"] }).notNull(),
   total: numeric("total", { precision: 12, scale: 2 }).notNull(),
   notes: text("notes"),
+  voided: boolean("voided").notNull().default(false),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidReason: text("void_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

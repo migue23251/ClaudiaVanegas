@@ -23,6 +23,11 @@ export interface Sale {
   total: number;
   /** @nullable */
   notes?: string | null;
+  voided: boolean;
+  /** @nullable */
+  voidedAt?: Date | null;
+  /** @nullable */
+  voidReason?: string | null;
   items: SaleItem[];
   createdAt: Date;
 }

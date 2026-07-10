@@ -6,13 +6,20 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AccountPayableStatus } from './accountPayableStatus';
+import type { AccountPayableType } from './accountPayableType';
 import type { LedgerPayment } from './ledgerPayment';
 
 export interface AccountPayable {
   id: number;
-  purchaseOrderId: number;
-  supplierName: string;
-  guideNumber: string;
+  /** @nullable */
+  purchaseOrderId?: number | null;
+  type: AccountPayableType;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  supplierName?: string | null;
+  /** @nullable */
+  guideNumber?: string | null;
   totalAmount: number;
   paidAmount: number;
   /** @nullable */

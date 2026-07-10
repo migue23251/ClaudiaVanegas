@@ -2,6 +2,7 @@ import { useState } from "react";
 import { 
   useListPurchaseOrders, getListPurchaseOrdersQueryKey, 
   useCreatePurchaseOrder,
+  useUpdatePurchaseOrder,
   useListSuppliers, getListSuppliersQueryKey,
   useListProducts, getListProductsQueryKey,
   useReceivePurchaseOrder,
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, PackageCheck, Search } from "lucide-react";
+import { Plus, Trash2, PackageCheck, Search, Pencil, Ban } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -48,6 +49,8 @@ export default function OrdenesCompra() {
   const [supplierSearch, setSupplierSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [page, setPage] = useState(1);
 
@@ -84,6 +87,7 @@ export default function OrdenesCompra() {
 
   const createOrder = useCreatePurchaseOrder();
   const receiveOrder = useReceivePurchaseOrder();
+  const updateOrder = useUpdatePurchaseOrder();
 
   const addLineItem = () => setLineItems(prev => [...prev, { productId: 0, qty: 1, unitCost: 0 }]);
   const removeLineItem = (idx: number) => setLineItems(prev => prev.filter((_, i) => i !== idx));
@@ -109,7 +113,7 @@ export default function OrdenesCompra() {
 
     const data: PurchaseOrderInput = {
       supplierId: Number(selectedSupplierId),
-      guideNumber: formData.get("guideNumber") as string,
+      guideNumber: (formData.get("guideNumber") as string) || undefined,
       paymentType: formData.get("paymentType") as "contado" | "credito",
       notes: formData.get("notes") as string || undefined,
       items: validItems.map(i => ({ productId: i.productId, qtyOrdered: i.qty, unitCost: i.unitCost }))
@@ -123,6 +127,70 @@ export default function OrdenesCompra() {
         setLineItems([{ productId: 0, qty: 1, unitCost: 0 }]);
         setSelectedSupplierId("");
       }
+    });
+  };
+
+  const openEdit = (order: any) => {
+    setEditingOrder(order);
+    setSelectedSupplierId(order.supplierId.toString());
+    setLineItems(order.items.map((i: any) => ({ productId: i.productId, qty: i.qtyOrdered, unitCost: i.unitCost })));
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    if (!selectedSupplierId) {
+      toast({ title: "Seleccione un proveedor", variant: "destructive" });
+      return;
+    }
+    const validItems = lineItems.filter(i => i.productId > 0 && i.qty > 0 && i.unitCost > 0);
+    if (!validItems.length) {
+      toast({ title: "Agregue al menos un producto", variant: "destructive" });
+      return;
+    }
+
+    updateOrder.mutate({
+      id: editingOrder.id,
+      data: {
+        supplierId: Number(selectedSupplierId),
+        guideNumber: (formData.get("guideNumber") as string) || undefined,
+        paymentType: formData.get("paymentType") as "contado" | "credito",
+        notes: formData.get("notes") as string || undefined,
+        items: validItems.map(i => ({ productId: i.productId, qtyOrdered: i.qty, unitCost: i.unitCost })),
+      },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Orden de compra actualizada" });
+        queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
+        queryClient.invalidateQueries({
+          predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/accounts-payable"),
+        });
+        setIsEditOpen(false);
+        setEditingOrder(null);
+        setLineItems([{ productId: 0, qty: 1, unitCost: 0 }]);
+        setSelectedSupplierId("");
+      },
+      onError: (err: any) => {
+        toast({ title: "No se pudo actualizar la orden", description: err?.response?.data?.error ?? "Intenta de nuevo", variant: "destructive" });
+      },
+    });
+  };
+
+  const handleCancelOrder = (order: any) => {
+    if (!confirm(`¿Anular la orden de compra "${order.guideNumber || order.id}"? Esta acción no se puede deshacer.`)) return;
+    updateOrder.mutate({ id: order.id, data: { status: "cancelled" } }, {
+      onSuccess: () => {
+        toast({ title: "Orden de compra anulada" });
+        queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
+        queryClient.invalidateQueries({
+          predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/accounts-payable"),
+        });
+      },
+      onError: (err: any) => {
+        toast({ title: "No se pudo anular la orden", description: err?.response?.data?.error ?? "Intenta de nuevo", variant: "destructive" });
+      },
     });
   };
 
@@ -214,10 +282,20 @@ export default function OrdenesCompra() {
                   <TableCell className="capitalize text-sm">{order.paymentType}</TableCell>
                   <TableCell className="text-right font-serif font-bold">{formatCurrency(order.total)}</TableCell>
                   <TableCell>{getStatusBadge(order.status)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-1 whitespace-nowrap">
                     {(order.status === 'pending' || order.status === 'partial') && (
                       <Button variant="outline" size="sm" className="h-8" onClick={() => { setSelectedOrder(order); setIsReceiveOpen(true); }}>
                         <PackageCheck className="h-3.5 w-3.5 mr-1.5" /> Recibir
+                      </Button>
+                    )}
+                    {order.status !== 'received' && order.status !== 'cancelled' && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => openEdit(order)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {order.status === 'pending' && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive" title="Anular orden" onClick={() => handleCancelOrder(order)}>
+                        <Ban className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </TableCell>
@@ -251,8 +329,11 @@ export default function OrdenesCompra() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Nº Guía / Ref</label>
-                <Input name="guideNumber" required />
+                <label className="text-sm font-medium">
+                  Nº Guía / Ref
+                  <span className="text-xs text-muted-foreground ml-1">(opcional)</span>
+                </label>
+                <Input name="guideNumber" />
               </div>
             </div>
 
@@ -336,6 +417,116 @@ export default function OrdenesCompra() {
               <Button type="submit" disabled={createOrder.isPending}>Crear Orden</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Order Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingOrder(null); setLineItems([{ productId: 0, qty: 1, unitCost: 0 }]); setSelectedSupplierId(""); } }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Orden de Compra</DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Proveedor</label>
+                  <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId} required>
+                    <SelectTrigger><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                    <SelectContent>
+                      {suppliers?.map(s => <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Nº Guía / Ref
+                    <span className="text-xs text-muted-foreground ml-1">(opcional)</span>
+                  </label>
+                  <Input name="guideNumber" defaultValue={editingOrder.guideNumber ?? ""} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Tipo de Pago</label>
+                <Select name="paymentType" defaultValue={editingOrder.paymentType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contado">Contado</SelectItem>
+                    <SelectItem value="credito">Crédito (Cuenta por pagar)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Productos a comprar</label>
+                  <Button type="button" variant="outline" size="sm" onClick={addLineItem} className="gap-1">
+                    <Plus className="h-3.5 w-3.5" /> Agregar
+                  </Button>
+                </div>
+                {lineItems.map((item, idx) => (
+                  <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end p-3 bg-muted/30 rounded-lg">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Producto</label>
+                      <Select
+                        value={item.productId ? item.productId.toString() : ""}
+                        onValueChange={(v) => {
+                          const prod = products?.find(p => p.id === Number(v));
+                          updateLineItem(idx, "productId", Number(v));
+                          if (prod) updateLineItem(idx, "unitCost", prod.costPrice);
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                        <SelectContent>
+                          {products?.map(p => <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Cant.</label>
+                      <Input
+                        type="number" min="1"
+                        value={item.qty}
+                        onChange={(e) => updateLineItem(idx, "qty", Number(e.target.value))}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium">Costo Unit.</label>
+                      <Input
+                        type="number" min="0"
+                        value={item.unitCost}
+                        onChange={(e) => updateLineItem(idx, "unitCost", Number(e.target.value))}
+                        className="h-9"
+                      />
+                    </div>
+                    <Button
+                      type="button" variant="ghost" size="icon"
+                      className="h-9 w-8 text-destructive hover:bg-destructive/10"
+                      disabled={lineItems.length === 1}
+                      onClick={() => removeLineItem(idx)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex justify-end text-sm font-semibold text-foreground">
+                  Total: <span className="ml-2 font-serif text-primary">{formatCurrency(orderTotal)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notas</label>
+                <Input name="notes" defaultValue={editingOrder.notes ?? ""} />
+              </div>
+
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={updateOrder.isPending}>Guardar Cambios</Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 

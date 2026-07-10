@@ -8,7 +8,6 @@
 import type { ProductUpdateCategory } from './productUpdateCategory';
 
 export interface ProductUpdate {
-  code?: string;
   name?: string;
   description?: string;
   costPrice?: number;

@@ -6,7 +6,7 @@ import { suppliersTable } from "./suppliers";
 export const purchaseOrdersTable = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   supplierId: integer("supplier_id").notNull().references(() => suppliersTable.id),
-  guideNumber: text("guide_number").notNull(),
+  guideNumber: text("guide_number"),
   paymentType: text("payment_type", { enum: ["contado", "credito"] }).notNull(),
   status: text("status", { enum: ["pending", "partial", "received", "cancelled"] }).notNull().default("pending"),
   total: numeric("total", { precision: 12, scale: 2 }).notNull().default("0"),

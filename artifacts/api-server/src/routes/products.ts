@@ -1,7 +1,11 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, type SQL, max } from "drizzle-orm";
+import { eq, ilike, or, and, type SQL, max, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { db, productsTable, PRODUCT_CATEGORIES } from "@workspace/db";
+import {
+  db, productsTable, PRODUCT_CATEGORIES,
+  purchaseOrderItemsTable, purchaseOrdersTable, suppliersTable,
+  saleItemsTable, salesTable, customersTable,
+} from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -11,7 +15,7 @@ const router: IRouter = Router();
  * Uses a pg advisory lock so concurrent creates don't race on MAX(code).
  * The caller must pass the Drizzle transaction context (tx).
  */
-async function nextProductCode(tx: typeof db): Promise<string> {
+async function nextProductCode(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]): Promise<string> {
   // Serialize code generation across concurrent requests
   await tx.execute(sql`SELECT pg_advisory_xact_lock(987654321)`);
   const [result] = await tx.select({ maxCode: max(productsTable.code) }).from(productsTable);
@@ -51,15 +55,15 @@ router.get("/products", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/products", requireAuth, requireAdmin, async (req, res): Promise<void> => {
-  const { code: rawCode, name, description, costPrice, salePrice, stock, category, images } = req.body;
+  const { name, description, costPrice, salePrice, stock, category, images } = req.body;
   if (!name || costPrice == null || salePrice == null || stock == null || !category) {
     res.status(400).json({ error: "Campos requeridos faltantes" });
     return;
   }
 
   const product = await db.transaction(async (tx) => {
-    // Generate code inside the transaction so the advisory lock serializes concurrent creates
-    const code = rawCode?.trim() || await nextProductCode(tx);
+    // The code is always auto-generated on creation; clients cannot set it.
+    const code = await nextProductCode(tx);
     const [inserted] = await tx.insert(productsTable).values({
       code, name, description, costPrice: String(costPrice), salePrice: String(salePrice),
       stock: parseInt(String(stock), 10), category, images: images ?? [],
@@ -77,11 +81,65 @@ router.get("/products/:id", requireAuth, async (req, res): Promise<void> => {
   res.json({ ...product, costPrice: parseFloat(product.costPrice), salePrice: parseFloat(product.salePrice) });
 });
 
+router.get("/products/:id/movements", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, id));
+  if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+
+  const incoming = await db.select({
+    id: purchaseOrderItemsTable.id,
+    purchaseOrderId: purchaseOrdersTable.id,
+    supplierName: suppliersTable.name,
+    qtyOrdered: purchaseOrderItemsTable.qtyOrdered,
+    qtyReceived: purchaseOrderItemsTable.qtyReceived,
+    unitCost: purchaseOrderItemsTable.unitCost,
+    date: purchaseOrdersTable.createdAt,
+  }).from(purchaseOrderItemsTable)
+    .innerJoin(purchaseOrdersTable, eq(purchaseOrderItemsTable.purchaseOrderId, purchaseOrdersTable.id))
+    .leftJoin(suppliersTable, eq(purchaseOrdersTable.supplierId, suppliersTable.id))
+    .where(and(eq(purchaseOrderItemsTable.productId, id), sql`${purchaseOrdersTable.status} != 'cancelled'`))
+    .orderBy(desc(purchaseOrdersTable.createdAt));
+
+  const outgoing = await db.select({
+    id: saleItemsTable.id,
+    saleId: salesTable.id,
+    customerName: customersTable.firstName,
+    customerLastName: customersTable.lastName,
+    qty: saleItemsTable.qty,
+    unitPrice: saleItemsTable.unitPrice,
+    date: salesTable.createdAt,
+  }).from(saleItemsTable)
+    .innerJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
+    .leftJoin(customersTable, eq(salesTable.customerId, customersTable.id))
+    .where(and(eq(saleItemsTable.productId, id), eq(salesTable.voided, false)))
+    .orderBy(desc(salesTable.createdAt));
+
+  res.json({
+    incoming: incoming.map(i => ({
+      id: i.id,
+      purchaseOrderId: i.purchaseOrderId,
+      supplierName: i.supplierName ?? "Desconocido",
+      qtyOrdered: i.qtyOrdered,
+      qtyReceived: i.qtyReceived,
+      unitCost: parseFloat(i.unitCost),
+      date: i.date,
+    })),
+    outgoing: outgoing.map(o => ({
+      id: o.id,
+      saleId: o.saleId,
+      customerName: o.customerName ? `${o.customerName} ${o.customerLastName ?? ""}`.trim() : "Cliente Genérico",
+      qty: o.qty,
+      unitPrice: parseFloat(o.unitPrice),
+      date: o.date,
+    })),
+  });
+});
+
 router.put("/products/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  const { code, name, description, costPrice, salePrice, stock, category, images } = req.body;
+  const { name, description, costPrice, salePrice, stock, category, images } = req.body;
   const updates: Record<string, unknown> = {};
-  if (code != null) updates.code = code;
+  // code is immutable after creation and cannot be changed via this endpoint
   if (name != null) updates.name = name;
   if (description !== undefined) updates.description = description;
   if (costPrice != null) updates.costPrice = String(costPrice);

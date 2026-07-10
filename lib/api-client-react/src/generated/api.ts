@@ -29,6 +29,7 @@ import type {
   CustomerUpdate,
   DashboardSummary,
   ExpensesVsIncomePoint,
+  FixedExpenseInput,
   GetDashboardBillingVsCollectionParams,
   GetDashboardExpensesVsIncomeParams,
   GetDashboardNetProfitTrendParams,
@@ -51,6 +52,7 @@ import type {
   PaymentTypePoint,
   Product,
   ProductInput,
+  ProductMovements,
   ProductUpdate,
   PurchaseOrder,
   PurchaseOrderInput,
@@ -69,7 +71,8 @@ import type {
   TopProduct,
   User,
   UserInput,
-  UserUpdate
+  UserUpdate,
+  VoidSaleInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -841,6 +844,83 @@ export const useCreateProduct = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateProductMutationOptions(options));
     }
+
+export const getGetProductMovementsUrl = (id: number,) => {
+
+
+
+
+  return `/api/products/${id}/movements`
+}
+
+/**
+ * @summary Get the entry/exit movement history (kardex) for a product
+ */
+export const getProductMovements = async (id: number, options?: RequestInit): Promise<ProductMovements> => {
+
+  return customFetch<ProductMovements>(getGetProductMovementsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProductMovementsQueryKey = (id: number,) => {
+    return [
+    `/api/products/${id}/movements`
+    ] as const;
+    }
+
+
+export const getGetProductMovementsQueryOptions = <TData = Awaited<ReturnType<typeof getProductMovements>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProductMovements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProductMovementsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProductMovements>>> = ({ signal }) => getProductMovements(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProductMovements>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProductMovementsQueryResult = NonNullable<Awaited<ReturnType<typeof getProductMovements>>>
+export type GetProductMovementsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the entry/exit movement history (kardex) for a product
+ */
+
+export function useGetProductMovements<TData = Awaited<ReturnType<typeof getProductMovements>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProductMovements>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProductMovementsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getGetProductUrl = (id: number,) => {
 
@@ -2048,7 +2128,7 @@ export const updatePurchaseOrder = async (id: number,
 
 
 
-export const getUpdatePurchaseOrderMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdatePurchaseOrderMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePurchaseOrder>>, TError,{id: number;data: BodyType<PurchaseOrderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updatePurchaseOrder>>, TError,{id: number;data: BodyType<PurchaseOrderUpdate>}, TContext> => {
 
@@ -2077,12 +2157,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdatePurchaseOrderMutationResult = NonNullable<Awaited<ReturnType<typeof updatePurchaseOrder>>>
     export type UpdatePurchaseOrderMutationBody = BodyType<PurchaseOrderUpdate>
-    export type UpdatePurchaseOrderMutationError = ErrorType<unknown>
+    export type UpdatePurchaseOrderMutationError = ErrorType<void>
 
     /**
  * @summary Update a purchase order
  */
-export const useUpdatePurchaseOrder = <TError = ErrorType<unknown>,
+export const useUpdatePurchaseOrder = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePurchaseOrder>>, TError,{id: number;data: BodyType<PurchaseOrderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updatePurchaseOrder>>,
@@ -2247,6 +2327,76 @@ export function useListAccountsPayable<TData = Awaited<ReturnType<typeof listAcc
 
 
 
+
+export const getCreateFixedExpenseUrl = () => {
+
+
+
+
+  return `/api/accounts-payable`
+}
+
+/**
+ * @summary Create a manual/fixed-expense account payable not tied to a purchase order
+ */
+export const createFixedExpense = async (fixedExpenseInput: FixedExpenseInput, options?: RequestInit): Promise<AccountPayable> => {
+
+  return customFetch<AccountPayable>(getCreateFixedExpenseUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(fixedExpenseInput)
+  }
+);}
+
+
+
+
+export const getCreateFixedExpenseMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFixedExpense>>, TError,{data: BodyType<FixedExpenseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createFixedExpense>>, TError,{data: BodyType<FixedExpenseInput>}, TContext> => {
+
+const mutationKey = ['createFixedExpense'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createFixedExpense>>, {data: BodyType<FixedExpenseInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createFixedExpense(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateFixedExpenseMutationResult = NonNullable<Awaited<ReturnType<typeof createFixedExpense>>>
+    export type CreateFixedExpenseMutationBody = BodyType<FixedExpenseInput>
+    export type CreateFixedExpenseMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a manual/fixed-expense account payable not tied to a purchase order
+ */
+export const useCreateFixedExpense = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createFixedExpense>>, TError,{data: BodyType<FixedExpenseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createFixedExpense>>,
+        TError,
+        {data: BodyType<FixedExpenseInput>},
+        TContext
+      > => {
+      return useMutation(getCreateFixedExpenseMutationOptions(options));
+    }
 
 export const getGetAccountPayableUrl = (id: number,) => {
 
@@ -2626,6 +2776,77 @@ export function useGetSale<TData = Awaited<ReturnType<typeof getSale>>, TError =
 
 
 
+
+export const getVoidSaleUrl = (id: number,) => {
+
+
+
+
+  return `/api/sales/${id}/void`
+}
+
+/**
+ * @summary Void/annul a sale, restoring stock and reversing any related debt
+ */
+export const voidSale = async (id: number,
+    voidSaleInput: VoidSaleInput, options?: RequestInit): Promise<Sale> => {
+
+  return customFetch<Sale>(getVoidSaleUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(voidSaleInput)
+  }
+);}
+
+
+
+
+export const getVoidSaleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidSale>>, TError,{id: number;data: BodyType<VoidSaleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof voidSale>>, TError,{id: number;data: BodyType<VoidSaleInput>}, TContext> => {
+
+const mutationKey = ['voidSale'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof voidSale>>, {id: number;data: BodyType<VoidSaleInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  voidSale(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VoidSaleMutationResult = NonNullable<Awaited<ReturnType<typeof voidSale>>>
+    export type VoidSaleMutationBody = BodyType<VoidSaleInput>
+    export type VoidSaleMutationError = ErrorType<void>
+
+    /**
+ * @summary Void/annul a sale, restoring stock and reversing any related debt
+ */
+export const useVoidSale = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof voidSale>>, TError,{id: number;data: BodyType<VoidSaleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof voidSale>>,
+        TError,
+        {id: number;data: BodyType<VoidSaleInput>},
+        TContext
+      > => {
+      return useMutation(getVoidSaleMutationOptions(options));
+    }
 
 export const getListAccountsReceivableUrl = (params?: ListAccountsReceivableParams,) => {
   const normalizedParams = new URLSearchParams();

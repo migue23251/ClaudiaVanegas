@@ -60,7 +60,7 @@ router.get("/purchase-orders", requireAuth, requireAdmin, async (req, res): Prom
 
 router.post("/purchase-orders", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const { supplierId, guideNumber, paymentType, notes, items } = req.body;
-  if (!supplierId || !guideNumber || !paymentType || !items?.length) {
+  if (!supplierId || !paymentType || !items?.length) {
     res.status(400).json({ error: "Campos requeridos faltantes" });
     return;
   }
@@ -90,7 +90,7 @@ router.post("/purchase-orders", requireAuth, requireAdmin, async (req, res): Pro
 
   const poId = await db.transaction(async (tx) => {
     const [po] = await tx.insert(purchaseOrdersTable).values({
-      supplierId, guideNumber, paymentType, notes, total: String(total),
+      supplierId, guideNumber: guideNumber || null, paymentType, notes, total: String(total),
     }).returning();
 
     await tx.insert(purchaseOrderItemsTable).values(
@@ -127,16 +127,78 @@ router.get("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): 
 
 router.put("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  const { guideNumber, paymentType, status, notes } = req.body;
-  const updates: Record<string, unknown> = {};
-  if (guideNumber != null) updates.guideNumber = guideNumber;
-  if (paymentType != null) updates.paymentType = paymentType;
-  if (status != null) updates.status = status;
-  if (notes !== undefined) updates.notes = notes;
+  const { guideNumber, paymentType, status, notes, supplierId, items } = req.body;
 
-  const [po] = await db.update(purchaseOrdersTable).set(updates).where(eq(purchaseOrdersTable.id, id)).returning();
-  if (!po) { res.status(404).json({ error: "Orden no encontrada" }); return; }
-  const result = await buildPOResponse(po.id);
+  const [existing] = await db.select().from(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Orden no encontrada" }); return; }
+
+  const existingItems = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
+  const someReceived = existingItems.some(i => i.qtyReceived > 0);
+
+  // Voiding/cancelling: only allowed if nothing has been received yet
+  if (status === "cancelled") {
+    if (someReceived) {
+      res.status(400).json({ error: "No se puede anular una orden con productos ya recibidos" });
+      return;
+    }
+    const [ap] = await db.select().from(accountsPayableTable).where(eq(accountsPayableTable.purchaseOrderId, id));
+    if (ap && parseFloat(ap.paidAmount) > 0) {
+      res.status(400).json({ error: "No se puede anular una orden con pagos registrados" });
+      return;
+    }
+    await db.transaction(async (tx) => {
+      await tx.update(purchaseOrdersTable).set({ status: "cancelled" }).where(eq(purchaseOrdersTable.id, id));
+      if (ap) await tx.delete(accountsPayableTable).where(eq(accountsPayableTable.id, ap.id));
+    });
+    const result = await buildPOResponse(id);
+    res.json(result);
+    return;
+  }
+
+  // Editing supplier/items only allowed while the order is not fully received
+  if ((items || supplierId != null) && existing.status === "received") {
+    res.status(400).json({ error: "No se puede modificar una orden ya recibida en su totalidad" });
+    return;
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (guideNumber !== undefined) updates.guideNumber = guideNumber || null;
+  if (paymentType != null) updates.paymentType = paymentType;
+  if (notes !== undefined) updates.notes = notes;
+  if (supplierId != null) updates.supplierId = supplierId;
+
+  await db.transaction(async (tx) => {
+    if (items?.length) {
+      if (someReceived) {
+        throw Object.assign(new Error("No se pueden modificar los productos de una orden con recepciones parciales"), { status: 400 });
+      }
+      await tx.delete(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
+      await tx.insert(purchaseOrderItemsTable).values(
+        items.map((i: { productId: number; qtyOrdered: number; unitCost: number }) => ({
+          purchaseOrderId: id,
+          productId: i.productId,
+          qtyOrdered: i.qtyOrdered,
+          unitCost: String(i.unitCost),
+        }))
+      );
+      const total = items.reduce((sum: number, i: { qtyOrdered: number; unitCost: number }) => sum + i.qtyOrdered * i.unitCost, 0);
+      updates.total = String(total);
+      const [ap] = await tx.select().from(accountsPayableTable).where(eq(accountsPayableTable.purchaseOrderId, id));
+      if (ap) await tx.update(accountsPayableTable).set({ totalAmount: String(total) }).where(eq(accountsPayableTable.id, ap.id));
+    }
+    if (Object.keys(updates).length > 0) {
+      await tx.update(purchaseOrdersTable).set(updates).where(eq(purchaseOrdersTable.id, id));
+    }
+  }).catch((err) => {
+    if (err?.status === 400) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    throw err;
+  });
+
+  if (res.headersSent) return;
+  const result = await buildPOResponse(id);
   res.json(result);
 });
 

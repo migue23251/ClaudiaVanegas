@@ -1,14 +1,20 @@
 import { useState } from "react";
-import { useListProducts, getListProductsQueryKey, useCreateProduct, useUpdateProduct, useDeleteProduct, ProductInput, Product } from "@workspace/api-client-react";
+import {
+  useListProducts, getListProductsQueryKey, useCreateProduct, useUpdateProduct, useDeleteProduct,
+  useGetProductMovements, getGetProductMovementsQueryKey,
+  ProductInput, Product,
+} from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Search, Edit, Trash2, History } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const PAGE_SIZE = 15;
 
@@ -49,6 +55,7 @@ export default function Inventario() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
+  const [movementsProduct, setMovementsProduct] = useState<Product | null>(null);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -67,6 +74,10 @@ export default function Inventario() {
   const updateProd = useUpdateProduct();
   const deleteProd = useDeleteProduct();
 
+  const { data: movements, isLoading: movementsLoading } = useGetProductMovements(movementsProduct?.id!, {
+    query: { enabled: !!movementsProduct, queryKey: getGetProductMovementsQueryKey(movementsProduct?.id!) },
+  });
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
 
@@ -76,9 +87,8 @@ export default function Inventario() {
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const codeVal = (formData.get("code") as string).trim();
     const data: ProductInput = {
-      code: codeVal || undefined as any, // API auto-generates if blank
+      // Code is always auto-generated on creation and cannot be changed on edit.
       name: formData.get("name") as string,
       description: formData.get("description") as string || undefined,
       category: formData.get("category") as CategoryValue,
@@ -191,6 +201,9 @@ export default function Inventario() {
                     <Badge variant={product.stock <= 5 ? "destructive" : "outline"}>{product.stock}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" title="Historial de movimientos" onClick={() => setMovementsProduct(product)}>
+                      <History className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(product)}>
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -217,14 +230,16 @@ export default function Inventario() {
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Código
-                  {!editingProduct && <span className="text-xs text-muted-foreground ml-1">(se genera automáticamente)</span>}
-                </label>
-                <Input name="code" defaultValue={editingProduct?.code} placeholder={editingProduct ? "" : "Dejar en blanco para auto-generar"} />
-              </div>
-              <div className="space-y-2">
+              {editingProduct && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Código
+                    <span className="text-xs text-muted-foreground ml-1">(no se puede modificar)</span>
+                  </label>
+                  <Input value={editingProduct.code} disabled readOnly />
+                </div>
+              )}
+              <div className="space-y-2 col-span-2 sm:col-span-1">
                 <label className="text-sm font-medium">Nombre</label>
                 <Input name="name" defaultValue={editingProduct?.name} required />
               </div>
@@ -274,6 +289,76 @@ export default function Inventario() {
               <Button type="submit" disabled={createProd.isPending || updateProd.isPending}>Guardar</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!movementsProduct} onOpenChange={(open) => !open && setMovementsProduct(null)}>
+        <DialogContent className="sm:max-w-[650px]">
+          <DialogHeader>
+            <DialogTitle>Historial de Movimientos — {movementsProduct?.name}</DialogTitle>
+          </DialogHeader>
+          <Tabs defaultValue="incoming" className="pt-2">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="incoming">Entradas</TabsTrigger>
+              <TabsTrigger value="outgoing">Salidas</TabsTrigger>
+            </TabsList>
+            <TabsContent value="incoming">
+              {movementsLoading ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Cargando...</p>
+              ) : !movements?.incoming.length ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Sin entradas registradas</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Proveedor</TableHead>
+                      <TableHead className="text-right">Cant.</TableHead>
+                      <TableHead className="text-right">Costo Unit.</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movements.incoming.map(m => (
+                      <TableRow key={m.id}>
+                        <TableCell className="text-sm">{format(new Date(m.date), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{m.supplierName}</TableCell>
+                        <TableCell className="text-right">{m.qtyReceived}/{m.qtyOrdered}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(m.unitCost)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+            <TabsContent value="outgoing">
+              {movementsLoading ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Cargando...</p>
+              ) : !movements?.outgoing.length ? (
+                <p className="text-center py-8 text-muted-foreground text-sm">Sin salidas registradas</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="text-right">Cant.</TableHead>
+                      <TableHead className="text-right">Precio Venta</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movements.outgoing.map(m => (
+                      <TableRow key={m.id}>
+                        <TableCell className="text-sm">{format(new Date(m.date), "dd/MM/yyyy")}</TableCell>
+                        <TableCell>{m.customerName}</TableCell>
+                        <TableCell className="text-right">{m.qty}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(m.unitPrice)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>

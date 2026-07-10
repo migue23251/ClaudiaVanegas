@@ -7,7 +7,9 @@ import { salesTable } from "./sales";
 // Accounts Payable
 export const accountsPayableTable = pgTable("accounts_payable", {
   id: serial("id").primaryKey(),
-  purchaseOrderId: integer("purchase_order_id").notNull().references(() => purchaseOrdersTable.id),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrdersTable.id),
+  type: text("type", { enum: ["purchase_order", "fixed_expense"] }).notNull().default("purchase_order"),
+  description: text("description"),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
   paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).notNull().default("0"),
   dueDate: date("due_date"),

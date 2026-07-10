@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and, gte, lte, or, ilike, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable } from "@workspace/db";
-import { requireAuth } from "../lib/auth";
+import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
+import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -27,6 +27,9 @@ async function buildSaleResponse(saleId: number) {
   return {
     ...sale,
     total: parseFloat(sale.total),
+    voided: sale.voided,
+    voidedAt: sale.voidedAt,
+    voidReason: sale.voidReason,
     userName: user?.name ?? null,
     customerName: customer ? `${customer.firstName} ${customer.lastName}` : null,
     customerCedula: customer?.cedula ?? null,
@@ -174,6 +177,58 @@ router.get("/sales/:id", requireAuth, async (req, res): Promise<void> => {
   if (req.user!.role === "cajero" && result.userId !== req.user!.userId) {
     res.status(403).json({ error: "Acceso denegado" }); return;
   }
+  res.json(result);
+});
+
+router.post("/sales/:id/void", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const { reason } = req.body as { reason?: string };
+  if (!reason || !reason.trim()) {
+    res.status(400).json({ error: "La observación es requerida para anular la venta" });
+    return;
+  }
+
+  const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, id));
+  if (!sale) { res.status(404).json({ error: "Venta no encontrada" }); return; }
+  if (sale.voided) { res.status(400).json({ error: "La venta ya fue anulada" }); return; }
+
+  let alreadyVoided = false;
+
+  await db.transaction(async (tx) => {
+    // Atomic guarded update: only proceed if this request is the one that actually
+    // transitions the sale from non-voided to voided. Prevents double stock-restore
+    // / double AR-cleanup from concurrent void requests on the same sale.
+    const updated = await tx.update(salesTable).set({
+      voided: true,
+      voidedAt: new Date(),
+      voidReason: reason.trim(),
+    }).where(and(eq(salesTable.id, id), eq(salesTable.voided, false))).returning({ id: salesTable.id });
+
+    if (updated.length === 0) {
+      alreadyVoided = true;
+      return;
+    }
+
+    const items = await tx.select().from(saleItemsTable).where(eq(saleItemsTable.saleId, id));
+
+    // Return items to stock
+    for (const item of items) {
+      await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} + ${item.qty}` })
+        .where(eq(productsTable.id, item.productId));
+    }
+
+    // If it was a credit sale, remove the outstanding debt (accounts receivable)
+    const [ar] = await tx.select().from(accountsReceivableTable).where(eq(accountsReceivableTable.saleId, id));
+    if (ar) {
+      await tx.delete(arPaymentsTable).where(eq(arPaymentsTable.accountReceivableId, ar.id));
+      await tx.delete(accountsReceivableTable).where(eq(accountsReceivableTable.id, ar.id));
+    }
+  });
+
+  if (alreadyVoided) { res.status(400).json({ error: "La venta ya fue anulada" }); return; }
+
+  const result = await buildSaleResponse(id);
   res.json(result);
 });
 

@@ -5,12 +5,15 @@
  * Claudia Vanegas POS API
  * OpenAPI spec version: 0.1.0
  */
+import type { PurchaseOrderItemInput } from './purchaseOrderItemInput';
 import type { PurchaseOrderUpdatePaymentType } from './purchaseOrderUpdatePaymentType';
 import type { PurchaseOrderUpdateStatus } from './purchaseOrderUpdateStatus';
 
 export interface PurchaseOrderUpdate {
   guideNumber?: string;
+  supplierId?: number;
   paymentType?: PurchaseOrderUpdatePaymentType;
   status?: PurchaseOrderUpdateStatus;
   notes?: string;
+  items?: PurchaseOrderItemInput[];
 }

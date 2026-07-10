@@ -13,7 +13,8 @@ export interface PurchaseOrder {
   id: number;
   supplierId: number;
   supplierName: string;
-  guideNumber: string;
+  /** @nullable */
+  guideNumber?: string | null;
   paymentType: PurchaseOrderPaymentType;
   status: PurchaseOrderStatus;
   total: number;

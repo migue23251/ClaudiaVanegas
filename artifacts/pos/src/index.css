@@ -3,6 +3,8 @@
 /* Prevent dual scrollbars on desktop */
 html, body {
   overflow: hidden;
+  height: 100%;
+  overscroll-behavior: none;
 }
 
 @import 'tailwindcss';

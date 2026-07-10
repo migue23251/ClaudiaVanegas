@@ -157,7 +157,6 @@ export const ListProductsResponse = zod.array(ListProductsResponseItem)
  * @summary Create a new product
  */
 export const CreateProductBody = zod.object({
-  "code": zod.string().optional(),
   "name": zod.string(),
   "description": zod.string().optional(),
   "costPrice": zod.number(),
@@ -178,6 +177,34 @@ export const CreateProductResponse = zod.object({
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get the entry/exit movement history (kardex) for a product
+ */
+export const GetProductMovementsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetProductMovementsResponse = zod.object({
+  "incoming": zod.array(zod.object({
+  "id": zod.number(),
+  "purchaseOrderId": zod.number(),
+  "supplierName": zod.string(),
+  "qtyOrdered": zod.number(),
+  "qtyReceived": zod.number(),
+  "unitCost": zod.number(),
+  "date": zod.coerce.date()
+})),
+  "outgoing": zod.array(zod.object({
+  "id": zod.number(),
+  "saleId": zod.number(),
+  "customerName": zod.string(),
+  "qty": zod.number(),
+  "unitPrice": zod.number(),
+  "date": zod.coerce.date()
+}))
 })
 
 
@@ -210,7 +237,6 @@ export const UpdateProductParams = zod.object({
 })
 
 export const UpdateProductBody = zod.object({
-  "code": zod.string().optional(),
   "name": zod.string().optional(),
   "description": zod.string().optional(),
   "costPrice": zod.number().optional(),
@@ -428,7 +454,7 @@ export const ListPurchaseOrdersResponseItem = zod.object({
   "id": zod.number(),
   "supplierId": zod.number(),
   "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "guideNumber": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "status": zod.enum(['pending', 'partial', 'received', 'cancelled']),
   "total": zod.number(),
@@ -451,7 +477,7 @@ export const ListPurchaseOrdersResponse = zod.array(ListPurchaseOrdersResponseIt
  */
 export const CreatePurchaseOrderBody = zod.object({
   "supplierId": zod.number(),
-  "guideNumber": zod.string(),
+  "guideNumber": zod.string().optional(),
   "paymentType": zod.enum(['contado', 'credito']),
   "notes": zod.string().optional(),
   "items": zod.array(zod.object({
@@ -465,7 +491,7 @@ export const CreatePurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "supplierId": zod.number(),
   "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "guideNumber": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "status": zod.enum(['pending', 'partial', 'received', 'cancelled']),
   "total": zod.number(),
@@ -493,7 +519,7 @@ export const GetPurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "supplierId": zod.number(),
   "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "guideNumber": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "status": zod.enum(['pending', 'partial', 'received', 'cancelled']),
   "total": zod.number(),
@@ -519,16 +545,22 @@ export const UpdatePurchaseOrderParams = zod.object({
 
 export const UpdatePurchaseOrderBody = zod.object({
   "guideNumber": zod.string().optional(),
+  "supplierId": zod.number().optional(),
   "paymentType": zod.enum(['contado', 'credito']).optional(),
   "status": zod.enum(['pending', 'partial', 'received', 'cancelled']).optional(),
-  "notes": zod.string().optional()
+  "notes": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "productId": zod.number(),
+  "qtyOrdered": zod.number(),
+  "unitCost": zod.number()
+})).optional()
 })
 
 export const UpdatePurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "supplierId": zod.number(),
   "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "guideNumber": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "status": zod.enum(['pending', 'partial', 'received', 'cancelled']),
   "total": zod.number(),
@@ -563,7 +595,7 @@ export const ReceivePurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "supplierId": zod.number(),
   "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "guideNumber": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "status": zod.enum(['pending', 'partial', 'received', 'cancelled']),
   "total": zod.number(),
@@ -589,9 +621,11 @@ export const ListAccountsPayableQueryParams = zod.object({
 
 export const ListAccountsPayableResponseItem = zod.object({
   "id": zod.number(),
-  "purchaseOrderId": zod.number(),
-  "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "purchaseOrderId": zod.number().nullish(),
+  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "description": zod.string().nullish(),
+  "supplierName": zod.string().nullish(),
+  "guideNumber": zod.string().nullish(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
   "dueDate": zod.coerce.date().nullish(),
@@ -608,6 +642,36 @@ export const ListAccountsPayableResponse = zod.array(ListAccountsPayableResponse
 
 
 /**
+ * @summary Create a manual/fixed-expense account payable not tied to a purchase order
+ */
+export const CreateFixedExpenseBody = zod.object({
+  "description": zod.string(),
+  "totalAmount": zod.number(),
+  "dueDate": zod.coerce.date().optional()
+})
+
+export const CreateFixedExpenseResponse = zod.object({
+  "id": zod.number(),
+  "purchaseOrderId": zod.number().nullish(),
+  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "description": zod.string().nullish(),
+  "supplierName": zod.string().nullish(),
+  "guideNumber": zod.string().nullish(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "dueDate": zod.coerce.date().nullish(),
+  "status": zod.enum(['pending', 'partial', 'paid']),
+  "payments": zod.array(zod.object({
+  "id": zod.number(),
+  "amount": zod.number(),
+  "notes": zod.string().nullish(),
+  "paidAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Get accounts payable by ID
  */
 export const GetAccountPayableParams = zod.object({
@@ -616,9 +680,11 @@ export const GetAccountPayableParams = zod.object({
 
 export const GetAccountPayableResponse = zod.object({
   "id": zod.number(),
-  "purchaseOrderId": zod.number(),
-  "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "purchaseOrderId": zod.number().nullish(),
+  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "description": zod.string().nullish(),
+  "supplierName": zod.string().nullish(),
+  "guideNumber": zod.string().nullish(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
   "dueDate": zod.coerce.date().nullish(),
@@ -647,9 +713,11 @@ export const CreateApPaymentBody = zod.object({
 
 export const CreateApPaymentResponse = zod.object({
   "id": zod.number(),
-  "purchaseOrderId": zod.number(),
-  "supplierName": zod.string(),
-  "guideNumber": zod.string(),
+  "purchaseOrderId": zod.number().nullish(),
+  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "description": zod.string().nullish(),
+  "supplierName": zod.string().nullish(),
+  "guideNumber": zod.string().nullish(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
   "dueDate": zod.coerce.date().nullish(),
@@ -685,6 +753,9 @@ export const ListSalesResponseItem = zod.object({
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
+  "voided": zod.boolean(),
+  "voidedAt": zod.coerce.date().nullish(),
+  "voidReason": zod.string().nullish(),
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
@@ -723,6 +794,9 @@ export const CreateSaleResponse = zod.object({
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
+  "voided": zod.boolean(),
+  "voidedAt": zod.coerce.date().nullish(),
+  "voidReason": zod.string().nullish(),
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
@@ -752,6 +826,45 @@ export const GetSaleResponse = zod.object({
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
+  "voided": zod.boolean(),
+  "voidedAt": zod.coerce.date().nullish(),
+  "voidReason": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "qty": zod.number(),
+  "unitPrice": zod.number(),
+  "subtotal": zod.number()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Void/annul a sale, restoring stock and reversing any related debt
+ */
+export const VoidSaleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const VoidSaleBody = zod.object({
+  "reason": zod.string()
+})
+
+export const VoidSaleResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().nullish(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string().nullish(),
+  "customerCedula": zod.string().nullish(),
+  "paymentType": zod.enum(['contado', 'credito']),
+  "total": zod.number(),
+  "notes": zod.string().nullish(),
+  "voided": zod.boolean(),
+  "voidedAt": zod.coerce.date().nullish(),
+  "voidReason": zod.string().nullish(),
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),

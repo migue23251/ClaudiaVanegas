@@ -77,7 +77,6 @@ export default function CuentasCobrar() {
     if (isOverdue) return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" /> Vencida</Badge>;
     switch (status) {
       case 'pending': return <Badge variant="outline" className="border-amber-500 text-amber-600">Pendiente</Badge>;
-      case 'partial': return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600">Anticipo</Badge>;
       case 'paid': return <Badge variant="outline" className="border-emerald-500 text-emerald-600">Pagado</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -102,7 +101,6 @@ export default function CuentasCobrar() {
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               <SelectItem value="pending">Pendientes</SelectItem>
-              <SelectItem value="partial">Con anticipo</SelectItem>
               <SelectItem value="paid">Pagadas</SelectItem>
             </SelectContent>
           </Select>
