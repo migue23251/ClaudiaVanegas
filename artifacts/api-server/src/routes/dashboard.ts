@@ -6,6 +6,7 @@ import {
   customersTable,
   arPaymentsTable, accountsReceivableTable,
   purchaseOrdersTable,
+  apPaymentsTable, accountsPayableTable,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 
@@ -107,7 +108,7 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
     count: sql<number>`COUNT(*)`,
   }).from(productsTable).where(sql`${productsTable.stock} <= 5`);
 
-  // Net profit = recaudo del mes - compras del mes
+  // Net profit = recaudo del mes - compras del mes - gastos fijos pagados del mes
   const [poExpensesResult] = await db.select({
     total: sql<string>`COALESCE(SUM(${purchaseOrdersTable.total}), 0)`,
   }).from(purchaseOrdersTable).where(and(
@@ -115,8 +116,18 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
     lte(purchaseOrdersTable.createdAt, endOfMonth),
   ));
 
+  const [fixedExpensePaymentsResult] = await db.select({
+    total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
+  }).from(apPaymentsTable)
+    .innerJoin(accountsPayableTable, eq(apPaymentsTable.accountPayableId, accountsPayableTable.id))
+    .where(and(
+      eq(accountsPayableTable.type, "fixed_expense"),
+      gte(apPaymentsTable.paidAt, startOfMonth),
+      lte(apPaymentsTable.paidAt, endOfMonth),
+    ));
+
   const collection = parseFloat(cashResult.total) + parseFloat(creditPaymentsResult.total);
-  const expenses = parseFloat(poExpensesResult.total);
+  const expenses = parseFloat(poExpensesResult.total) + parseFloat(fixedExpensePaymentsResult.total);
 
   // Pending credits = total outstanding balance on pending/partial AR records
   const [pendingCreditsResult] = await db.select({
@@ -395,8 +406,8 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
   const rangeStart = months[0].start;
   const rangeEnd = months[months.length - 1].end;
 
-  // 3 aggregate queries: cash income, AR payments income, PO expenses
-  const [cashRows, arRows, poRows] = await Promise.all([
+  // 4 aggregate queries: cash income, AR payments income, PO expenses, fixed expense payments
+  const [cashRows, arRows, poRows, fixedExpenseRows] = await Promise.all([
     db.select({
       month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
@@ -422,6 +433,18 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
     }).from(purchaseOrdersTable)
       .where(and(gte(purchaseOrdersTable.createdAt, rangeStart), lte(purchaseOrdersTable.createdAt, rangeEnd)))
       .groupBy(sql`DATE_TRUNC('month', ${purchaseOrdersTable.createdAt})`),
+
+    db.select({
+      month: sql<string>`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`,
+      total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
+    }).from(apPaymentsTable)
+      .innerJoin(accountsPayableTable, eq(apPaymentsTable.accountPayableId, accountsPayableTable.id))
+      .where(and(
+        eq(accountsPayableTable.type, "fixed_expense"),
+        gte(apPaymentsTable.paidAt, rangeStart),
+        lte(apPaymentsTable.paidAt, rangeEnd),
+      ))
+      .groupBy(sql`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`),
   ]);
 
   const toKey = (d: string | Date) => {
@@ -431,11 +454,12 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
   const cashMap = Object.fromEntries(cashRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const arMap = Object.fromEntries(arRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const poMap = Object.fromEntries(poRows.map(r => [toKey(r.month), parseFloat(r.total)]));
+  const fixedExpenseMap = Object.fromEntries(fixedExpenseRows.map(r => [toKey(r.month), parseFloat(r.total)]));
 
   const result = months.map(({ start, label }) => {
     const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
     const income = (cashMap[key] ?? 0) + (arMap[key] ?? 0);
-    const expenses = poMap[key] ?? 0;
+    const expenses = (poMap[key] ?? 0) + (fixedExpenseMap[key] ?? 0);
     return {
       month: label,
       netProfit: income - expenses,
