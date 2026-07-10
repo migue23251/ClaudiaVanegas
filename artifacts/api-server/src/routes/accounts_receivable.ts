@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lt, type SQL } from "drizzle-orm";
+import { eq, and, lt, or, type SQL } from "drizzle-orm";
 import { db, accountsReceivableTable, arPaymentsTable, salesTable, customersTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
@@ -29,7 +29,10 @@ router.get("/accounts-receivable", requireAuth, requireAdmin, async (req, res): 
   }
   if (overdue === "true") {
     conditions.push(lt(accountsReceivableTable.dueDate, new Date().toISOString().split("T")[0]));
-    conditions.push(eq(accountsReceivableTable.status, "pending"));
+    conditions.push(or(
+      eq(accountsReceivableTable.status, "pending"),
+      eq(accountsReceivableTable.status, "partial"),
+    )!);
   }
   const records = conditions.length > 0
     ? await db.select().from(accountsReceivableTable).where(and(...conditions)).orderBy(accountsReceivableTable.createdAt)
@@ -66,9 +69,7 @@ router.post("/accounts-receivable/:id/payments", requireAuth, requireAdmin, asyn
   await db.insert(arPaymentsTable).values({ accountReceivableId: id, amount: String(amount), notes });
 
   const newPaid = alreadyPaid + payAmount;
-  // "partial" is no longer surfaced as a distinct category: an advance/partial
-  // payment still leaves the account "pending" until fully paid.
-  const newStatus = newPaid >= total ? "paid" : "pending";
+  const newStatus = newPaid >= total ? "paid" : newPaid > 0 ? "partial" : "pending";
   await db.update(accountsReceivableTable).set({ paidAmount: String(newPaid), status: newStatus }).where(eq(accountsReceivableTable.id, id));
 
   const result = await buildARResponse(id);

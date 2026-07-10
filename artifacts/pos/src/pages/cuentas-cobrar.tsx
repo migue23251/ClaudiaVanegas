@@ -39,10 +39,16 @@ export default function CuentasCobrar() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const queryParams = { status: statusFilter !== "all" ? statusFilter as any : undefined };
-  const { data: ars, isLoading } = useListAccountsReceivable(queryParams, {
+  // "Pendientes" must include accounts that already received partial payments
+  // (status "partial") but still have an outstanding balance, not just "pending".
+  const fetchAll = statusFilter === "all" || statusFilter === "pending";
+  const queryParams = { status: fetchAll ? undefined : statusFilter as any };
+  const { data: fetchedArs, isLoading } = useListAccountsReceivable(queryParams, {
     query: { queryKey: getListAccountsReceivableQueryKey(queryParams) }
   });
+  const ars = statusFilter === "pending"
+    ? fetchedArs?.filter(ar => ar.status === "pending" || ar.status === "partial")
+    : fetchedArs;
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
@@ -77,6 +83,7 @@ export default function CuentasCobrar() {
     if (isOverdue) return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" /> Vencida</Badge>;
     switch (status) {
       case 'pending': return <Badge variant="outline" className="border-amber-500 text-amber-600">Pendiente</Badge>;
+      case 'partial': return <Badge variant="outline" className="border-amber-500 text-amber-600">Pendiente</Badge>;
       case 'paid': return <Badge variant="outline" className="border-emerald-500 text-emerald-600">Pagado</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
