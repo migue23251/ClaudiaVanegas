@@ -10,7 +10,13 @@ export type ProductUpdateCategory = typeof ProductUpdateCategory[keyof typeof Pr
 
 
 export const ProductUpdateCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;

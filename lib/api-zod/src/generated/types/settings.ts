@@ -25,4 +25,8 @@ export interface Settings {
   smtpPass?: string | null;
   /** @nullable */
   smtpFrom?: string | null;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  primaryColor?: string | null;
 }

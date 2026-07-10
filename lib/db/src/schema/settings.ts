@@ -13,6 +13,8 @@ export const settingsTable = pgTable("settings", {
   smtpUser: text("smtp_user"),
   smtpPass: text("smtp_pass"),
   smtpFrom: text("smtp_from"),
+  logoUrl: text("logo_url"),
+  primaryColor: text("primary_color"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settingsTable).omit({ id: true });

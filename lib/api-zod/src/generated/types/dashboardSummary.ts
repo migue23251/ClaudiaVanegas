@@ -12,4 +12,6 @@ export interface DashboardSummary {
   newCustomers: number;
   totalSales: number;
   lowStockProducts: number;
+  netProfit: number;
+  pendingCredits: number;
 }

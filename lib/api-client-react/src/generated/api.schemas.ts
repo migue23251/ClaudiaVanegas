@@ -69,8 +69,14 @@ export type ProductCategory = typeof ProductCategory[keyof typeof ProductCategor
 
 
 export const ProductCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;
 
@@ -92,13 +98,19 @@ export type ProductInputCategory = typeof ProductInputCategory[keyof typeof Prod
 
 
 export const ProductInputCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;
 
 export interface ProductInput {
-  code: string;
+  code?: string;
   name: string;
   description?: string;
   costPrice: number;
@@ -112,8 +124,14 @@ export type ProductUpdateCategory = typeof ProductUpdateCategory[keyof typeof Pr
 
 
 export const ProductUpdateCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;
 
@@ -337,6 +355,8 @@ export interface Sale {
   customerId?: number | null;
   /** @nullable */
   customerName?: string | null;
+  /** @nullable */
+  customerCedula?: string | null;
   paymentType: SalePaymentType;
   total: number;
   /** @nullable */
@@ -357,6 +377,7 @@ export interface SaleInput {
   customerId?: number;
   paymentType: SaleInputPaymentType;
   notes?: string;
+  advanceAmount?: number;
   items: SaleItemInput[];
 }
 
@@ -377,6 +398,7 @@ export interface AccountReceivable {
   customerName: string;
   totalAmount: number;
   paidAmount: number;
+  advanceAmount?: number;
   /** @nullable */
   dueDate?: string | null;
   status: AccountReceivableStatus;
@@ -395,6 +417,8 @@ export interface DashboardSummary {
   newCustomers: number;
   totalSales: number;
   lowStockProducts: number;
+  netProfit: number;
+  pendingCredits: number;
 }
 
 export interface BillingVsCollectionPoint {
@@ -441,6 +465,27 @@ export interface PaymentTypePoint {
   count: number;
 }
 
+export interface NetProfitTrendPoint {
+  month: string;
+  netProfit: number;
+  income: number;
+  expenses: number;
+}
+
+export interface SlowMovingProduct {
+  id: number;
+  name: string;
+  code: string;
+  category: string;
+  stock: number;
+  daysInStock: number;
+  /** @nullable */
+  daysSinceLastSale?: number | null;
+  /** @nullable */
+  lastSaleAt?: string | null;
+  saleCount: number;
+}
+
 export interface Settings {
   id: number;
   storeName: string;
@@ -460,6 +505,10 @@ export interface Settings {
   smtpPass?: string | null;
   /** @nullable */
   smtpFrom?: string | null;
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  primaryColor?: string | null;
 }
 
 export interface SettingsInput {
@@ -472,6 +521,8 @@ export interface SettingsInput {
   smtpUser?: string;
   smtpPass?: string;
   smtpFrom?: string;
+  logoUrl?: string;
+  primaryColor?: string;
 }
 
 export type ListProductsParams = {
@@ -484,8 +535,14 @@ export type ListProductsCategory = typeof ListProductsCategory[keyof typeof List
 
 
 export const ListProductsCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;
 
@@ -495,6 +552,8 @@ search?: string;
 
 export type ListPurchaseOrdersParams = {
 status?: ListPurchaseOrdersStatus;
+supplierId?: number;
+supplierSearch?: string;
 };
 
 export type ListPurchaseOrdersStatus = typeof ListPurchaseOrdersStatus[keyof typeof ListPurchaseOrdersStatus];
@@ -525,6 +584,7 @@ userId?: number;
 paymentType?: ListSalesPaymentType;
 from?: string;
 to?: string;
+search?: string;
 };
 
 export type ListSalesPaymentType = typeof ListSalesPaymentType[keyof typeof ListSalesPaymentType];
@@ -550,6 +610,37 @@ export const ListAccountsReceivableStatus = {
 } as const;
 
 export type GetDashboardBillingVsCollectionParams = {
+/**
+ * Start date (ISO 8601, e.g. 2025-01-01)
+ */
+from?: string;
+/**
+ * End date (ISO 8601, e.g. 2025-12-31)
+ */
+to?: string;
+};
+
+export type GetDashboardSalesByCategoryParams = {
+from?: string;
+to?: string;
+};
+
+export type GetDashboardPaymentTypeBreakdownParams = {
+from?: string;
+to?: string;
+};
+
+export type GetDashboardExpensesVsIncomeParams = {
+from?: string;
+to?: string;
+};
+
+export type GetDashboardTopProductsParams = {
+from?: string;
+to?: string;
+};
+
+export type GetDashboardNetProfitTrendParams = {
 /**
  * Start date (ISO 8601, e.g. 2025-01-01)
  */

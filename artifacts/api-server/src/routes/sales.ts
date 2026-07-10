@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, or, ilike, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
@@ -29,6 +29,7 @@ async function buildSaleResponse(saleId: number) {
     total: parseFloat(sale.total),
     userName: user?.name ?? null,
     customerName: customer ? `${customer.firstName} ${customer.lastName}` : null,
+    customerCedula: customer?.cedula ?? null,
     items: items.map(i => ({
       ...i,
       productName: i.productName ?? "Desconocido",
@@ -39,7 +40,7 @@ async function buildSaleResponse(saleId: number) {
 }
 
 router.get("/sales", requireAuth, async (req, res): Promise<void> => {
-  const { userId, paymentType, from, to } = req.query;
+  const { userId, paymentType, from, to, search } = req.query;
   const conditions: SQL[] = [];
 
   // Cajero only sees their own sales
@@ -62,16 +63,27 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
     ? await db.select().from(salesTable).where(and(...conditions)).orderBy(salesTable.createdAt)
     : await db.select().from(salesTable).orderBy(salesTable.createdAt);
 
-  const results = await Promise.all(sales.map(s => buildSaleResponse(s.id)));
-  res.json(results.filter(Boolean));
+  let results = (await Promise.all(sales.map(s => buildSaleResponse(s.id)))).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof buildSaleResponse>>>[];
+
+  // Client-side filter by customer name or cedula (after joining)
+  if (search && typeof search === "string") {
+    const q = search.toLowerCase();
+    results = results.filter(r =>
+      r.customerName?.toLowerCase().includes(q) ||
+      r.customerCedula?.toLowerCase().includes(q)
+    );
+  }
+
+  res.json(results);
 });
 
 router.post("/sales", requireAuth, async (req, res): Promise<void> => {
-  const { customerId, paymentType, notes, items } = req.body as {
+  const { customerId, paymentType, notes, items, advanceAmount } = req.body as {
     customerId?: number;
     paymentType: "contado" | "credito";
     notes?: string;
     items: { productId: number; qty: number; unitPrice: number }[];
+    advanceAmount?: number;
   };
 
   if (!paymentType || !items?.length) {
@@ -97,6 +109,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
   }
 
   const total = items.reduce((sum, i) => sum + i.qty * i.unitPrice, 0);
+  const advance = Math.max(0, Math.min(advanceAmount ?? 0, total));
 
   // Wrap all writes in a transaction for atomicity
   const saleId = await db.transaction(async (tx) => {
@@ -127,12 +140,22 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
 
     // For credit sales, create an accounts receivable entry
     if (paymentType === "credito") {
+      // dueDate = 15 days after today
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 15);
+      const dueDateStr = dueDate.toISOString().split("T")[0];
+
+      const initialPaid = advance;
+      const status = initialPaid >= total ? "paid" : initialPaid > 0 ? "partial" : "pending";
+
       await tx.insert(accountsReceivableTable).values({
         saleId: sale.id,
         customerId: customerId ?? null,
         totalAmount: String(total),
-        paidAmount: "0",
-        status: "pending",
+        paidAmount: String(initialPaid),
+        advanceAmount: String(advance),
+        dueDate: dueDateStr,
+        status,
       });
     }
 

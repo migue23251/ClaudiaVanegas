@@ -11,18 +11,40 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
+const PAGE_SIZE = 15;
+
+function Pagination({ total, page, onChange }: { total: number; page: number; onChange: (p: number) => void }) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between pt-4 border-t">
+      <p className="text-sm text-muted-foreground">
+        Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(page - 1)}>Anterior</Button>
+        <span className="text-sm font-medium">{page} / {pages}</span>
+        <Button variant="outline" size="sm" disabled={page === pages} onClick={() => onChange(page + 1)}>Siguiente</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function CuentasPagar() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedAp, setSelectedAp] = useState<any>(null);
+  const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const queryParams = { status: statusFilter !== "all" ? statusFilter as any : undefined };
-  const { data: aps, isLoading } = useListAccountsPayable(queryParams, { query: { queryKey: getListAccountsPayableQueryKey(queryParams) } });
+  const { data: aps, isLoading } = useListAccountsPayable(queryParams, {
+    query: { queryKey: getListAccountsPayableQueryKey(queryParams) }
+  });
 
-  const formatCurrency = (val: number) => 
+  const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
 
   const createPayment = useCreateApPayment();
@@ -31,15 +53,15 @@ export default function CuentasPagar() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const amount = Number(formData.get("amount"));
-    
+
     if (amount <= 0 || amount > (selectedAp.totalAmount - selectedAp.paidAmount)) {
       toast({ title: "Monto inválido", variant: "destructive" });
       return;
     }
 
-    createPayment.mutate({ 
-      id: selectedAp.id, 
-      data: { amount, notes: formData.get("notes") as string } 
+    createPayment.mutate({
+      id: selectedAp.id,
+      data: { amount, notes: formData.get("notes") as string }
     }, {
       onSuccess: () => {
         toast({ title: "Pago registrado exitosamente" });
@@ -50,13 +72,16 @@ export default function CuentasPagar() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch(status) {
+    switch (status) {
       case 'pending': return <Badge variant="destructive">Pendiente</Badge>;
-      case 'partial': return <Badge variant="warning">Abono Parcial</Badge>;
-      case 'paid': return <Badge variant="success">Pagado</Badge>;
+      case 'partial': return <Badge variant="outline" className="border-amber-500 text-amber-600">Abono Parcial</Badge>;
+      case 'paid': return <Badge variant="outline" className="border-emerald-500 text-emerald-600">Pagado</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
+  const paginated = (aps ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -69,10 +94,8 @@ export default function CuentasPagar() {
 
       <div className="flex items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
         <div className="w-48">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
+          <Select value={statusFilter} onValueChange={handleStatusChange}>
+            <SelectTrigger><SelectValue placeholder="Estado" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               <SelectItem value="pending">Pendientes</SelectItem>
@@ -99,10 +122,10 @@ export default function CuentasPagar() {
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell></TableRow>
-            ) : aps?.length === 0 ? (
+            ) : paginated.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8">No hay cuentas por pagar</TableCell></TableRow>
             ) : (
-              aps?.map((ap) => {
+              paginated.map((ap) => {
                 const balance = ap.totalAmount - ap.paidAmount;
                 return (
                   <TableRow key={ap.id}>
@@ -117,7 +140,11 @@ export default function CuentasPagar() {
                     <TableCell>{getStatusBadge(ap.status)}</TableCell>
                     <TableCell className="text-right">
                       {balance > 0 && (
-                        <Button variant="outline" size="sm" className="h-8" onClick={() => { setSelectedAp(ap); setIsPaymentOpen(true); }}>
+                        <Button
+                          variant="outline" size="sm"
+                          className="h-8"
+                          onClick={() => { setSelectedAp(ap); setIsPaymentOpen(true); }}
+                        >
                           <DollarSign className="h-3.5 w-3.5 mr-1" /> Pagar
                         </Button>
                       )}
@@ -128,12 +155,17 @@ export default function CuentasPagar() {
             )}
           </TableBody>
         </Table>
+        {!isLoading && (aps?.length ?? 0) > PAGE_SIZE && (
+          <div className="px-4 pb-4">
+            <Pagination total={aps?.length ?? 0} page={page} onChange={setPage} />
+          </div>
+        )}
       </div>
 
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Registrar Pago a Proveedor</DialogTitle>
+            <DialogTitle>Registrar Pago al Proveedor</DialogTitle>
           </DialogHeader>
           {selectedAp && (
             <form onSubmit={handlePaymentSubmit} className="space-y-4 py-4">
@@ -143,31 +175,27 @@ export default function CuentasPagar() {
                   <span className="font-medium">{selectedAp.supplierName}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Saldo pendiente:</span>
+                  <span className="text-muted-foreground">Deuda actual:</span>
                   <span className="font-bold text-destructive">{formatCurrency(selectedAp.totalAmount - selectedAp.paidAmount)}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Monto a Abonar</label>
+                <label className="text-sm font-medium">Monto a Pagar</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    name="amount" 
-                    type="number" 
-                    step="0.01"
-                    min="1" 
-                    max={selectedAp.totalAmount - selectedAp.paidAmount} 
-                    defaultValue={selectedAp.totalAmount - selectedAp.paidAmount} 
-                    required 
-                    className="pl-9 font-serif text-lg"
+                  <Input
+                    name="amount" type="number" step="0.01" min="1"
+                    max={selectedAp.totalAmount - selectedAp.paidAmount}
+                    defaultValue={selectedAp.totalAmount - selectedAp.paidAmount}
+                    required className="pl-9 font-serif text-lg"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Referencia / Notas</label>
-                <Input name="notes" placeholder="Ej: Transferencia Bancolombia #1234" />
+                <label className="text-sm font-medium">Notas</label>
+                <Input name="notes" placeholder="Ej: Transferencia / Efectivo" />
               </div>
 
               <DialogFooter className="pt-4">

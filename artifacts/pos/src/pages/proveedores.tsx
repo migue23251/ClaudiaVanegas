@@ -1,16 +1,105 @@
 import { useState } from "react";
-import { useListSuppliers, getListSuppliersQueryKey, useCreateSupplier, useUpdateSupplier, SupplierInput, Supplier } from "@workspace/api-client-react";
+import { 
+  useListSuppliers, getListSuppliersQueryKey, useCreateSupplier, useUpdateSupplier, SupplierInput, Supplier,
+  useListPurchaseOrders, getListPurchaseOrdersQueryKey,
+} from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Edit } from "lucide-react";
+import { Plus, Edit, ClipboardList } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+
+const PAGE_SIZE = 15;
+
+function Pagination({ total, page, onChange }: { total: number; page: number; onChange: (p: number) => void }) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between pt-4 border-t">
+      <p className="text-sm text-muted-foreground">
+        Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total}
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={page === 1} onClick={() => onChange(page - 1)}>Anterior</Button>
+        <span className="text-sm font-medium">{page} / {pages}</span>
+        <Button variant="outline" size="sm" disabled={page === pages} onClick={() => onChange(page + 1)}>Siguiente</Button>
+      </div>
+    </div>
+  );
+}
+
+function OrderHistoryDialog({ supplier, open, onClose }: { supplier: Supplier; open: boolean; onClose: () => void }) {
+  const params = { supplierId: supplier.id };
+  const { data: orders, isLoading } = useListPurchaseOrders(params as any, {
+    query: { enabled: open, queryKey: [...getListPurchaseOrdersQueryKey(params as any), supplier.id] }
+  });
+
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending': return <Badge variant="outline" className="border-amber-500 text-amber-600">Pendiente</Badge>;
+      case 'partial': return <Badge variant="secondary">Parcial</Badge>;
+      case 'received': return <Badge variant="outline" className="border-emerald-500 text-emerald-600">Recibido</Badge>;
+      case 'cancelled': return <Badge variant="destructive">Cancelado</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Historial de Órdenes — {supplier.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          {isLoading ? (
+            <p className="text-center text-muted-foreground py-8">Cargando...</p>
+          ) : !orders?.length ? (
+            <p className="text-center text-muted-foreground py-8">No hay órdenes para este proveedor</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Guía / Ref</TableHead>
+                  <TableHead>Tipo Pago</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Estado</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map(order => (
+                  <TableRow key={order.id}>
+                    <TableCell className="text-sm text-muted-foreground">{format(new Date(order.createdAt), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="font-mono text-xs">{order.guideNumber}</TableCell>
+                    <TableCell className="capitalize text-sm">{order.paymentType}</TableCell>
+                    <TableCell className="text-right font-serif font-bold">{formatCurrency(order.total)}</TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function Proveedores() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [historySupplier, setHistorySupplier] = useState<Supplier | null>(null);
+  const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -51,6 +140,8 @@ export default function Proveedores() {
     }
   };
 
+  const paginated = (suppliers ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -77,16 +168,19 @@ export default function Proveedores() {
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell></TableRow>
-            ) : suppliers?.length === 0 ? (
+            ) : paginated.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center py-8">No hay proveedores registrados</TableCell></TableRow>
             ) : (
-              suppliers?.map((supplier) => (
+              paginated.map((supplier) => (
                 <TableRow key={supplier.id}>
                   <TableCell className="font-medium font-serif">{supplier.name}</TableCell>
-                  <TableCell>{supplier.contact || "-"}</TableCell>
-                  <TableCell className="text-muted-foreground">{supplier.email || "-"}</TableCell>
-                  <TableCell>{supplier.phone || "-"}</TableCell>
+                  <TableCell>{supplier.contact || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{supplier.email || "—"}</TableCell>
+                  <TableCell>{supplier.phone || "—"}</TableCell>
                   <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={() => setHistorySupplier(supplier)}>
+                      <ClipboardList className="h-4 w-4" /> Órdenes
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => { setEditingSupplier(supplier); setIsDialogOpen(true); }}>
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -96,7 +190,21 @@ export default function Proveedores() {
             )}
           </TableBody>
         </Table>
+        {!isLoading && (suppliers?.length ?? 0) > PAGE_SIZE && (
+          <div className="px-4 pb-4">
+            <Pagination total={suppliers?.length ?? 0} page={page} onChange={setPage} />
+          </div>
+        )}
       </div>
+
+      {/* Order history dialog */}
+      {historySupplier && (
+        <OrderHistoryDialog
+          supplier={historySupplier}
+          open={!!historySupplier}
+          onClose={() => setHistorySupplier(null)}
+        />
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>

@@ -21,7 +21,11 @@ router.get("/settings", requireAuth, async (_req, res): Promise<void> => {
 
 router.put("/settings", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const settings = await getOrCreateSettings();
-  const { storeName, storeEmail, storePhone, storeAddress, smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom } = req.body;
+  const {
+    storeName, storeEmail, storePhone, storeAddress,
+    smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom,
+    logoUrl, primaryColor,
+  } = req.body;
   const updates: Record<string, unknown> = {};
   if (storeName != null) updates.storeName = storeName;
   if (storeEmail !== undefined) updates.storeEmail = storeEmail;
@@ -32,6 +36,8 @@ router.put("/settings", requireAuth, requireAdmin, async (req, res): Promise<voi
   if (smtpUser !== undefined) updates.smtpUser = smtpUser;
   if (smtpPass && smtpPass !== "••••••••") updates.smtpPass = smtpPass;
   if (smtpFrom !== undefined) updates.smtpFrom = smtpFrom;
+  if (logoUrl !== undefined) updates.logoUrl = logoUrl || null;
+  if (primaryColor !== undefined) updates.primaryColor = primaryColor || null;
 
   const [updated] = await db.update(settingsTable).set(updates).where(eq(settingsTable.id, settings.id)).returning();
   const { smtpPass: __, ...safeSettings } = updated;

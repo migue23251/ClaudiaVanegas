@@ -17,6 +17,8 @@ export interface Sale {
   customerId?: number | null;
   /** @nullable */
   customerName?: string | null;
+  /** @nullable */
+  customerCedula?: string | null;
   paymentType: SalePaymentType;
   total: number;
   /** @nullable */

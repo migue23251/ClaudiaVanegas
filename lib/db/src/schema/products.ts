@@ -2,6 +2,20 @@ import { pgTable, serial, text, integer, numeric, timestamp, jsonb } from "drizz
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const PRODUCT_CATEGORIES = [
+  "blusas",
+  "jeans",
+  "vestidos",
+  "conjuntos",
+  "faldas",
+  "chaquetas",
+  "zapatos",
+  "bolsos",
+  "accesorios",
+] as const;
+
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
+
 export const productsTable = pgTable("products", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(),
@@ -10,7 +24,7 @@ export const productsTable = pgTable("products", {
   costPrice: numeric("cost_price", { precision: 12, scale: 2 }).notNull(),
   salePrice: numeric("sale_price", { precision: 12, scale: 2 }).notNull(),
   stock: integer("stock").notNull().default(0),
-  category: text("category", { enum: ["ropa", "zapatos", "accesorios"] }).notNull(),
+  category: text("category", { enum: PRODUCT_CATEGORIES }).notNull(),
   images: jsonb("images").$type<string[]>().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

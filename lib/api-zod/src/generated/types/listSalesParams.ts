@@ -12,4 +12,5 @@ userId?: number;
 paymentType?: ListSalesPaymentType;
 from?: Date;
 to?: Date;
+search?: string;
 };

@@ -10,7 +10,13 @@ export type ListProductsCategory = typeof ListProductsCategory[keyof typeof List
 
 
 export const ListProductsCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;

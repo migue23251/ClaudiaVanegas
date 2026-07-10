@@ -9,4 +9,6 @@ import type { ListPurchaseOrdersStatus } from './listPurchaseOrdersStatus';
 
 export type ListPurchaseOrdersParams = {
 status?: ListPurchaseOrdersStatus;
+supplierId?: number;
+supplierSearch?: string;
 };

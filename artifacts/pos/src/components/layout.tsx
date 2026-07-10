@@ -20,7 +20,6 @@ import { cn } from "@/lib/utils";
 const menuItems = [
   { icon: LayoutDashboard, label: "Panel",            href: "/dashboard",       roles: ["admin", "cajero"] },
   { icon: ShoppingCart,   label: "Punto de Venta",   href: "/pos",              roles: ["admin", "cajero"] },
-  { icon: Users,          label: "Clientes",          href: "/clientes",         roles: ["admin", "cajero"] },
   { icon: FileText,       label: "Historial Ventas",  href: "/ventas",           roles: ["admin", "cajero"] },
   { icon: Briefcase,      label: "Cuentas por Cobrar",href: "/cuentas-cobrar",   roles: ["admin"] },
   { icon: Package,        label: "Inventario",        href: "/inventario",       roles: ["admin"] },

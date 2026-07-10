@@ -16,4 +16,6 @@ export interface SettingsInput {
   smtpUser?: string;
   smtpPass?: string;
   smtpFrom?: string;
+  logoUrl?: string;
+  primaryColor?: string;
 }

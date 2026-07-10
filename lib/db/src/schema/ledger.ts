@@ -30,6 +30,7 @@ export const accountsReceivableTable = pgTable("accounts_receivable", {
   customerId: integer("customer_id"),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
   paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  advanceAmount: numeric("advance_amount", { precision: 12, scale: 2 }).notNull().default("0"),
   dueDate: date("due_date"),
   status: text("status", { enum: ["pending", "partial", "paid"] }).notNull().default("pending"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

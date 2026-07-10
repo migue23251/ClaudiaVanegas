@@ -31,15 +31,20 @@ export default function Configuracion() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Logo state ──────────────────────────────────────────────────
-  const [logo, setLogo] = useState<string | null>(() =>
-    typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null
-  );
+  // Prefer DB logoUrl; fallback to localStorage for preview before settings load
+  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
+  const [logo, setLogo] = useState<string | null>(storedLogo);
+
+  // Sync logo from DB settings when loaded
+  useEffect(() => {
+    if (settings?.logoUrl) setLogo(settings.logoUrl);
+  }, [settings?.logoUrl]);
 
   // ── Brand color state ────────────────────────────────────────────
   const [colorHex, setColorHex] = useState<string>(() => {
+    if (settings?.primaryColor) return settings.primaryColor;
     const stored = localStorage.getItem("pos_brand_color");
     if (stored) return stored;
-    // Derive from current CSS var if not stored
     try {
       const hsl = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
       if (hsl) return hslStringToHex(hsl);
@@ -48,8 +53,23 @@ export default function Configuracion() {
   });
   const [hexInput, setHexInput] = useState(colorHex);
 
+  // Sync color from DB settings when loaded
+  useEffect(() => {
+    if (settings?.primaryColor) {
+      setColorHex(settings.primaryColor);
+    }
+  }, [settings?.primaryColor]);
+
   // Sync text input when colorHex changes (e.g. preset click)
   useEffect(() => { setHexInput(colorHex); }, [colorHex]);
+
+  const saveColorToDb = (hex: string) => {
+    updateSettings.mutate({ data: { primaryColor: hex } as any }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+      }
+    });
+  };
 
   const applyAndSave = (hex: string) => {
     const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
@@ -57,6 +77,7 @@ export default function Configuracion() {
     applyBrandColor(hex);
     localStorage.setItem("pos_brand_color", hex);
     setColorHex(hex);
+    saveColorToDb(hex);
     toast({ title: "Color de marca actualizado" });
   };
 
@@ -107,7 +128,13 @@ export default function Configuracion() {
       const base64 = ev.target?.result as string;
       localStorage.setItem("pos_logo", base64);
       setLogo(base64);
-      toast({ title: "Logo actualizado" });
+      // Save to DB so all users see the logo
+      updateSettings.mutate({ data: { logoUrl: base64 } as any }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+          toast({ title: "Logo actualizado en el sistema" });
+        }
+      });
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -116,7 +143,12 @@ export default function Configuracion() {
   const handleRemoveLogo = () => {
     localStorage.removeItem("pos_logo");
     setLogo(null);
-    toast({ title: "Logo eliminado" });
+    updateSettings.mutate({ data: { logoUrl: "" } as any }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+        toast({ title: "Logo eliminado" });
+      }
+    });
   };
 
   const onSubmit = (data: SettingsInput) => {
@@ -150,7 +182,7 @@ export default function Configuracion() {
             <CardTitle>Color de Marca</CardTitle>
           </div>
           <CardDescription>
-            Define el color principal del sistema. Se aplica a botones, íconos activos y elementos destacados.
+            Define el color principal del sistema. Se guarda en la base de datos y se aplica para todos los usuarios.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -171,6 +203,7 @@ export default function Configuracion() {
                   localStorage.setItem("pos_brand_color", hex);
                   setColorHex(hex);
                 }}
+                onBlur={(e) => applyAndSave(e.target.value)}
                 className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
               />
             </label>
@@ -230,7 +263,7 @@ export default function Configuracion() {
             <CardTitle>Logo de la Tienda</CardTitle>
           </div>
           <CardDescription>
-            Se muestra en el login y la barra de navegación. Se guarda localmente en este dispositivo.
+            Se muestra en el login y la barra de navegación. Se guarda en la base de datos y es visible para todos los usuarios.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -334,8 +367,8 @@ export default function Configuracion() {
         </Card>
 
         <div className="flex justify-end">
-          <Button type="submit" size="lg" disabled={updateSettings.isPending}>
-            {updateSettings.isPending ? "Guardando…" : "Guardar Cambios"}
+          <Button type="submit" disabled={updateSettings.isPending} className="min-w-32">
+            {updateSettings.isPending ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </div>
       </form>

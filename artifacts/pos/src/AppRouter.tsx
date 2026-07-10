@@ -5,7 +5,6 @@ import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import Pos from "@/pages/pos";
 import Inventario from "@/pages/inventario";
-import Clientes from "@/pages/clientes";
 import Proveedores from "@/pages/proveedores";
 import OrdenesCompra from "@/pages/ordenes-compra";
 import CuentasPagar from "@/pages/cuentas-pagar";
@@ -54,7 +53,6 @@ export function AppRouter() {
 
       <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
       <Route path="/pos"><ProtectedRoute component={Pos} /></Route>
-      <Route path="/clientes"><ProtectedRoute component={Clientes} /></Route>
       <Route path="/ventas"><ProtectedRoute component={Ventas} /></Route>
 
       {/* Admin Only */}

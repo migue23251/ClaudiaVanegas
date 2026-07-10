@@ -134,7 +134,7 @@ export const DeleteUserResponse = zod.void()
  */
 export const ListProductsQueryParams = zod.object({
   "search": zod.coerce.string().optional(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']).optional(),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']).optional(),
   "lowStock": zod.coerce.boolean().optional()
 })
 
@@ -146,7 +146,7 @@ export const ListProductsResponseItem = zod.object({
   "costPrice": zod.number(),
   "salePrice": zod.number(),
   "stock": zod.number(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 })
@@ -157,13 +157,13 @@ export const ListProductsResponse = zod.array(ListProductsResponseItem)
  * @summary Create a new product
  */
 export const CreateProductBody = zod.object({
-  "code": zod.string(),
+  "code": zod.string().optional(),
   "name": zod.string(),
   "description": zod.string().optional(),
   "costPrice": zod.number(),
   "salePrice": zod.number(),
   "stock": zod.number(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()).optional()
 })
 
@@ -175,7 +175,7 @@ export const CreateProductResponse = zod.object({
   "costPrice": zod.number(),
   "salePrice": zod.number(),
   "stock": zod.number(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 })
@@ -196,7 +196,7 @@ export const GetProductResponse = zod.object({
   "costPrice": zod.number(),
   "salePrice": zod.number(),
   "stock": zod.number(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 })
@@ -216,7 +216,7 @@ export const UpdateProductBody = zod.object({
   "costPrice": zod.number().optional(),
   "salePrice": zod.number().optional(),
   "stock": zod.number().optional(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']).optional(),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']).optional(),
   "images": zod.array(zod.string()).optional()
 })
 
@@ -228,7 +228,7 @@ export const UpdateProductResponse = zod.object({
   "costPrice": zod.number(),
   "salePrice": zod.number(),
   "stock": zod.number(),
-  "category": zod.enum(['ropa', 'zapatos', 'accesorios']),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 })
@@ -419,7 +419,9 @@ export const DeleteSupplierResponse = zod.void()
  * @summary List all purchase orders
  */
 export const ListPurchaseOrdersQueryParams = zod.object({
-  "status": zod.enum(['pending', 'partial', 'received', 'cancelled']).optional()
+  "status": zod.enum(['pending', 'partial', 'received', 'cancelled']).optional(),
+  "supplierId": zod.coerce.number().optional(),
+  "supplierSearch": zod.coerce.string().optional()
 })
 
 export const ListPurchaseOrdersResponseItem = zod.object({
@@ -669,7 +671,8 @@ export const ListSalesQueryParams = zod.object({
   "userId": zod.coerce.number().optional(),
   "paymentType": zod.enum(['contado', 'credito']).optional(),
   "from": zod.date().optional(),
-  "to": zod.date().optional()
+  "to": zod.date().optional(),
+  "search": zod.coerce.string().optional()
 })
 
 export const ListSalesResponseItem = zod.object({
@@ -678,6 +681,7 @@ export const ListSalesResponseItem = zod.object({
   "userName": zod.string().nullish(),
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
+  "customerCedula": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -701,6 +705,7 @@ export const CreateSaleBody = zod.object({
   "customerId": zod.number().optional(),
   "paymentType": zod.enum(['contado', 'credito']),
   "notes": zod.string().optional(),
+  "advanceAmount": zod.number().optional(),
   "items": zod.array(zod.object({
   "productId": zod.number(),
   "qty": zod.number(),
@@ -714,6 +719,7 @@ export const CreateSaleResponse = zod.object({
   "userName": zod.string().nullish(),
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
+  "customerCedula": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -742,6 +748,7 @@ export const GetSaleResponse = zod.object({
   "userName": zod.string().nullish(),
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
+  "customerCedula": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -772,6 +779,7 @@ export const ListAccountsReceivableResponseItem = zod.object({
   "customerName": zod.string(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
+  "advanceAmount": zod.number().optional(),
   "dueDate": zod.coerce.date().nullish(),
   "status": zod.enum(['pending', 'partial', 'paid']),
   "payments": zod.array(zod.object({
@@ -799,6 +807,7 @@ export const GetAccountReceivableResponse = zod.object({
   "customerName": zod.string(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
+  "advanceAmount": zod.number().optional(),
   "dueDate": zod.coerce.date().nullish(),
   "status": zod.enum(['pending', 'partial', 'paid']),
   "payments": zod.array(zod.object({
@@ -830,6 +839,7 @@ export const CreateArPaymentResponse = zod.object({
   "customerName": zod.string(),
   "totalAmount": zod.number(),
   "paidAmount": zod.number(),
+  "advanceAmount": zod.number().optional(),
   "dueDate": zod.coerce.date().nullish(),
   "status": zod.enum(['pending', 'partial', 'paid']),
   "payments": zod.array(zod.object({
@@ -850,7 +860,9 @@ export const GetDashboardSummaryResponse = zod.object({
   "totalCollection": zod.number(),
   "newCustomers": zod.number(),
   "totalSales": zod.number(),
-  "lowStockProducts": zod.number()
+  "lowStockProducts": zod.number(),
+  "netProfit": zod.number(),
+  "pendingCredits": zod.number()
 })
 
 
@@ -871,8 +883,13 @@ export const GetDashboardBillingVsCollectionResponse = zod.array(GetDashboardBil
 
 
 /**
- * @summary Sales totals grouped by product category (all time)
+ * @summary Sales totals grouped by product category
  */
+export const GetDashboardSalesByCategoryQueryParams = zod.object({
+  "from": zod.date().optional(),
+  "to": zod.date().optional()
+})
+
 export const GetDashboardSalesByCategoryResponseItem = zod.object({
   "category": zod.string(),
   "total": zod.number(),
@@ -884,6 +901,11 @@ export const GetDashboardSalesByCategoryResponse = zod.array(GetDashboardSalesBy
 /**
  * @summary Sales breakdown by payment type
  */
+export const GetDashboardPaymentTypeBreakdownQueryParams = zod.object({
+  "from": zod.date().optional(),
+  "to": zod.date().optional()
+})
+
 export const GetDashboardPaymentTypeBreakdownResponseItem = zod.object({
   "paymentType": zod.string(),
   "total": zod.number(),
@@ -904,8 +926,13 @@ export const GetDashboardInventoryCostByCategoryResponse = zod.array(GetDashboar
 
 
 /**
- * @summary Monthly expenses (purchase orders) vs income (cash + AR payments) — last 6 months
+ * @summary Monthly expenses (purchase orders) vs income (cash + AR payments)
  */
+export const GetDashboardExpensesVsIncomeQueryParams = zod.object({
+  "from": zod.date().optional(),
+  "to": zod.date().optional()
+})
+
 export const GetDashboardExpensesVsIncomeResponseItem = zod.object({
   "month": zod.string(),
   "expenses": zod.number(),
@@ -915,8 +942,13 @@ export const GetDashboardExpensesVsIncomeResponse = zod.array(GetDashboardExpens
 
 
 /**
- * @summary Top selling products this month
+ * @summary Top selling products
  */
+export const GetDashboardTopProductsQueryParams = zod.object({
+  "from": zod.date().optional(),
+  "to": zod.date().optional()
+})
+
 export const GetDashboardTopProductsResponseItem = zod.object({
   "productId": zod.number(),
   "productName": zod.string(),
@@ -925,6 +957,40 @@ export const GetDashboardTopProductsResponseItem = zod.object({
   "totalRevenue": zod.number()
 })
 export const GetDashboardTopProductsResponse = zod.array(GetDashboardTopProductsResponseItem)
+
+
+/**
+ * @summary Monthly net profit trend (income minus purchase expenses)
+ */
+export const GetDashboardNetProfitTrendQueryParams = zod.object({
+  "from": zod.date().optional().describe('Start date (ISO 8601, e.g. 2025-01-01)'),
+  "to": zod.date().optional().describe('End date (ISO 8601, e.g. 2025-12-31)')
+})
+
+export const GetDashboardNetProfitTrendResponseItem = zod.object({
+  "month": zod.string(),
+  "netProfit": zod.number(),
+  "income": zod.number(),
+  "expenses": zod.number()
+})
+export const GetDashboardNetProfitTrendResponse = zod.array(GetDashboardNetProfitTrendResponseItem)
+
+
+/**
+ * @summary Products with low turnover (slow-moving inventory)
+ */
+export const GetDashboardSlowMovingProductsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "code": zod.string(),
+  "category": zod.string(),
+  "stock": zod.number(),
+  "daysInStock": zod.number(),
+  "daysSinceLastSale": zod.number().nullish(),
+  "lastSaleAt": zod.coerce.date().nullish(),
+  "saleCount": zod.number()
+})
+export const GetDashboardSlowMovingProductsResponse = zod.array(GetDashboardSlowMovingProductsResponseItem)
 
 
 /**
@@ -994,7 +1060,9 @@ export const GetSettingsResponse = zod.object({
   "smtpPort": zod.number().nullish(),
   "smtpUser": zod.string().nullish(),
   "smtpPass": zod.string().nullish(),
-  "smtpFrom": zod.string().nullish()
+  "smtpFrom": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish()
 })
 
 
@@ -1010,7 +1078,9 @@ export const UpdateSettingsBody = zod.object({
   "smtpPort": zod.number().optional(),
   "smtpUser": zod.string().optional(),
   "smtpPass": zod.string().optional(),
-  "smtpFrom": zod.string().optional()
+  "smtpFrom": zod.string().optional(),
+  "logoUrl": zod.string().optional(),
+  "primaryColor": zod.string().optional()
 })
 
 export const UpdateSettingsResponse = zod.object({
@@ -1023,7 +1093,9 @@ export const UpdateSettingsResponse = zod.object({
   "smtpPort": zod.number().nullish(),
   "smtpUser": zod.string().nullish(),
   "smtpPass": zod.string().nullish(),
-  "smtpFrom": zod.string().nullish()
+  "smtpFrom": zod.string().nullish(),
+  "logoUrl": zod.string().nullish(),
+  "primaryColor": zod.string().nullish()
 })
 
 

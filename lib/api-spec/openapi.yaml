@@ -178,7 +178,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [ropa, zapatos, accesorios]
+            enum: [blusas, jeans, vestidos, conjuntos, faldas, chaquetas, zapatos, bolsos, accesorios]
         - name: lowStock
           in: query
           schema:
@@ -463,6 +463,14 @@ paths:
           schema:
             type: string
             enum: [pending, partial, received, cancelled]
+        - name: supplierId
+          in: query
+          schema:
+            type: integer
+        - name: supplierSearch
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: List of purchase orders
@@ -653,6 +661,10 @@ paths:
           schema:
             type: string
             format: date
+        - name: search
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: List of sales
@@ -819,7 +831,18 @@ paths:
     get:
       operationId: getDashboardSalesByCategory
       tags: [dashboard]
-      summary: Sales totals grouped by product category (all time)
+      summary: Sales totals grouped by product category
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Sales by category
@@ -835,6 +858,17 @@ paths:
       operationId: getDashboardPaymentTypeBreakdown
       tags: [dashboard]
       summary: Sales breakdown by payment type
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Payment type breakdown
@@ -864,7 +898,18 @@ paths:
     get:
       operationId: getDashboardExpensesVsIncome
       tags: [dashboard]
-      summary: Monthly expenses (purchase orders) vs income (cash + AR payments) — last 6 months
+      summary: Monthly expenses (purchase orders) vs income (cash + AR payments)
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Expenses vs income data
@@ -879,7 +924,18 @@ paths:
     get:
       operationId: getDashboardTopProducts
       tags: [dashboard]
-      summary: Top selling products this month
+      summary: Top selling products
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
       responses:
         "200":
           description: Top products
@@ -889,6 +945,49 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TopProduct"
+
+  /dashboard/net-profit-trend:
+    get:
+      operationId: getDashboardNetProfitTrend
+      tags: [dashboard]
+      summary: Monthly net profit trend (income minus purchase expenses)
+      parameters:
+        - name: from
+          in: query
+          description: Start date (ISO 8601, e.g. 2025-01-01)
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: End date (ISO 8601, e.g. 2025-12-31)
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Net profit trend data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NetProfitTrendPoint"
+
+  /dashboard/slow-moving-products:
+    get:
+      operationId: getDashboardSlowMovingProducts
+      tags: [dashboard]
+      summary: Products with low turnover (slow-moving inventory)
+      responses:
+        "200":
+          description: Slow moving products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SlowMovingProduct"
 
   # ─── REPORTS ─────────────────────────────────────────────────────────────────
   /reports/sales-by-month:
@@ -1087,7 +1186,7 @@ components:
           type: integer
         category:
           type: string
-          enum: [ropa, zapatos, accesorios]
+          enum: [blusas, jeans, vestidos, conjuntos, faldas, chaquetas, zapatos, bolsos, accesorios]
         images:
           type: array
           items:
@@ -1098,7 +1197,7 @@ components:
 
     ProductInput:
       type: object
-      required: [code, name, costPrice, salePrice, stock, category]
+      required: [name, costPrice, salePrice, stock, category]
       properties:
         code:
           type: string
@@ -1114,7 +1213,7 @@ components:
           type: integer
         category:
           type: string
-          enum: [ropa, zapatos, accesorios]
+          enum: [blusas, jeans, vestidos, conjuntos, faldas, chaquetas, zapatos, bolsos, accesorios]
         images:
           type: array
           items:
@@ -1137,7 +1236,7 @@ components:
           type: integer
         category:
           type: string
-          enum: [ropa, zapatos, accesorios]
+          enum: [blusas, jeans, vestidos, conjuntos, faldas, chaquetas, zapatos, bolsos, accesorios]
         images:
           type: array
           items:
@@ -1428,6 +1527,8 @@ components:
           type: ["integer", "null"]
         customerName:
           type: ["string", "null"]
+        customerCedula:
+          type: ["string", "null"]
         paymentType:
           type: string
           enum: [contado, credito]
@@ -1454,6 +1555,8 @@ components:
           enum: [contado, credito]
         notes:
           type: string
+        advanceAmount:
+          type: number
         items:
           type: array
           items:
@@ -1475,6 +1578,8 @@ components:
         totalAmount:
           type: number
         paidAmount:
+          type: number
+        advanceAmount:
           type: number
         dueDate:
           type: ["string", "null"]
@@ -1503,7 +1608,7 @@ components:
     # ─── DASHBOARD ───────────────────────────────────────────────────────────
     DashboardSummary:
       type: object
-      required: [totalBilling, totalCollection, newCustomers, totalSales, lowStockProducts]
+      required: [totalBilling, totalCollection, newCustomers, totalSales, lowStockProducts, netProfit, pendingCredits]
       properties:
         totalBilling:
           type: number
@@ -1515,6 +1620,10 @@ components:
           type: integer
         lowStockProducts:
           type: integer
+        netProfit:
+          type: number
+        pendingCredits:
+          type: number
 
     BillingVsCollectionPoint:
       type: object
@@ -1598,6 +1707,43 @@ components:
         count:
           type: integer
 
+    NetProfitTrendPoint:
+      type: object
+      required: [month, netProfit, income, expenses]
+      properties:
+        month:
+          type: string
+        netProfit:
+          type: number
+        income:
+          type: number
+        expenses:
+          type: number
+
+    SlowMovingProduct:
+      type: object
+      required: [id, name, code, category, stock, daysInStock, saleCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+        category:
+          type: string
+        stock:
+          type: integer
+        daysInStock:
+          type: number
+        daysSinceLastSale:
+          type: ["number", "null"]
+        lastSaleAt:
+          type: ["string", "null"]
+          format: date-time
+        saleCount:
+          type: integer
+
     # ─── SETTINGS ────────────────────────────────────────────────────────────
     Settings:
       type: object
@@ -1623,6 +1769,10 @@ components:
           type: ["string", "null"]
         smtpFrom:
           type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        primaryColor:
+          type: ["string", "null"]
 
     SettingsInput:
       type: object
@@ -1644,4 +1794,8 @@ components:
         smtpPass:
           type: string
         smtpFrom:
+          type: string
+        logoUrl:
+          type: string
+        primaryColor:
           type: string

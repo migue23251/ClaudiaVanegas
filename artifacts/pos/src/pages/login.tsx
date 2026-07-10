@@ -49,13 +49,16 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-background overflow-hidden">
-      {/* Left decorative panel — hidden on small screens */}
-      <div className="hidden md:flex md:w-[42%] lg:w-[48%] flex-col items-center justify-center bg-primary relative overflow-hidden p-12">
-        {/* Decorative circles */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-white/5" />
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-white/5" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] rounded-full bg-white/3" />
+    <div className="min-h-screen w-full flex flex-col md:flex-row bg-background overflow-hidden">
+      {/* Brand panel — full width on mobile (top), side panel on desktop (left) */}
+      <div className="flex flex-col items-center justify-center bg-primary relative overflow-hidden p-8 md:p-12
+                      w-full min-h-[38vh] md:min-h-screen md:w-[42%] lg:w-[48%] shrink-0">
+        {/* Decorative circles — same palette as desktop */}
+        <div className="absolute -top-24 -left-24 w-72 h-72 md:w-96 md:h-96 rounded-full bg-white/5" />
+        <div className="absolute -bottom-24 -right-24 w-72 h-72 md:w-96 md:h-96 rounded-full bg-white/5" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] rounded-full bg-white/[0.03]" />
+        <div className="absolute top-1/4 right-0 w-40 h-40 rounded-full bg-white/5" />
+        <div className="absolute bottom-1/4 left-0 w-32 h-32 rounded-full bg-white/5" />
 
         {/* Brand content */}
         <div className="relative z-10 text-center text-primary-foreground">
@@ -63,41 +66,27 @@ export default function Login() {
             <img
               src={storedLogo}
               alt="Logo"
-              className="mx-auto h-24 w-24 rounded-2xl object-contain shadow-xl mb-8 bg-white/10 p-2"
+              className="mx-auto h-16 w-16 md:h-24 md:w-24 rounded-2xl object-contain shadow-xl mb-4 md:mb-8 bg-white/10 p-2"
             />
           ) : (
-            <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-2xl bg-white/15 shadow-xl backdrop-blur-sm">
-              <Store className="h-12 w-12 text-white" />
+            <div className="mx-auto mb-4 md:mb-8 flex h-16 w-16 md:h-24 md:w-24 items-center justify-center rounded-2xl bg-white/15 shadow-xl backdrop-blur-sm">
+              <Store className="h-8 w-8 md:h-12 md:w-12 text-white" />
             </div>
           )}
-          <h1 className="font-serif text-4xl lg:text-5xl font-bold text-white mb-3 leading-tight">
+          <h1 className="font-serif text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 md:mb-3 leading-tight">
             Claudia<br />Vanegas
           </h1>
-          <p className="text-white/70 text-base mt-2 font-medium tracking-wide uppercase text-sm">
+          <p className="text-white/70 text-sm font-medium tracking-wide uppercase">
             Sistema de Punto de Venta
           </p>
         </div>
       </div>
 
-      {/* Right: Login form */}
+      {/* Login form */}
       <div className="flex flex-1 flex-col items-center justify-center p-6 sm:p-10 relative">
-        {/* Mobile logo */}
-        <div className="md:hidden flex flex-col items-center mb-8">
-          {storedLogo ? (
-            <img src={storedLogo} alt="Logo" className="h-16 w-16 rounded-xl object-contain mb-3 shadow-md" />
-          ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10 mb-3 shadow-sm">
-              <Store className="h-8 w-8 text-primary" />
-            </div>
-          )}
-          <h1 className="font-serif text-2xl font-bold text-foreground">Claudia Vanegas</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sistema POS</p>
-        </div>
-
-        {/* Form card */}
         <div className="w-full max-w-[380px]">
-          <div className="mb-8 hidden md:block">
-            <h2 className="font-serif text-3xl font-bold text-foreground">Bienvenida</h2>
+          <div className="mb-8">
+            <h2 className="font-serif text-2xl md:text-3xl font-bold text-foreground">Bienvenida</h2>
             <p className="text-muted-foreground mt-1.5 text-sm">Ingrese sus credenciales para continuar</p>
           </div>
 

@@ -10,7 +10,13 @@ export type ProductInputCategory = typeof ProductInputCategory[keyof typeof Prod
 
 
 export const ProductInputCategory = {
-  ropa: 'ropa',
+  blusas: 'blusas',
+  jeans: 'jeans',
+  vestidos: 'vestidos',
+  conjuntos: 'conjuntos',
+  faldas: 'faldas',
+  chaquetas: 'chaquetas',
   zapatos: 'zapatos',
+  bolsos: 'bolsos',
   accesorios: 'accesorios',
 } as const;

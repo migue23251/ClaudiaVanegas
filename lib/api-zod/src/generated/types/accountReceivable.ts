@@ -16,6 +16,7 @@ export interface AccountReceivable {
   customerName: string;
   totalAmount: number;
   paidAmount: number;
+  advanceAmount?: number;
   /** @nullable */
   dueDate?: Date | null;
   status: AccountReceivableStatus;

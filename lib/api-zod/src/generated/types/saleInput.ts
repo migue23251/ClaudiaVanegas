@@ -12,5 +12,6 @@ export interface SaleInput {
   customerId?: number;
   paymentType: SaleInputPaymentType;
   notes?: string;
+  advanceAmount?: number;
   items: SaleItemInput[];
 }

@@ -2,10 +2,26 @@ import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Menu, Store } from "lucide-react";
+import { useGetSettings } from "@workspace/api-client-react";
+import { applyBrandColor } from "@/lib/brand-color";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
+
+  // Load settings from DB (brand color + logo)
+  const { data: settings } = useGetSettings();
+
+  // Apply brand color from DB settings on load / whenever settings change
+  useEffect(() => {
+    if (settings?.primaryColor) {
+      applyBrandColor(settings.primaryColor);
+    }
+  }, [settings?.primaryColor]);
+
+  // Fallback: logo from localStorage (set by configuracion on upload)
+  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
+  const logo = settings?.logoUrl || storedLogo;
 
   // Close sidebar on Escape key
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -15,7 +31,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (sidebarOpen) {
       document.addEventListener("keydown", handleKeyDown);
-      // Prevent body scroll when sidebar is open on mobile
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -35,8 +50,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
-
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* ── Desktop sidebar (always visible ≥1024px) ── */}
@@ -45,7 +58,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ── Mobile sidebar overlay ── */}
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden transition-opacity duration-300 ${
           sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -76,14 +88,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="flex items-center gap-2 min-w-0">
-            {storedLogo ? (
-              <img src={storedLogo} alt="Logo" className="h-7 w-7 rounded-md object-contain shrink-0" />
+            {logo ? (
+              <img src={logo} alt="Logo" className="h-7 w-7 rounded-md object-contain shrink-0" />
             ) : (
               <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/12 shrink-0">
                 <Store className="h-3.5 w-3.5 text-primary" />
               </div>
             )}
-            <span className="font-serif text-base font-semibold text-foreground truncate">Claudia Vanegas</span>
+            <span className="font-serif text-base font-semibold text-foreground truncate">
+              {settings?.storeName ?? "Claudia Vanegas"}
+            </span>
           </div>
 
           {user && (

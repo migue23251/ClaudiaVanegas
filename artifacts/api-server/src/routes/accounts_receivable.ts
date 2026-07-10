@@ -54,10 +54,18 @@ router.post("/accounts-receivable/:id/payments", requireAuth, requireAdmin, asyn
   const [ar] = await db.select().from(accountsReceivableTable).where(eq(accountsReceivableTable.id, id));
   if (!ar) { res.status(404).json({ error: "Cuenta por cobrar no encontrada" }); return; }
 
+  const total = parseFloat(ar.totalAmount);
+  const alreadyPaid = parseFloat(ar.paidAmount);
+  const remaining = total - alreadyPaid;
+  const payAmount = parseFloat(String(amount));
+  if (payAmount > remaining + 0.001) {
+    res.status(400).json({ error: `El monto supera el saldo pendiente (${remaining.toLocaleString("es-CO")})` });
+    return;
+  }
+
   await db.insert(arPaymentsTable).values({ accountReceivableId: id, amount: String(amount), notes });
 
-  const newPaid = parseFloat(ar.paidAmount) + parseFloat(String(amount));
-  const total = parseFloat(ar.totalAmount);
+  const newPaid = alreadyPaid + payAmount;
   const newStatus = newPaid >= total ? "paid" : "partial";
   await db.update(accountsReceivableTable).set({ paidAmount: String(newPaid), status: newStatus }).where(eq(accountsReceivableTable.id, id));
 
