@@ -14,13 +14,13 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — API server (port via workflow, proxied at `/api`)
-- `pnpm --filter @workspace/pos run dev` — Frontend React/Vite (port via workflow, proxied at `/`)
+- **API Server workflow**: `PORT=8080 pnpm --filter @workspace/api-server run dev` — proxied at `/api`
+- **POS Frontend workflow**: `PORT=24730 pnpm --filter @workspace/pos run dev` — proxied at `/`
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/db run seed` — re-seed default users (idempotent)
-- Required env: `DATABASE_URL` (auto-provisioned by Replit), `JWT_SECRET` (set manually in Replit Secrets)
+- Required env: `DATABASE_URL` (auto-provisioned by Replit), `JWT_SECRET` (set manually in Replit Secrets), `BASE_PATH=/` (set as shared env var in Replit)
 
 ## Default Credentials
 
