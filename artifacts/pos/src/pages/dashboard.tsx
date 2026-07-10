@@ -349,17 +349,18 @@ export default function Dashboard() {
           [...Array(6)].map((_, i) => <Skeleton key={i} className="h-28" />)
         ) : (
           <>
+            {/* Fila 1: Ventas, Facturación, Utilidad Neta */}
+            <StatCard label="Ventas" value={summary?.totalSales ?? 0} icon={ShoppingBag} color="bg-amber-50 text-amber-600" sub="Completadas" />
             <StatCard label="Facturación" value={formatCOP(summary?.totalBilling ?? 0)} icon={DollarSign} color="bg-primary/10 text-primary" sub="Este mes" />
-            <StatCard label="Recaudo" value={formatCOP(summary?.totalCollection ?? 0)} icon={TrendingUp} color="bg-emerald-50 text-emerald-600" sub="Pagos recibidos" />
             <StatCard
               label="Utilidad Neta"
               value={formatCOP(summary?.netProfit ?? 0)}
               icon={(summary?.netProfit ?? 0) >= 0 ? TrendingUp : TrendingDown}
               color={(summary?.netProfit ?? 0) >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"}
-              sub="Recaudo − compras"
+              sub="Recaudo − (gastos + proveedores)"
             />
-            <StatCard label="Clientes Nuevos" value={summary?.newCustomers ?? 0} icon={Users} color="bg-blue-50 text-blue-600" sub="Registrados" />
-            <StatCard label="Ventas" value={summary?.totalSales ?? 0} icon={ShoppingBag} color="bg-amber-50 text-amber-600" sub="Completadas" />
+            {/* Fila 2: Recaudo, Cartera Pendiente, Clientes Nuevos */}
+            <StatCard label="Recaudo" value={formatCOP(summary?.totalCollection ?? 0)} icon={TrendingUp} color="bg-emerald-50 text-emerald-600" sub="Pagos recibidos" />
             <StatCard
               label="Cartera Pendiente"
               value={formatCOP(summary?.pendingCredits ?? 0)}
@@ -367,11 +368,13 @@ export default function Dashboard() {
               color="bg-orange-50 text-orange-600"
               sub="Créditos por cobrar"
             />
+            <StatCard label="Clientes Nuevos" value={summary?.newCustomers ?? 0} icon={Users} color="bg-blue-50 text-blue-600" sub="Registrados" />
           </>
         )}
       </div>
 
-      {/* ── Facturación vs Recaudo ── */}
+      {/* ── Facturación vs Recaudo + Tendencia Utilidad Neta (side by side on lg) ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
       <ChartCard
         title="Facturación vs. Recaudo"
         sub={`${billingFrom} → ${billingTo}`}
@@ -421,7 +424,6 @@ export default function Dashboard() {
         )}
       </ChartCard>
 
-      {/* ── Tendencia de Utilidad Neta ── */}
       <ChartCard
         title="Tendencia de Utilidad Neta"
         sub={`${profitFrom} → ${profitTo}`}
@@ -521,18 +523,20 @@ export default function Dashboard() {
         )}
       </ChartCard>
 
+      </div>
+
       {/* ── Row 2: Ventas por categoría + Tipo de pago (shared chart filter) ── */}
       <div className="grid gap-4 lg:grid-cols-2">
         <ChartCard title="Ventas por Categoría" sub={`${chartFrom} → ${chartTo}`} action={chartFilterAction}>
           {lsc ? <Skeleton className="h-[220px]" /> : (
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pieData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={32}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART.grid} />
-                  <XAxis dataKey="name" tick={{ fill: CHART.muted, fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: CHART.muted, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatShort} width={52} />
+                <BarChart data={pieData} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART.grid} />
+                  <XAxis type="number" tick={{ fill: CHART.muted, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatShort} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: CHART.muted, fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" name="Ventas" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="value" name="Ventas" radius={[0, 6, 6, 0]} barSize={20}>
                     {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Bar>
                 </BarChart>
@@ -584,31 +588,39 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-2">
         <ChartCard title="Costo de Inventario" sub="Por categoría (costo × stock)">
           {lic ? <Skeleton className="h-[220px]" /> : (
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={invData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={32}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART.grid} />
-                  <XAxis dataKey="name" tick={{ fill: CHART.muted, fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: CHART.muted, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatShort} width={52} />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = invData.find(x => x.name === label);
-                      return (
-                        <div className="rounded-lg border border-border bg-card px-3 py-2.5 shadow-md text-xs">
-                          <p className="font-semibold text-foreground mb-1">{label}</p>
-                          <p className="text-muted-foreground">Costo total: <span className="font-semibold">{formatCOP(payload[0].value as number)}</span></p>
-                          <p className="text-muted-foreground">Unidades: <span className="font-semibold">{d?.units ?? 0}</span></p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="value" name="Costo" radius={[6, 6, 0, 0]}>
-                    {invData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={invData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={32}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART.grid} />
+                    <XAxis dataKey="name" tick={{ fill: CHART.muted, fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: CHART.muted, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatShort} width={52} />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = invData.find(x => x.name === label);
+                        return (
+                          <div className="rounded-lg border border-border bg-card px-3 py-2.5 shadow-md text-xs">
+                            <p className="font-semibold text-foreground mb-1">{label}</p>
+                            <p className="text-muted-foreground">Costo total: <span className="font-semibold">{formatCOP(payload[0].value as number)}</span></p>
+                            <p className="text-muted-foreground">Unidades: <span className="font-semibold">{d?.units ?? 0}</span></p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="value" name="Costo" radius={[6, 6, 0, 0]}>
+                      {invData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {invData.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border/50 flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Valor total inventario:</span>
+                  <span className="font-bold text-foreground">{formatCOP(invData.reduce((s, d) => s + d.value, 0))}</span>
+                </div>
+              )}
+            </>
           )}
         </ChartCard>
 

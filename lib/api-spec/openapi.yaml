@@ -1361,7 +1361,7 @@ components:
     # ─── CUSTOMER ────────────────────────────────────────────────────────────
     Customer:
       type: object
-      required: [id, cedula, firstName, lastName, email, createdAt]
+      required: [id, cedula, firstName, lastName, createdAt]
       properties:
         id:
           type: integer
@@ -1372,14 +1372,16 @@ components:
         lastName:
           type: string
         email:
-          type: string
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
         createdAt:
           type: string
           format: date-time
 
     CustomerInput:
       type: object
-      required: [cedula, firstName, lastName, email]
+      required: [cedula, firstName, lastName]
       properties:
         cedula:
           type: string
@@ -1388,6 +1390,8 @@ components:
         lastName:
           type: string
         email:
+          type: string
+        phone:
           type: string
 
     CustomerUpdate:
@@ -1400,6 +1404,8 @@ components:
         lastName:
           type: string
         email:
+          type: string
+        phone:
           type: string
 
     # ─── SUPPLIER ────────────────────────────────────────────────────────────
@@ -1457,6 +1463,10 @@ components:
           type: integer
         productName:
           type: string
+        description:
+          type: ["string", "null"]
+        salePrice:
+          type: ["number", "null"]
         qtyOrdered:
           type: integer
         qtyReceived:
@@ -1551,6 +1561,8 @@ components:
           type: integer
         qtyReceived:
           type: integer
+        salePrice:
+          type: number
 
     ReceiveOrderInput:
       type: object
@@ -1634,6 +1646,8 @@ components:
           type: integer
         productName:
           type: string
+        description:
+          type: ["string", "null"]
         qty:
           type: integer
         unitPrice:
@@ -1667,6 +1681,10 @@ components:
         customerName:
           type: ["string", "null"]
         customerCedula:
+          type: ["string", "null"]
+        customerEmail:
+          type: ["string", "null"]
+        customerPhone:
           type: ["string", "null"]
         paymentType:
           type: string

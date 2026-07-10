@@ -204,8 +204,14 @@ export default function Ventas() {
                 <div>
                   <p className="text-muted-foreground mb-1">Cliente</p>
                   <p className="font-medium">{saleDetail.customerName || "Cliente Final"}</p>
-                  {(saleDetail as any).customerCedula && (
-                    <p className="text-xs text-muted-foreground font-mono">CC: {(saleDetail as any).customerCedula}</p>
+                  {saleDetail.customerCedula && (
+                    <p className="text-xs text-muted-foreground font-mono">CC: {saleDetail.customerCedula}</p>
+                  )}
+                  {saleDetail.customerPhone && (
+                    <p className="text-xs text-muted-foreground font-mono">📱 {saleDetail.customerPhone}</p>
+                  )}
+                  {saleDetail.customerEmail && (
+                    <p className="text-xs text-muted-foreground truncate">{saleDetail.customerEmail}</p>
                   )}
                 </div>
                 <div>
@@ -234,12 +240,17 @@ export default function Ventas() {
                 <h4 className="font-serif font-semibold mb-3">Artículos</h4>
                 <div className="space-y-3">
                   {saleDetail.items.map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm border-b pb-2 last:border-0">
-                      <div className="flex gap-3">
-                        <span className="font-medium">{item.qty}x</span>
-                        <span className="text-muted-foreground">{item.productName}</span>
+                    <div key={item.id} className="flex justify-between items-start text-sm border-b pb-2 last:border-0">
+                      <div className="flex gap-3 min-w-0">
+                        <span className="font-medium shrink-0">{item.qty}x</span>
+                        <div className="min-w-0">
+                          <span className="text-foreground font-medium">{item.productName}</span>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.description}</p>
+                          )}
+                        </div>
                       </div>
-                      <span className="font-mono">{formatCurrency(item.subtotal)}</span>
+                      <span className="font-mono shrink-0 ml-3">{formatCurrency(item.subtotal)}</span>
                     </div>
                   ))}
                 </div>

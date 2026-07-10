@@ -35,7 +35,8 @@ export default function Clientes() {
       firstName: formData.get("firstName") as string,
       lastName: formData.get("lastName") as string,
       email: formData.get("email") as string,
-    };
+      phone: formData.get("phone") as string,
+    } as CustomerInput;
 
     if (editingCustomer) {
       updateCust.mutate({ id: editingCustomer.id, data }, {
@@ -99,21 +100,23 @@ export default function Clientes() {
               <TableHead>Nombre</TableHead>
               <TableHead>Apellidos</TableHead>
               <TableHead>Correo Electrónico</TableHead>
+              <TableHead>Celular</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8">Cargando...</TableCell></TableRow>
             ) : customers?.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-8">No se encontraron clientes</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center py-8">No se encontraron clientes</TableCell></TableRow>
             ) : (
               customers?.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell className="font-mono text-xs">{customer.cedula}</TableCell>
                   <TableCell className="font-medium">{customer.firstName}</TableCell>
                   <TableCell>{customer.lastName}</TableCell>
-                  <TableCell className="text-muted-foreground">{customer.email}</TableCell>
+                  <TableCell className="text-muted-foreground">{customer.email ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground font-mono text-xs">{customer.phone ?? "—"}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => { setEditingCustomer(customer); setIsDialogOpen(true); }}>
                       <Edit className="h-4 w-4" />
@@ -151,7 +154,11 @@ export default function Clientes() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Correo Electrónico</label>
-              <Input name="email" type="email" defaultValue={editingCustomer?.email} required />
+              <Input name="email" type="email" defaultValue={editingCustomer?.email ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Celular</label>
+              <Input name="phone" type="tel" defaultValue={editingCustomer?.phone ?? ""} placeholder="300 000 0000" />
             </div>
 
             <DialogFooter className="pt-4">

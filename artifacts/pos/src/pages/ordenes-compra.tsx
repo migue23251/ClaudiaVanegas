@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, PackageCheck, Search, Pencil, Ban } from "lucide-react";
+import { Plus, Trash2, PackageCheck, Search, Pencil, Ban, Eye } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -50,6 +50,8 @@ export default function OrdenesCompra() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewingOrder, setViewingOrder] = useState<any>(null);
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [page, setPage] = useState(1);
@@ -82,6 +84,16 @@ export default function OrdenesCompra() {
       case 'received': return <Badge variant="outline" className="border-emerald-500 text-emerald-600">Recibido</Badge>;
       case 'cancelled': return <Badge variant="destructive">Cancelado</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pendiente';
+      case 'partial': return 'Parcial';
+      case 'received': return 'Recibido';
+      case 'cancelled': return 'Cancelado';
+      default: return status;
     }
   };
 
@@ -199,7 +211,9 @@ export default function OrdenesCompra() {
     const formData = new FormData(e.currentTarget);
     const items = selectedOrder.items.map((item: any) => {
       const rec = Number(formData.get(`qty_${item.id}`) || 0);
-      return { purchaseOrderItemId: item.id, qtyReceived: rec };
+      const salePriceVal = formData.get(`salePrice_${item.id}`);
+      const salePrice = salePriceVal ? Number(salePriceVal) : undefined;
+      return { purchaseOrderItemId: item.id, qtyReceived: rec, ...(salePrice && salePrice > 0 ? { salePrice } : {}) };
     }).filter((i: any) => i.qtyReceived > 0);
 
     if (!items.length) {
@@ -210,6 +224,7 @@ export default function OrdenesCompra() {
       onSuccess: () => {
         toast({ title: "Mercancía recibida" });
         queryClient.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
         setIsReceiveOpen(false);
       }
     });
@@ -283,6 +298,10 @@ export default function OrdenesCompra() {
                   <TableCell className="text-right font-serif font-bold">{formatCurrency(order.total)}</TableCell>
                   <TableCell>{getStatusBadge(order.status)}</TableCell>
                   <TableCell className="text-right space-x-1 whitespace-nowrap">
+                    {/* View button — always visible */}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" title="Ver detalle" onClick={() => { setViewingOrder(order); setIsViewOpen(true); }}>
+                      <Eye className="h-3.5 w-3.5" />
+                    </Button>
                     {(order.status === 'pending' || order.status === 'partial') && (
                       <Button variant="outline" size="sm" className="h-8" onClick={() => { setSelectedOrder(order); setIsReceiveOpen(true); }}>
                         <PackageCheck className="h-3.5 w-3.5 mr-1.5" /> Recibir
@@ -310,6 +329,86 @@ export default function OrdenesCompra() {
           </div>
         )}
       </div>
+
+      {/* View Order Dialog */}
+      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <DialogContent className="sm:max-w-[580px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalle de Orden de Compra</DialogTitle>
+          </DialogHeader>
+          {viewingOrder && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Proveedor</p>
+                  <p className="font-medium">{viewingOrder.supplierName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Guía / Ref</p>
+                  <p className="font-mono">{viewingOrder.guideNumber ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Fecha</p>
+                  <p>{format(new Date(viewingOrder.createdAt), "dd/MM/yyyy HH:mm")}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Estado</p>
+                  {getStatusBadge(viewingOrder.status)}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Tipo de Pago</p>
+                  <p className="capitalize">{viewingOrder.paymentType}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+                  <p className="font-serif font-bold text-primary">{formatCurrency(viewingOrder.total)}</p>
+                </div>
+              </div>
+              {viewingOrder.notes && (
+                <div className="bg-muted/30 rounded-md p-3 text-sm">
+                  <p className="text-xs text-muted-foreground mb-1">Notas</p>
+                  <p>{viewingOrder.notes}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium mb-2">Productos</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-right">Costo Unit.</TableHead>
+                      <TableHead className="text-right">Pedido</TableHead>
+                      <TableHead className="text-right">Recibido</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewingOrder.items.map((item: any) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <p className="font-medium text-sm">{item.productName}</p>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">{formatCurrency(item.unitCost)}</TableCell>
+                        <TableCell className="text-right">{item.qtyOrdered}</TableCell>
+                        <TableCell className="text-right">
+                          <span className={item.qtyReceived >= item.qtyOrdered ? "text-emerald-600 font-medium" : item.qtyReceived > 0 ? "text-blue-600 font-medium" : "text-muted-foreground"}>
+                            {item.qtyReceived}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsViewOpen(false)}>Cerrar</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Create Order Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -370,7 +469,12 @@ export default function OrdenesCompra() {
                     >
                       <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                       <SelectContent>
-                        {products?.map(p => <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>)}
+                        {products?.map(p => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            <span>{p.name}</span>
+                            {p.description && <span className="text-muted-foreground ml-1 text-xs">— {p.description}</span>}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -479,7 +583,12 @@ export default function OrdenesCompra() {
                       >
                         <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                         <SelectContent>
-                          {products?.map(p => <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>)}
+                          {products?.map(p => (
+                            <SelectItem key={p.id} value={p.id.toString()}>
+                              <span>{p.name}</span>
+                              {p.description && <span className="text-muted-foreground ml-1 text-xs">— {p.description}</span>}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -532,9 +641,9 @@ export default function OrdenesCompra() {
 
       {/* Receive Dialog */}
       <Dialog open={isReceiveOpen} onOpenChange={setIsReceiveOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Recibir Mercancía — {selectedOrder?.guideNumber}</DialogTitle>
+            <DialogTitle>Recibir Mercancía — {selectedOrder?.guideNumber ?? `Orden #${selectedOrder?.id}`}</DialogTitle>
           </DialogHeader>
           {selectedOrder && (
             <form onSubmit={handleReceiveSubmit} className="space-y-4 py-4">
@@ -544,7 +653,8 @@ export default function OrdenesCompra() {
                     <TableHead>Producto</TableHead>
                     <TableHead className="text-right">Pedido</TableHead>
                     <TableHead className="text-right">Ya Recibido</TableHead>
-                    <TableHead className="text-right">A Recibir</TableHead>
+                    <TableHead className="text-right w-24">A Recibir</TableHead>
+                    <TableHead className="text-right w-32">Precio Venta</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -552,7 +662,12 @@ export default function OrdenesCompra() {
                     const remaining = item.qtyOrdered - item.qtyReceived;
                     return (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.productName}</TableCell>
+                        <TableCell>
+                          <p className="font-medium text-sm">{item.productName}</p>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{item.qtyOrdered}</TableCell>
                         <TableCell className="text-right">{item.qtyReceived}</TableCell>
                         <TableCell className="text-right">
@@ -564,11 +679,22 @@ export default function OrdenesCompra() {
                             className="w-20 ml-auto h-8 text-right"
                           />
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            name={`salePrice_${item.id}`}
+                            type="number" min="0" step="100"
+                            defaultValue={item.salePrice ?? ""}
+                            placeholder={item.salePrice ? String(item.salePrice) : "Sin cambio"}
+                            disabled={remaining === 0}
+                            className="w-28 ml-auto h-8 text-right"
+                          />
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
+              <p className="text-xs text-muted-foreground">💡 El precio de venta se actualizará en el inventario si lo modificas aquí.</p>
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsReceiveOpen(false)}>Cancelar</Button>
                 <Button type="submit" disabled={receiveOrder.isPending}>Confirmar Recepción</Button>

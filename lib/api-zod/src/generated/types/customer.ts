@@ -11,6 +11,9 @@ export interface Customer {
   cedula: string;
   firstName: string;
   lastName: string;
-  email: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
   createdAt: Date;
 }

@@ -7,7 +7,8 @@ export const customersTable = pgTable("customers", {
   cedula: text("cedula").notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  email: text("email").notNull(),
+  email: text("email"),
+  phone: text("phone"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

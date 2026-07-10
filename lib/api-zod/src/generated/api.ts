@@ -282,7 +282,8 @@ export const ListCustomersResponseItem = zod.object({
   "cedula": zod.string(),
   "firstName": zod.string(),
   "lastName": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 export const ListCustomersResponse = zod.array(ListCustomersResponseItem)
@@ -295,7 +296,8 @@ export const CreateCustomerBody = zod.object({
   "cedula": zod.string(),
   "firstName": zod.string(),
   "lastName": zod.string(),
-  "email": zod.string()
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
 })
 
 export const CreateCustomerResponse = zod.object({
@@ -303,7 +305,8 @@ export const CreateCustomerResponse = zod.object({
   "cedula": zod.string(),
   "firstName": zod.string(),
   "lastName": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -320,7 +323,8 @@ export const GetCustomerResponse = zod.object({
   "cedula": zod.string(),
   "firstName": zod.string(),
   "lastName": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -336,7 +340,8 @@ export const UpdateCustomerBody = zod.object({
   "cedula": zod.string().optional(),
   "firstName": zod.string().optional(),
   "lastName": zod.string().optional(),
-  "email": zod.string().optional()
+  "email": zod.string().optional(),
+  "phone": zod.string().optional()
 })
 
 export const UpdateCustomerResponse = zod.object({
@@ -344,7 +349,8 @@ export const UpdateCustomerResponse = zod.object({
   "cedula": zod.string(),
   "firstName": zod.string(),
   "lastName": zod.string(),
-  "email": zod.string(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
 
@@ -463,6 +469,8 @@ export const ListPurchaseOrdersResponseItem = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
+  "salePrice": zod.number().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -500,6 +508,8 @@ export const CreatePurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
+  "salePrice": zod.number().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -528,6 +538,8 @@ export const GetPurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
+  "salePrice": zod.number().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -569,6 +581,8 @@ export const UpdatePurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
+  "salePrice": zod.number().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -587,7 +601,8 @@ export const ReceivePurchaseOrderParams = zod.object({
 export const ReceivePurchaseOrderBody = zod.object({
   "items": zod.array(zod.object({
   "purchaseOrderItemId": zod.number(),
-  "qtyReceived": zod.number()
+  "qtyReceived": zod.number(),
+  "salePrice": zod.number().optional()
 }))
 })
 
@@ -604,6 +619,8 @@ export const ReceivePurchaseOrderResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
+  "salePrice": zod.number().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -750,6 +767,8 @@ export const ListSalesResponseItem = zod.object({
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
   "customerCedula": zod.string().nullish(),
+  "customerEmail": zod.string().nullish(),
+  "customerPhone": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -760,6 +779,7 @@ export const ListSalesResponseItem = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -791,6 +811,8 @@ export const CreateSaleResponse = zod.object({
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
   "customerCedula": zod.string().nullish(),
+  "customerEmail": zod.string().nullish(),
+  "customerPhone": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -801,6 +823,7 @@ export const CreateSaleResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -823,6 +846,8 @@ export const GetSaleResponse = zod.object({
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
   "customerCedula": zod.string().nullish(),
+  "customerEmail": zod.string().nullish(),
+  "customerPhone": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -833,6 +858,7 @@ export const GetSaleResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -859,6 +885,8 @@ export const VoidSaleResponse = zod.object({
   "customerId": zod.number().nullish(),
   "customerName": zod.string().nullish(),
   "customerCedula": zod.string().nullish(),
+  "customerEmail": zod.string().nullish(),
+  "customerPhone": zod.string().nullish(),
   "paymentType": zod.enum(['contado', 'credito']),
   "total": zod.number(),
   "notes": zod.string().nullish(),
@@ -869,6 +897,7 @@ export const VoidSaleResponse = zod.object({
   "id": zod.number(),
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()

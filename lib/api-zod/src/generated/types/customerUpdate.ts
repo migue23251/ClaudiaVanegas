@@ -11,4 +11,5 @@ export interface CustomerUpdate {
   firstName?: string;
   lastName?: string;
   email?: string;
+  phone?: string;
 }

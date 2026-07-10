@@ -173,7 +173,10 @@ export interface Customer {
   cedula: string;
   firstName: string;
   lastName: string;
-  email: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  phone?: string | null;
   createdAt: string;
 }
 
@@ -181,7 +184,8 @@ export interface CustomerInput {
   cedula: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface CustomerUpdate {
@@ -189,6 +193,7 @@ export interface CustomerUpdate {
   firstName?: string;
   lastName?: string;
   email?: string;
+  phone?: string;
 }
 
 export interface Supplier {
@@ -221,6 +226,10 @@ export interface PurchaseOrderItem {
   id: number;
   productId: number;
   productName: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  salePrice?: number | null;
   qtyOrdered: number;
   qtyReceived: number;
   unitCost: number;
@@ -311,6 +320,7 @@ export interface PurchaseOrderUpdate {
 export interface ReceiveItemInput {
   purchaseOrderItemId: number;
   qtyReceived: number;
+  salePrice?: number;
 }
 
 export interface ReceiveOrderInput {
@@ -372,6 +382,8 @@ export interface SaleItem {
   id: number;
   productId: number;
   productName: string;
+  /** @nullable */
+  description?: string | null;
   qty: number;
   unitPrice: number;
   subtotal: number;
@@ -402,6 +414,10 @@ export interface Sale {
   customerName?: string | null;
   /** @nullable */
   customerCedula?: string | null;
+  /** @nullable */
+  customerEmail?: string | null;
+  /** @nullable */
+  customerPhone?: string | null;
   paymentType: SalePaymentType;
   total: number;
   /** @nullable */

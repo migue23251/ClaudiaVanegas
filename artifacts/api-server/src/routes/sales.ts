@@ -20,6 +20,7 @@ async function buildSaleResponse(saleId: number) {
     unitPrice: saleItemsTable.unitPrice,
     subtotal: saleItemsTable.subtotal,
     productName: productsTable.name,
+    description: productsTable.description,
   }).from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .where(eq(saleItemsTable.saleId, saleId));
@@ -33,9 +34,12 @@ async function buildSaleResponse(saleId: number) {
     userName: user?.name ?? null,
     customerName: customer ? `${customer.firstName} ${customer.lastName}` : null,
     customerCedula: customer?.cedula ?? null,
+    customerEmail: customer?.email ?? null,
+    customerPhone: customer?.phone ?? null,
     items: items.map(i => ({
       ...i,
       productName: i.productName ?? "Desconocido",
+      description: i.description ?? null,
       unitPrice: parseFloat(i.unitPrice),
       subtotal: parseFloat(i.subtotal),
     })),

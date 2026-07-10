@@ -46,7 +46,7 @@ router.get("/products", requireAuth, async (req, res): Promise<void> => {
     ? db.select().from(productsTable).where(and(...conditions))
     : db.select().from(productsTable);
 
-  const products = await query.orderBy(productsTable.name);
+  const products = await query.orderBy(productsTable.category, productsTable.name);
   res.json(products.map(p => ({
     ...p,
     costPrice: parseFloat(p.costPrice),

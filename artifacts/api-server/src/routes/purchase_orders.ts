@@ -17,6 +17,8 @@ async function buildPOResponse(poId: number) {
     qtyReceived: purchaseOrderItemsTable.qtyReceived,
     unitCost: purchaseOrderItemsTable.unitCost,
     productName: productsTable.name,
+    description: productsTable.description,
+    salePrice: productsTable.salePrice,
   }).from(purchaseOrderItemsTable)
     .leftJoin(productsTable, eq(purchaseOrderItemsTable.productId, productsTable.id))
     .where(eq(purchaseOrderItemsTable.purchaseOrderId, poId));
@@ -28,7 +30,9 @@ async function buildPOResponse(poId: number) {
     items: items.map(i => ({
       ...i,
       productName: i.productName ?? "Desconocido",
+      description: i.description ?? null,
       unitCost: parseFloat(i.unitCost),
+      salePrice: i.salePrice != null ? parseFloat(i.salePrice) : null,
     })),
   };
 }
@@ -204,7 +208,7 @@ router.put("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): 
 
 router.post("/purchase-orders/:id/receive", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  const { items } = req.body as { items: { purchaseOrderItemId: number; qtyReceived: number }[] };
+  const { items } = req.body as { items: { purchaseOrderItemId: number; qtyReceived: number; salePrice?: number }[] };
 
   if (!items?.length) {
     res.status(400).json({ error: "Items requeridos" }); return;
@@ -214,7 +218,7 @@ router.post("/purchase-orders/:id/receive", requireAuth, requireAdmin, async (re
   if (!po) { res.status(404).json({ error: "Orden no encontrada" }); return; }
 
   await db.transaction(async (tx) => {
-    for (const { purchaseOrderItemId, qtyReceived } of items) {
+    for (const { purchaseOrderItemId, qtyReceived, salePrice } of items) {
       if (qtyReceived <= 0) continue;
       const [item] = await tx.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.id, purchaseOrderItemId));
       if (!item) continue;
@@ -222,8 +226,14 @@ router.post("/purchase-orders/:id/receive", requireAuth, requireAdmin, async (re
       await tx.update(purchaseOrderItemsTable)
         .set({ qtyReceived: newReceived })
         .where(eq(purchaseOrderItemsTable.id, purchaseOrderItemId));
+      const productUpdates: Record<string, unknown> = {
+        stock: sql`${productsTable.stock} + ${qtyReceived}`,
+      };
+      if (salePrice != null && salePrice > 0) {
+        productUpdates.salePrice = String(salePrice);
+      }
       await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} + ${qtyReceived}` })
+        .set(productUpdates)
         .where(eq(productsTable.id, item.productId));
     }
 

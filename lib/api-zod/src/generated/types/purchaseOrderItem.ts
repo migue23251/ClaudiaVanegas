@@ -10,6 +10,10 @@ export interface PurchaseOrderItem {
   id: number;
   productId: number;
   productName: string;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  salePrice?: number | null;
   qtyOrdered: number;
   qtyReceived: number;
   unitCost: number;

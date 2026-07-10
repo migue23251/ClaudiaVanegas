@@ -147,6 +147,7 @@ export default function Pos() {
         firstName: formData.get("firstName") as string,
         lastName: formData.get("lastName") as string,
         email: formData.get("email") as string,
+        phone: formData.get("phone") as string,
       } as CustomerInput
     }, {
       onSuccess: (updated) => {
@@ -250,6 +251,9 @@ export default function Pos() {
               <div className="min-w-0">
                 <p className="font-medium text-sm">{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
                 <p className="text-xs text-muted-foreground font-mono">CC: {selectedCustomer.cedula}</p>
+                {selectedCustomer.phone && (
+                  <p className="text-xs text-muted-foreground font-mono">📱 {selectedCustomer.phone}</p>
+                )}
                 {selectedCustomer.email && (
                   <p className="text-xs text-muted-foreground truncate">{selectedCustomer.email}</p>
                 )}
@@ -492,6 +496,10 @@ export default function Pos() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Correo Electrónico</label>
               <Input name="email" type="email" defaultValue={selectedCustomer?.email ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Celular</label>
+              <Input name="phone" type="tel" defaultValue={selectedCustomer?.phone ?? ""} placeholder="300 000 0000" />
             </div>
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setIsEditingCustomer(false)}>Cancelar</Button>

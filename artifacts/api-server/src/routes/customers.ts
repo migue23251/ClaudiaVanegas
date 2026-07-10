@@ -21,12 +21,12 @@ router.get("/customers", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/customers", requireAuth, async (req, res): Promise<void> => {
-  const { cedula, firstName, lastName, email } = req.body;
-  if (!cedula || !firstName || !lastName || !email) {
-    res.status(400).json({ error: "Todos los campos son requeridos" });
+  const { cedula, firstName, lastName, email, phone } = req.body;
+  if (!cedula || !firstName || !lastName) {
+    res.status(400).json({ error: "Cédula, nombres y apellidos son requeridos" });
     return;
   }
-  const [customer] = await db.insert(customersTable).values({ cedula, firstName, lastName, email }).returning();
+  const [customer] = await db.insert(customersTable).values({ cedula, firstName, lastName, email: email || null, phone: phone || null }).returning();
   res.status(201).json(customer);
 });
 
@@ -39,12 +39,13 @@ router.get("/customers/:id", requireAuth, async (req, res): Promise<void> => {
 
 router.put("/customers/:id", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  const { cedula, firstName, lastName, email } = req.body;
+  const { cedula, firstName, lastName, email, phone } = req.body;
   const updates: Record<string, unknown> = {};
   if (cedula) updates.cedula = cedula;
   if (firstName) updates.firstName = firstName;
   if (lastName) updates.lastName = lastName;
-  if (email) updates.email = email;
+  if (email !== undefined) updates.email = email || null;
+  if (phone !== undefined) updates.phone = phone || null;
   const [customer] = await db.update(customersTable).set(updates).where(eq(customersTable.id, id)).returning();
   if (!customer) { res.status(404).json({ error: "Cliente no encontrado" }); return; }
   res.json(customer);

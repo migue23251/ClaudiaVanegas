@@ -10,6 +10,8 @@ export interface SaleItem {
   id: number;
   productId: number;
   productName: string;
+  /** @nullable */
+  description?: string | null;
   qty: number;
   unitPrice: number;
   subtotal: number;

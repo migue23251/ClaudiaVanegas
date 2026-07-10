@@ -10,5 +10,6 @@ export interface CustomerInput {
   cedula: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
+  phone?: string;
 }

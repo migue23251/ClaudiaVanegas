@@ -9,4 +9,5 @@
 export interface ReceiveItemInput {
   purchaseOrderItemId: number;
   qtyReceived: number;
+  salePrice?: number;
 }
