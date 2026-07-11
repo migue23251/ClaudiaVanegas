@@ -84,10 +84,15 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
                       ${hasCidLogo ? `<td style="vertical-align:middle;padding-right:14px;">${logoHtml}</td>` : ""}
                       <td style="vertical-align:middle;">
                         <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${storeName}</div>
-                        ${storeAddress ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:3px;">${storeAddress}</div>` : ""}
-                        ${storePhone ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:2px;">📞 ${storePhone}</div>` : ""}
                       </td>
                     </tr>
+                    ${storeAddress || storePhone ? `
+                    <tr>
+                      <td colspan="2" style="padding-top:6px;">
+                        ${storeAddress ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;">${storeAddress}</div>` : ""}
+                        ${storePhone ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:2px;">📞 ${storePhone}</div>` : ""}
+                      </td>
+                    </tr>` : ""}
                   </table>
                 </td>
                 <td align="right" style="color:#fff;font-size:13px;line-height:1.6;vertical-align:middle;">
