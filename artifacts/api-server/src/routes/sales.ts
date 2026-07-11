@@ -3,6 +3,7 @@ import { eq, and, gte, lte, or, ilike, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
+import { sendInvoiceEmail } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -182,6 +183,22 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
 
   const result = await buildSaleResponse(saleId);
   res.status(201).json(result);
+
+  // Fire-and-forget invoice email — does not block or affect the sale response
+  if (result?.customerEmail) {
+    sendInvoiceEmail({
+      saleId: result.id,
+      createdAt: result.createdAt,
+      paymentType: result.paymentType as "contado" | "credito",
+      customerName: result.customerName ?? result.customerEmail,
+      customerEmail: result.customerEmail,
+      items: result.items,
+      total: result.total,
+      notes: result.notes,
+    }).catch(err => {
+      console.error("[email] Error enviando factura:", err?.message ?? err);
+    });
+  }
 });
 
 router.get("/sales/:id", requireAuth, async (req, res): Promise<void> => {
