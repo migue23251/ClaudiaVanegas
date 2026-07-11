@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { sendInvoiceEmail } from "../lib/email";
-import { bogotaToday } from "../lib/tz";
+import { bogotaNow, bogotaToday } from "../lib/tz";
 
 const router: IRouter = Router();
 
