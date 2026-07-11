@@ -79,14 +79,8 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="vertical-align:middle;">
-                  <table cellpadding="0" cellspacing="0">
-                    <tr>
-                      ${hasCidLogo ? `<td style="vertical-align:middle;padding-right:14px;">${logoHtml}</td>` : ""}
-                      <td style="vertical-align:middle;">
-                        <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${storeName}</div>
-                      </td>
-                    </tr>
-                  </table>
+                  ${hasCidLogo ? logoHtml : ""}
+                  <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${storeName}</div>
                 </td>
                 <td align="right" style="color:#fff;font-size:13px;line-height:1.6;vertical-align:middle;">
                   <div style="font-size:20px;font-weight:700;">Factura #${invoice.saleId}</div>
