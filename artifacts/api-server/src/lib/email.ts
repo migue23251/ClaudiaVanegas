@@ -44,7 +44,7 @@ function formatDate(date: string | Date) {
 function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: boolean, primaryColor: string | null, storePhone: string | null, storeAddress: string | null) {
   const color = primaryColor ?? "#c2697a";
   const logoHtml = hasCidLogo
-    ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:56px;max-width:160px;object-fit:contain;display:block;margin-bottom:6px;" />`
+    ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:80px;max-width:200px;object-fit:contain;display:block;" />`
     : "";
 
   const itemRows = invoice.items.map(item => `
@@ -79,8 +79,12 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td style="vertical-align:middle;">
-                  ${hasCidLogo ? logoHtml : ""}
-                  <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${storeName}</div>
+                  <table cellpadding="0" cellspacing="0"><tr>
+                    ${hasCidLogo ? `<td style="vertical-align:middle;padding-right:14px;">${logoHtml}</td>` : ""}
+                    <td style="vertical-align:middle;">
+                      <div style="color:#fff;font-size:18px;font-weight:700;line-height:1.3;">${storeName}</div>
+                    </td>
+                  </tr></table>
                 </td>
                 <td align="right" style="color:#fff;font-size:13px;line-height:1.6;vertical-align:middle;">
                   <div style="font-size:20px;font-weight:700;">Factura #${invoice.saleId}</div>
