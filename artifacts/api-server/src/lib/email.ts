@@ -41,11 +41,11 @@ function formatDate(date: string | Date) {
   });
 }
 
-function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: boolean, primaryColor: string | null) {
+function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: boolean, primaryColor: string | null, storePhone: string | null, storeAddress: string | null) {
   const color = primaryColor ?? "#c2697a";
   const logoHtml = hasCidLogo
-    ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:64px;max-width:200px;object-fit:contain;" />`
-    : `<span style="font-size:22px;font-weight:700;color:${color};">${storeName}</span>`;
+    ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:56px;max-width:160px;object-fit:contain;display:block;margin-bottom:6px;" />`
+    : "";
 
   const itemRows = invoice.items.map(item => `
     <tr style="border-bottom:1px solid #f0f0f0;">
@@ -78,8 +78,13 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
           <td style="background:${color};padding:28px 36px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td>${logoHtml}</td>
-                <td align="right" style="color:#fff;font-size:13px;line-height:1.6;">
+                <td style="vertical-align:middle;">
+                  ${logoHtml}
+                  <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${storeName}</div>
+                  ${storeAddress ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:2px;">${storeAddress}</div>` : ""}
+                  ${storePhone ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:1px;">📞 ${storePhone}</div>` : ""}
+                </td>
+                <td align="right" style="color:#fff;font-size:13px;line-height:1.6;vertical-align:middle;">
                   <div style="font-size:20px;font-weight:700;">Factura #${invoice.saleId}</div>
                   <div style="opacity:0.85;">${formatDate(invoice.createdAt)}</div>
                 </td>
@@ -206,7 +211,7 @@ export async function sendInvoiceEmail(invoice: InvoiceData): Promise<void> {
     auth: { user: smtpUser, pass: smtpPass },
   });
 
-  const html = buildInvoiceHtml(invoice, storeName, hasCidLogo, primaryColor ?? null);
+  const html = buildInvoiceHtml(invoice, storeName, hasCidLogo, primaryColor ?? null, settings.storePhone ?? null, settings.storeAddress ?? null);
   const subject = `Factura #${invoice.saleId} — ${storeName}`;
 
   await transporter.sendMail({
