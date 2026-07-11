@@ -86,13 +86,6 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
                         <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${storeName}</div>
                       </td>
                     </tr>
-                    ${storeAddress || storePhone ? `
-                    <tr>
-                      <td colspan="2" style="padding-top:6px;">
-                        ${storeAddress ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;">${storeAddress}</div>` : ""}
-                        ${storePhone ? `<div style="color:rgba(255,255,255,0.8);font-size:12px;margin-top:2px;">📞 ${storePhone}</div>` : ""}
-                      </td>
-                    </tr>` : ""}
                   </table>
                 </td>
                 <td align="right" style="color:#fff;font-size:13px;line-height:1.6;vertical-align:middle;">
@@ -172,10 +165,11 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
 
         <!-- Footer -->
         <tr>
-          <td style="padding:28px 36px;text-align:center;border-top:1px solid #f0f0f0;margin-top:24px;">
-            <p style="font-size:12px;color:#bbb;margin:0;">
-              Este correo fue generado automáticamente por ${storeName}. Por favor no responda a este mensaje.
-            </p>
+          <td style="padding:24px 36px;text-align:center;border-top:1px solid #f0f0f0;">
+            <p style="font-size:13px;font-weight:600;color:#555;margin:0 0 4px;">${storeName}</p>
+            ${storeAddress ? `<p style="font-size:12px;color:#999;margin:0 0 2px;">${storeAddress}</p>` : ""}
+            ${storePhone ? `<p style="font-size:12px;color:#999;margin:0 0 10px;">📞 ${storePhone}</p>` : ""}
+            <p style="font-size:11px;color:#ccc;margin:0;">Este correo fue generado automáticamente. Por favor no responda a este mensaje.</p>
           </td>
         </tr>
 
