@@ -229,6 +229,7 @@ router.get("/dashboard/top-products", requireAuth, async (req, res): Promise<voi
   const top = await db.select({
     productId: saleItemsTable.productId,
     productName: productsTable.name,
+    description: productsTable.description,
     category: productsTable.category,
     totalQty: sql<number>`SUM(${saleItemsTable.qty})`,
     totalRevenue: sql<number>`SUM(${saleItemsTable.subtotal})`,
@@ -236,13 +237,14 @@ router.get("/dashboard/top-products", requireAuth, async (req, res): Promise<voi
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .leftJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
     .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
-    .groupBy(saleItemsTable.productId, productsTable.name, productsTable.category)
+    .groupBy(saleItemsTable.productId, productsTable.name, productsTable.description, productsTable.category)
     .orderBy(sql`SUM(${saleItemsTable.qty}) DESC`)
     .limit(10);
 
   res.json(top.map(t => ({
     productId: t.productId,
     productName: t.productName ?? "Desconocido",
+    description: t.description ?? null,
     category: t.category ?? "accesorios",
     totalQty: Number(t.totalQty),
     totalRevenue: Number(t.totalRevenue),
@@ -464,6 +466,7 @@ router.get("/dashboard/slow-moving-products", requireAuth, async (_req, res): Pr
     SELECT
       p.id,
       p.name,
+      p.description,
       p.code,
       p.category,
       p.stock,
@@ -479,7 +482,7 @@ router.get("/dashboard/slow-moving-products", requireAuth, async (_req, res): Pr
     LEFT JOIN ${saleItemsTable} si ON si.product_id = p.id
     LEFT JOIN ${salesTable} s ON s.id = si.sale_id AND s.voided = false
     WHERE p.stock > 0
-    GROUP BY p.id, p.name, p.code, p.category, p.stock, p.created_at
+    GROUP BY p.id, p.name, p.description, p.code, p.category, p.stock, p.created_at
     ORDER BY days_in_stock DESC
     LIMIT 15
   `);
@@ -487,6 +490,7 @@ router.get("/dashboard/slow-moving-products", requireAuth, async (_req, res): Pr
   res.json((result.rows as any[]).map(r => ({
     id: r.id,
     name: r.name,
+    description: r.description ?? null,
     code: r.code,
     category: r.category,
     stock: r.stock,

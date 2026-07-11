@@ -663,6 +663,9 @@ export default function Dashboard() {
                       <span className="text-xs font-bold text-muted-foreground w-4 shrink-0 text-right tabular-nums">{idx + 1}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate leading-none">{product.productName}</p>
+                        {product.description && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{product.description}</p>
+                        )}
                         <p className="text-xs text-muted-foreground mt-0.5 capitalize">{product.category} · {product.totalQty} unid.</p>
                       </div>
                       <span className="text-xs font-semibold text-foreground tabular-nums shrink-0">{formatShort(product.totalRevenue)}</span>
@@ -711,6 +714,9 @@ export default function Dashboard() {
                     <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
                       <td className="py-2 pr-4 font-medium">
                         <div>{p.name}</div>
+                        {p.description && (
+                          <div className="text-muted-foreground font-normal truncate max-w-[160px]">{p.description}</div>
+                        )}
                         <div className="text-muted-foreground font-mono">{p.code}</div>
                       </td>
                       <td className="py-2 pr-4 text-muted-foreground capitalize">{CATEGORY_LABELS[p.category] ?? p.category}</td>
