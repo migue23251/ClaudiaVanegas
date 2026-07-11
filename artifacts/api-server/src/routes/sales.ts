@@ -192,6 +192,8 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
       paymentType: result.paymentType as "contado" | "credito",
       customerName: result.customerName ?? result.customerEmail,
       customerEmail: result.customerEmail,
+      customerCedula: result.customerCedula,
+      customerPhone: result.customerPhone,
       items: result.items,
       total: result.total,
       notes: result.notes,

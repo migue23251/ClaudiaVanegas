@@ -15,6 +15,8 @@ interface InvoiceData {
   paymentType: "contado" | "credito";
   customerName: string;
   customerEmail: string;
+  customerCedula?: string | null;
+  customerPhone?: string | null;
   items: SaleItem[];
   total: number;
   notes?: string | null;
@@ -94,6 +96,8 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, logoUrl: stri
                   <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:6px;">Cliente</div>
                   <div style="font-size:16px;font-weight:600;color:#1a1a1a;">${invoice.customerName}</div>
                   <div style="font-size:13px;color:#666;margin-top:2px;">${invoice.customerEmail}</div>
+                  ${invoice.customerCedula ? `<div style="font-size:13px;color:#666;margin-top:2px;">CC ${invoice.customerCedula}</div>` : ""}
+                  ${invoice.customerPhone ? `<div style="font-size:13px;color:#666;margin-top:2px;">📱 ${invoice.customerPhone}</div>` : ""}
                 </td>
                 <td width="16"></td>
                 <td style="background:#fafafa;border-radius:8px;padding:16px 20px;text-align:right;">
