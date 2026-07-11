@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, lt, or, type SQL } from "drizzle-orm";
+import { eq, and, lt, or, desc, type SQL } from "drizzle-orm";
 import { bogotaToday } from "../lib/tz";
 import { db, accountsReceivableTable, arPaymentsTable, salesTable, customersTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
@@ -36,8 +36,8 @@ router.get("/accounts-receivable", requireAuth, requireAdmin, async (req, res): 
     )!);
   }
   const records = conditions.length > 0
-    ? await db.select().from(accountsReceivableTable).where(and(...conditions)).orderBy(accountsReceivableTable.createdAt)
-    : await db.select().from(accountsReceivableTable).orderBy(accountsReceivableTable.createdAt);
+    ? await db.select().from(accountsReceivableTable).where(and(...conditions)).orderBy(desc(accountsReceivableTable.createdAt))
+    : await db.select().from(accountsReceivableTable).orderBy(desc(accountsReceivableTable.createdAt));
 
   const results = await Promise.all(records.map(r => buildARResponse(r.id)));
   res.json(results.filter(Boolean));

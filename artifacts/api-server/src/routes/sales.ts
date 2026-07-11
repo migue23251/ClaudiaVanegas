@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, or, ilike, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, or, ilike, desc, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
@@ -69,8 +69,8 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
   }
 
   const sales = conditions.length > 0
-    ? await db.select().from(salesTable).where(and(...conditions)).orderBy(salesTable.createdAt)
-    : await db.select().from(salesTable).orderBy(salesTable.createdAt);
+    ? await db.select().from(salesTable).where(and(...conditions)).orderBy(desc(salesTable.createdAt))
+    : await db.select().from(salesTable).orderBy(desc(salesTable.createdAt));
 
   let results = (await Promise.all(sales.map(s => buildSaleResponse(s.id)))).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof buildSaleResponse>>>[];
 

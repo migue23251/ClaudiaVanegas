@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, ilike, type SQL } from "drizzle-orm";
+import { eq, and, ilike, desc, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, purchaseOrdersTable, purchaseOrderItemsTable, productsTable, suppliersTable, accountsPayableTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
@@ -48,8 +48,8 @@ router.get("/purchase-orders", requireAuth, requireAdmin, async (req, res): Prom
   }
 
   const orders = conditions.length > 0
-    ? await db.select().from(purchaseOrdersTable).where(and(...conditions)).orderBy(purchaseOrdersTable.createdAt)
-    : await db.select().from(purchaseOrdersTable).orderBy(purchaseOrdersTable.createdAt);
+    ? await db.select().from(purchaseOrdersTable).where(and(...conditions)).orderBy(desc(purchaseOrdersTable.createdAt))
+    : await db.select().from(purchaseOrdersTable).orderBy(desc(purchaseOrdersTable.createdAt));
 
   let results = (await Promise.all(orders.map(o => buildPOResponse(o.id)))).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof buildPOResponse>>>[];
 
