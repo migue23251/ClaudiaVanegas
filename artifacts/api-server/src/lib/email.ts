@@ -31,7 +31,8 @@ function formatCOP(value: number) {
 }
 
 function formatDate(date: string | Date) {
-  return new Date(date).toLocaleDateString("es-CO", {
+  return new Date(date).toLocaleString("es-CO", {
+    timeZone: "America/Bogota",
     year: "numeric",
     month: "long",
     day: "numeric",

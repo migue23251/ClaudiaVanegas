@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { sendInvoiceEmail } from "../lib/email";
+import { bogotaToday } from "../lib/tz";
 
 const router: IRouter = Router();
 
@@ -148,10 +149,10 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
 
     // For credit sales, create an accounts receivable entry
     if (paymentType === "credito") {
-      // dueDate = 15 days after today
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 15);
-      const dueDateStr = dueDate.toISOString().split("T")[0];
+      // dueDate = 15 days after today in Bogotá timezone
+      const { y: dy, m: dm, d: dd } = bogotaNow();
+      const base = new Date(Date.UTC(dy, dm, dd + 15));
+      const dueDateStr = `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
 
       const initialPaid = advance;
       const status = initialPaid >= total ? "paid" : initialPaid > 0 ? "partial" : "pending";

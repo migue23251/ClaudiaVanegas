@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, lt, or, type SQL } from "drizzle-orm";
+import { bogotaToday } from "../lib/tz";
 import { db, accountsReceivableTable, arPaymentsTable, salesTable, customersTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
@@ -28,7 +29,7 @@ router.get("/accounts-receivable", requireAuth, requireAdmin, async (req, res): 
     conditions.push(eq(accountsReceivableTable.status, status as "pending" | "partial" | "paid"));
   }
   if (overdue === "true") {
-    conditions.push(lt(accountsReceivableTable.dueDate, new Date().toISOString().split("T")[0]));
+    conditions.push(lt(accountsReceivableTable.dueDate, bogotaToday()));
     conditions.push(or(
       eq(accountsReceivableTable.status, "pending"),
       eq(accountsReceivableTable.status, "partial"),

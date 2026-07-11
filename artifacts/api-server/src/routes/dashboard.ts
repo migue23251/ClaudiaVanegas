@@ -9,6 +9,7 @@ import {
   apPaymentsTable, accountsPayableTable,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import { bogotaNow, bogotaMonthStart, bogotaMonthEnd, bogotaDayStart, bogotaDayEnd } from "../lib/tz";
 
 const router: IRouter = Router();
 
@@ -32,11 +33,11 @@ function monthBuckets(
   let m = fromYM.m;
   const maxBuckets = 36;
   while ((y < toYM.y || (y === toYM.y && m <= toYM.m)) && buckets.length < maxBuckets) {
-    const start = new Date(y, m, 1);
-    const end = new Date(y, m + 1, 0, 23, 59, 59);
+    const start = bogotaMonthStart(y, m);
+    const end = bogotaMonthEnd(y, m);
     buckets.push({
       start, end,
-      label: start.toLocaleDateString("es-CO", { month: "short", year: "2-digit" }),
+      label: start.toLocaleDateString("es-CO", { month: "short", year: "2-digit", timeZone: "America/Bogota" }),
     });
     m++;
     if (m > 11) { m = 0; y++; }
@@ -50,13 +51,12 @@ function parseDateRange(
   toQ: unknown,
   fallback: () => { start: Date; end: Date },
 ): { start: Date; end: Date } {
-  const now = new Date();
   const fromP = parseDateLocal(fromQ);
   const toP = parseDateLocal(toQ);
   if (fromP && toP) {
     return {
-      start: new Date(fromP.y, fromP.m, fromP.d, 0, 0, 0),
-      end: new Date(toP.y, toP.m, toP.d, 23, 59, 59),
+      start: bogotaDayStart(fromP.y, fromP.m, fromP.d),
+      end: bogotaDayEnd(toP.y, toP.m, toP.d),
     };
   }
   return fallback();
@@ -65,9 +65,9 @@ function parseDateRange(
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> => {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const { y, m } = bogotaNow();
+  const startOfMonth = bogotaMonthStart(y, m);
+  const endOfMonth = bogotaMonthEnd(y, m);
 
   const [billingResult] = await db.select({
     total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
@@ -150,12 +150,12 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
 // ─── Billing vs Collection ────────────────────────────────────────────────────
 
 router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Promise<void> => {
-  const now = new Date();
+  const { y: curY, m: curM } = bogotaNow();
   const fromParsed = parseDateLocal(req.query.from);
   const toParsed = parseDateLocal(req.query.to);
 
-  const fromYM = fromParsed ?? { y: now.getFullYear(), m: now.getMonth() - 5 < 0 ? now.getMonth() - 5 + 12 : now.getMonth() - 5 };
-  const toYM = toParsed ?? { y: now.getFullYear(), m: now.getMonth() };
+  const fromYM = fromParsed ?? { y: curM - 5 < 0 ? curY - 1 : curY, m: curM - 5 < 0 ? curM - 5 + 12 : curM - 5 };
+  const toYM = toParsed ?? { y: curY, m: curM };
 
   const fromNorm = (() => {
     if (fromYM.m < 0) return { y: fromYM.y - 1, m: fromYM.m + 12 };
@@ -174,14 +174,14 @@ router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Pr
   // 3 aggregate queries instead of 3-per-month loop
   const [billingRows, cashRows, arRows] = await Promise.all([
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, rangeStart), lte(salesTable.createdAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${salesTable.createdAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(
@@ -190,26 +190,23 @@ router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Pr
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
       ))
-      .groupBy(sql`DATE_TRUNC('month', ${salesTable.createdAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${arPaymentsTable.paidAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`,
       total: sql<string>`COALESCE(SUM(${arPaymentsTable.amount}), 0)`,
     }).from(arPaymentsTable)
       .where(and(gte(arPaymentsTable.paidAt, rangeStart), lte(arPaymentsTable.paidAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${arPaymentsTable.paidAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`),
   ]);
 
-  const toKey = (d: string | Date) => {
-    const date = new Date(d);
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-  };
+  const toKey = (d: string | Date) => String(d).substring(0, 7);
   const billingMap = Object.fromEntries(billingRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const cashMap = Object.fromEntries(cashRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const arMap = Object.fromEntries(arRows.map(r => [toKey(r.month), parseFloat(r.total)]));
 
   const result = months.map(({ start, label }) => {
-    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const key = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`;
     return {
       month: label,
       billing: billingMap[key] ?? 0,
@@ -223,10 +220,10 @@ router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Pr
 // ─── Top Products ─────────────────────────────────────────────────────────────
 
 router.get("/dashboard/top-products", requireAuth, async (req, res): Promise<void> => {
-  const now = new Date();
+  const { y, m } = bogotaNow();
   const { start, end } = parseDateRange(req.query.from, req.query.to, () => ({
-    start: new Date(now.getFullYear(), now.getMonth(), 1),
-    end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+    start: bogotaMonthStart(y, m),
+    end: bogotaMonthEnd(y, m),
   }));
 
   const top = await db.select({
@@ -255,10 +252,10 @@ router.get("/dashboard/top-products", requireAuth, async (req, res): Promise<voi
 // ─── Sales by Category ────────────────────────────────────────────────────────
 
 router.get("/dashboard/sales-by-category", requireAuth, async (req, res): Promise<void> => {
-  const now = new Date();
+  const { y, m } = bogotaNow();
   const { start, end } = parseDateRange(req.query.from, req.query.to, () => ({
-    start: new Date(now.getFullYear(), now.getMonth(), 1),
-    end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+    start: bogotaMonthStart(y, m),
+    end: bogotaMonthEnd(y, m),
   }));
 
   const result = await db.select({
@@ -281,10 +278,10 @@ router.get("/dashboard/sales-by-category", requireAuth, async (req, res): Promis
 // ─── Payment Type Breakdown ───────────────────────────────────────────────────
 
 router.get("/dashboard/payment-type-breakdown", requireAuth, async (req, res): Promise<void> => {
-  const now = new Date();
+  const { y, m } = bogotaNow();
   const { start, end } = parseDateRange(req.query.from, req.query.to, () => ({
-    start: new Date(now.getFullYear(), now.getMonth(), 1),
-    end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+    start: bogotaMonthStart(y, m),
+    end: bogotaMonthEnd(y, m),
   }));
 
   const result = await db.select({
@@ -322,10 +319,7 @@ router.get("/dashboard/inventory-cost-by-category", requireAuth, async (_req, re
 // ─── Expenses vs Income ───────────────────────────────────────────────────────
 
 router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promise<void> => {
-  const now = new Date();
-  const curY = now.getFullYear();
-  const curM = now.getMonth();
-
+  const { y: curY, m: curM } = bogotaNow();
   const fromParsed = parseDateLocal(req.query.from);
   const toParsed = parseDateLocal(req.query.to);
 
@@ -342,14 +336,14 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
   // not the full PO total at creation time. Income = cash sales + AR payments.
   const [apRows, cashRows, arRows] = await Promise.all([
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`,
       total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
     }).from(apPaymentsTable)
       .where(and(gte(apPaymentsTable.paidAt, rangeStart), lte(apPaymentsTable.paidAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(
@@ -358,26 +352,23 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
       ))
-      .groupBy(sql`DATE_TRUNC('month', ${salesTable.createdAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${arPaymentsTable.paidAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`,
       total: sql<string>`COALESCE(SUM(${arPaymentsTable.amount}), 0)`,
     }).from(arPaymentsTable)
       .where(and(gte(arPaymentsTable.paidAt, rangeStart), lte(arPaymentsTable.paidAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${arPaymentsTable.paidAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`),
   ]);
 
-  const toKey = (d: string | Date) => {
-    const date = new Date(d);
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-  };
+  const toKey = (d: string | Date) => String(d).substring(0, 7);
   const apMap = Object.fromEntries(apRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const cashMap = Object.fromEntries(cashRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const arMap = Object.fromEntries(arRows.map(r => [toKey(r.month), parseFloat(r.total)]));
 
   const result = months.map(({ start, label }) => {
-    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const key = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`;
     return {
       month: label,
       expenses: apMap[key] ?? 0,
@@ -391,10 +382,7 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
 // ─── Net Profit Trend ─────────────────────────────────────────────────────────
 
 router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise<void> => {
-  const now = new Date();
-  const curY = now.getFullYear();
-  const curM = now.getMonth();
-
+  const { y: curY, m: curM } = bogotaNow();
   const fromParsed = parseDateLocal(req.query.from);
   const toParsed = parseDateLocal(req.query.to);
 
@@ -410,7 +398,7 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
   // 4 aggregate queries: cash income, AR payments income, PO expenses, fixed expense payments
   const [cashRows, arRows, poRows, fixedExpenseRows] = await Promise.all([
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${salesTable.createdAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
     }).from(salesTable)
       .where(and(
@@ -419,24 +407,24 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
       ))
-      .groupBy(sql`DATE_TRUNC('month', ${salesTable.createdAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${arPaymentsTable.paidAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`,
       total: sql<string>`COALESCE(SUM(${arPaymentsTable.amount}), 0)`,
     }).from(arPaymentsTable)
       .where(and(gte(arPaymentsTable.paidAt, rangeStart), lte(arPaymentsTable.paidAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${arPaymentsTable.paidAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${purchaseOrdersTable.createdAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${purchaseOrdersTable.createdAt}))`,
       total: sql<string>`COALESCE(SUM(${purchaseOrdersTable.total}), 0)`,
     }).from(purchaseOrdersTable)
       .where(and(gte(purchaseOrdersTable.createdAt, rangeStart), lte(purchaseOrdersTable.createdAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', ${purchaseOrdersTable.createdAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${purchaseOrdersTable.createdAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`,
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`,
       total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
     }).from(apPaymentsTable)
       .innerJoin(accountsPayableTable, eq(apPaymentsTable.accountPayableId, accountsPayableTable.id))
@@ -445,20 +433,17 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
         gte(apPaymentsTable.paidAt, rangeStart),
         lte(apPaymentsTable.paidAt, rangeEnd),
       ))
-      .groupBy(sql`DATE_TRUNC('month', ${apPaymentsTable.paidAt})`),
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`),
   ]);
 
-  const toKey = (d: string | Date) => {
-    const date = new Date(d);
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-  };
+  const toKey = (d: string | Date) => String(d).substring(0, 7);
   const cashMap = Object.fromEntries(cashRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const arMap = Object.fromEntries(arRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const poMap = Object.fromEntries(poRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const fixedExpenseMap = Object.fromEntries(fixedExpenseRows.map(r => [toKey(r.month), parseFloat(r.total)]));
 
   const result = months.map(({ start, label }) => {
-    const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const key = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`;
     const income = (cashMap[key] ?? 0) + (arMap[key] ?? 0);
     const expenses = (poMap[key] ?? 0) + (fixedExpenseMap[key] ?? 0);
     return {
