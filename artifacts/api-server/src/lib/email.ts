@@ -41,10 +41,10 @@ function formatDate(date: string | Date) {
   });
 }
 
-function buildInvoiceHtml(invoice: InvoiceData, storeName: string, logoUrl: string | null, primaryColor: string | null) {
+function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: boolean, primaryColor: string | null) {
   const color = primaryColor ?? "#c2697a";
-  const logoHtml = logoUrl
-    ? `<img src="${logoUrl}" alt="${storeName}" style="max-height:64px;max-width:200px;object-fit:contain;" />`
+  const logoHtml = hasCidLogo
+    ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:64px;max-width:200px;object-fit:contain;" />`
     : `<span style="font-size:22px;font-weight:700;color:${color};">${storeName}</span>`;
 
   const itemRows = invoice.items.map(item => `
@@ -170,6 +170,19 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, logoUrl: stri
 </html>`;
 }
 
+/** Parse a logoUrl that may be a data URI or a plain URL. Returns attachment info for nodemailer. */
+function parseLogoAttachment(logoUrl: string): { content: Buffer; contentType: string } | null {
+  const dataUriMatch = logoUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (dataUriMatch) {
+    return {
+      contentType: dataUriMatch[1],
+      content: Buffer.from(dataUriMatch[2], "base64"),
+    };
+  }
+  // Plain URL — clients can fetch it directly, no inline attachment needed
+  return null;
+}
+
 export async function sendInvoiceEmail(invoice: InvoiceData): Promise<void> {
   // Load settings fresh each time (allows changing SMTP without restart)
   const [settings] = await db.select().from(settingsTable);
@@ -182,6 +195,10 @@ export async function sendInvoiceEmail(invoice: InvoiceData): Promise<void> {
     return;
   }
 
+  // Determine logo strategy: inline CID attachment (data URI) or plain <img src> (URL)
+  const logoAttachment = logoUrl ? parseLogoAttachment(logoUrl) : null;
+  const hasCidLogo = !!logoAttachment;
+
   const transporter = nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort ?? 587,
@@ -189,7 +206,7 @@ export async function sendInvoiceEmail(invoice: InvoiceData): Promise<void> {
     auth: { user: smtpUser, pass: smtpPass },
   });
 
-  const html = buildInvoiceHtml(invoice, storeName, logoUrl ?? null, primaryColor ?? null);
+  const html = buildInvoiceHtml(invoice, storeName, hasCidLogo, primaryColor ?? null);
   const subject = `Factura #${invoice.saleId} — ${storeName}`;
 
   await transporter.sendMail({
@@ -197,5 +214,13 @@ export async function sendInvoiceEmail(invoice: InvoiceData): Promise<void> {
     to: invoice.customerEmail,
     subject,
     html,
+    attachments: logoAttachment
+      ? [{
+          filename: "logo.jpg",
+          content: logoAttachment.content,
+          contentType: logoAttachment.contentType,
+          cid: "store-logo",          // referenced as cid:store-logo in the HTML
+        }]
+      : [],
   });
 }
