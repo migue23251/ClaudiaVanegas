@@ -1,13 +1,40 @@
 import { Router, type IRouter } from "express";
 import { eq, and, type SQL } from "drizzle-orm";
-import { db, productsTable, PRODUCT_CATEGORIES } from "@workspace/db";
+import { db, productsTable, PRODUCT_CATEGORIES, settingsTable } from "@workspace/db";
 
 const router: IRouter = Router();
+
+async function getPublicSettings() {
+  const [existing] = await db
+    .select({
+      storeName: settingsTable.storeName,
+      logoUrl: settingsTable.logoUrl,
+      primaryColor: settingsTable.primaryColor,
+      storePhone: settingsTable.storePhone,
+      storeAddress: settingsTable.storeAddress,
+    })
+    .from(settingsTable);
+
+  if (existing) return existing;
+
+  // First boot — create row with defaults and return it
+  const [created] = await db
+    .insert(settingsTable)
+    .values({ storeName: "Claudia Vanegas" })
+    .returning({
+      storeName: settingsTable.storeName,
+      logoUrl: settingsTable.logoUrl,
+      primaryColor: settingsTable.primaryColor,
+      storePhone: settingsTable.storePhone,
+      storeAddress: settingsTable.storeAddress,
+    });
+  return created;
+}
 
 /**
  * GET /api/catalog
  * Public endpoint — no auth required.
- * Returns categories list and products (only public fields: no costPrice, no stock).
+ * Returns store branding + categories + products (no costPrice, no stock).
  * Optional query param: ?category=blusas
  */
 router.get("/catalog", async (req, res): Promise<void> => {
@@ -35,15 +62,22 @@ router.get("/catalog", async (req, res): Promise<void> => {
     })
     .from(productsTable);
 
-  const query =
-    conditions.length > 0 ? base.where(and(...conditions)) : base;
-
-  const products = await query.orderBy(
-    productsTable.category,
-    productsTable.name
-  );
+  const [settingsResult, products] = await Promise.all([
+    getPublicSettings(),
+    (conditions.length > 0 ? base.where(and(...conditions)) : base).orderBy(
+      productsTable.category,
+      productsTable.name
+    ),
+  ]);
 
   res.json({
+    store: {
+      name: settingsResult.storeName,
+      logoUrl: settingsResult.logoUrl ?? null,
+      primaryColor: settingsResult.primaryColor ?? null,
+      phone: settingsResult.storePhone ?? null,
+      address: settingsResult.storeAddress ?? null,
+    },
     categories: PRODUCT_CATEGORIES,
     products: products.map((p) => ({
       ...p,
