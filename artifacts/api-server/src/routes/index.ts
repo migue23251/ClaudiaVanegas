@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import authRouter from "./auth";
 import usersRouter from "./users";
 import productsRouter from "./products";
+import catalogRouter from "./catalog";
 import customersRouter from "./customers";
 import suppliersRouter from "./suppliers";
 import purchaseOrdersRouter from "./purchase_orders";
@@ -16,6 +17,7 @@ import settingsRouter from "./settings";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(catalogRouter);
 router.use(authRouter);
 router.use(usersRouter);
 router.use(productsRouter);

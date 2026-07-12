@@ -2,6 +2,7 @@ import { useLocation, Route, Switch } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import Login from "@/pages/login";
+import Catalogo from "@/pages/catalogo";
 import Dashboard from "@/pages/dashboard";
 import Pos from "@/pages/pos";
 import Inventario from "@/pages/inventario";
@@ -14,13 +15,6 @@ import Configuracion from "@/pages/configuracion";
 import Usuarios from "@/pages/usuarios";
 import NotFound from "@/pages/not-found";
 import { Shell } from "@/components/shell";
-
-function RootRedirect() {
-  const { isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
-  useEffect(() => { setLocation(isAuthenticated ? "/dashboard" : "/login"); }, [isAuthenticated, setLocation]);
-  return null;
-}
 
 export function ProtectedRoute({ component: Component, adminOnly = false }: { component: any, adminOnly?: boolean }) {
   const { isAuthenticated, user } = useAuth();
@@ -48,8 +42,8 @@ export function AppRouter() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      
-      <Route path="/" component={RootRedirect} />
+
+      <Route path="/" component={Catalogo} />
 
       <Route path="/dashboard"><ProtectedRoute component={Dashboard} /></Route>
       <Route path="/pos"><ProtectedRoute component={Pos} /></Route>
