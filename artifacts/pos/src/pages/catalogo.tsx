@@ -302,10 +302,10 @@ export default function Catalogo() {
 
   // Apply brand color whenever settings load
   useEffect(() => {
-    if (data?.store.primaryColor) {
+    if (data?.store?.primaryColor) {
       applyBrandColor(data.store.primaryColor);
     }
-  }, [data?.store.primaryColor]);
+  }, [data?.store?.primaryColor]);
 
   const store = data?.store;
 
