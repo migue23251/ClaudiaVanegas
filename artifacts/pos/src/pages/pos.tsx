@@ -11,9 +11,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Search, ShoppingCart, Plus, Minus, Trash2, UserSearch, Receipt, ShoppingBag, Edit, X, UserPlus, Package } from "lucide-react";
+import {
+  Search, ShoppingCart, Plus, Minus, Trash2, UserSearch, Receipt,
+  ShoppingBag, Edit, X, UserPlus, Package, CreditCard, Copy, CheckCircle2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+
+const BOLD_FEE_RATE = 0.05;
 
 interface CartItem extends Product {
   cartQty: number;
@@ -29,8 +34,13 @@ export default function Pos() {
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
-  // Mobile: switch between products panel and cart panel
   const [mobileTab, setMobileTab] = useState<"products" | "cart">("products");
+
+  // Bold link state
+  const [useBoldLink, setUseBoldLink] = useState(false);
+  const [boldLinkOpen, setBoldLinkOpen] = useState(false);
+  const [boldLinkUrl, setBoldLinkUrl] = useState<string | null>(null);
+  const [boldFeeAmount, setBoldFeeAmount] = useState(0);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -94,6 +104,20 @@ export default function Pos() {
   };
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + (item.cartQty * item.cartPrice), 0), [cart]);
+  const boldFee = useBoldLink ? Math.round(total * BOLD_FEE_RATE) : 0;
+  const totalWithBold = total + boldFee;
+
+  const resetCart = () => {
+    setCart([]);
+    setSelectedCustomer(null);
+    setCustomerSearch("");
+    setSearchTerm("");
+    setPaymentType("contado");
+    setAdvanceAmount(0);
+    setMobileTab("products");
+    setUseBoldLink(false);
+    setBoldLinkUrl(null);
+  };
 
   // ── Checkout ───────────────────────────────────────────────────────────────
 
@@ -110,6 +134,7 @@ export default function Pos() {
         customerId: selectedCustomer?.id,
         paymentType,
         advanceAmount: advance > 0 ? advance : undefined,
+        withBoldLink: useBoldLink || undefined,
         items: cart.map(item => ({
           productId: item.id,
           qty: item.cartQty,
@@ -117,15 +142,17 @@ export default function Pos() {
         }))
       } as any
     }, {
-      onSuccess: () => {
-        toast({ title: "Venta registrada con éxito", className: "bg-emerald-500 text-white border-none" });
-        setCart([]);
-        setSelectedCustomer(null);
-        setCustomerSearch("");
-        setSearchTerm("");
-        setPaymentType("contado");
-        setAdvanceAmount(0);
-        setMobileTab("products");
+      onSuccess: (result: any) => {
+        const hasLink = !!(result?.paymentLink);
+        if (hasLink) {
+          setBoldLinkUrl(result.paymentLink);
+          setBoldFeeAmount(result.boldFee ? parseFloat(String(result.boldFee)) : 0);
+          setBoldLinkOpen(true);
+          toast({ title: "Venta registrada y link de pago generado", className: "bg-emerald-500 text-white border-none" });
+        } else {
+          toast({ title: "Venta registrada con éxito", className: "bg-emerald-500 text-white border-none" });
+        }
+        resetCart();
         queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
       },
       onError: (err: any) => {
@@ -186,11 +213,17 @@ export default function Pos() {
     });
   };
 
+  const copyBoldLink = () => {
+    if (boldLinkUrl) {
+      navigator.clipboard.writeText(boldLinkUrl);
+      toast({ title: "Link copiado" });
+    }
+  };
+
   // ── Panels ─────────────────────────────────────────────────────────────────
 
   const productsPanel = (
     <div className={`flex-1 flex flex-col gap-4 min-h-0 ${mobileTab === "cart" ? "hidden lg:flex" : "flex"}`}>
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -201,7 +234,6 @@ export default function Pos() {
         />
       </div>
 
-      {/* Grid */}
       <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {products?.map(product => (
           <Card
@@ -275,7 +307,6 @@ export default function Pos() {
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 className="pl-8 h-9 text-sm"
               />
-              {/* Dropdown */}
               {customerSearch && customers && customers.length > 0 && (
                 <div className="absolute top-full left-0 w-full mt-1 bg-popover border shadow-md rounded-md z-50 max-h-48 overflow-y-auto">
                   {customers.map(c => (
@@ -290,7 +321,6 @@ export default function Pos() {
                   ))}
                 </div>
               )}
-              {/* No results — offer to create */}
               {customerSearch.length > 1 && customers?.length === 0 && (
                 <div className="absolute top-full left-0 w-full mt-1 bg-popover border shadow-md rounded-md z-50">
                   <div className="p-3 text-sm text-muted-foreground text-center">
@@ -298,8 +328,7 @@ export default function Pos() {
                   </div>
                   <div className="border-t p-2">
                     <Button
-                      variant="ghost"
-                      size="sm"
+                      variant="ghost" size="sm"
                       className="w-full gap-2 text-primary hover:text-primary hover:bg-primary/10"
                       onClick={() => { setIsCreatingCustomer(true); }}
                     >
@@ -383,10 +412,7 @@ export default function Pos() {
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
                 <Input
-                  type="number"
-                  min={0}
-                  max={total}
-                  step={1000}
+                  type="number" min={0} max={total} step={1000}
                   value={advanceAmount}
                   onChange={(e) => setAdvanceAmount(Math.max(0, Math.min(Number(e.target.value), total)))}
                   className="pl-7 h-9 font-serif text-sm"
@@ -401,17 +427,61 @@ export default function Pos() {
             </div>
           )}
 
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-muted-foreground">Total</span>
-            <span className="text-2xl font-serif font-bold text-primary">{formatCurrency(total)}</span>
+          {/* Bold link toggle */}
+          <div
+            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-colors ${
+              useBoldLink ? "border-primary bg-primary/5" : "border-border bg-background"
+            }`}
+            onClick={() => setUseBoldLink(!useBoldLink)}
+          >
+            <div>
+              <p className="text-xs font-semibold flex items-center gap-1.5">
+                <CreditCard className="h-3.5 w-3.5 text-primary" />
+                Link de pago Bold
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">+5% comisión</p>
+            </div>
+            <div className={`relative h-5 w-9 rounded-full transition-colors ${useBoldLink ? "bg-primary" : "bg-muted"}`}>
+              <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${useBoldLink ? "translate-x-4" : ""}`} />
+            </div>
           </div>
+
+          {/* Totals */}
+          {useBoldLink ? (
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="tabular-nums">{formatCurrency(total)}</span>
+              </div>
+              <div className="flex justify-between text-amber-600 font-medium">
+                <span>Comisión Bold (5%)</span>
+                <span className="tabular-nums">+ {formatCurrency(boldFee)}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-border">
+                <span className="font-semibold">Total</span>
+                <span className="text-2xl font-serif font-bold text-primary tabular-nums">
+                  {formatCurrency(totalWithBold)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-muted-foreground">Total</span>
+              <span className="text-2xl font-serif font-bold text-primary">{formatCurrency(total)}</span>
+            </div>
+          )}
 
           <Button
             className="w-full h-12 text-base font-bold"
             onClick={handleCheckout}
             disabled={cart.length === 0 || createSale.isPending}
           >
-            {createSale.isPending ? "Procesando..." : "Cobrar"}
+            {createSale.isPending
+              ? "Procesando..."
+              : useBoldLink
+                ? <span className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Cobrar + link Bold</span>
+                : "Cobrar"
+            }
           </Button>
         </div>
       </Card>
@@ -420,7 +490,7 @@ export default function Pos() {
 
   return (
     <>
-      {/* ── Mobile tab bar (hidden on lg+) ── */}
+      {/* Mobile tab bar */}
       <div className="lg:hidden flex rounded-xl border border-border bg-card overflow-hidden mb-3 shrink-0">
         <button
           onClick={() => setMobileTab("products")}
@@ -453,15 +523,13 @@ export default function Pos() {
         </button>
       </div>
 
-      {/* ── Main layout ── */}
-      {/* Mobile: 100dvh - 62px header - 16px padding top - 52px tab bar - 16px padding bottom = ~146px */}
-      {/* Desktop: 100dvh - 32px padding top - 32px padding bottom = 64px (lg:p-8) */}
+      {/* Main layout */}
       <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 h-[calc(100dvh-150px)] lg:h-[calc(100dvh-64px)]">
         {productsPanel}
         {cartPanel}
       </div>
 
-      {/* ── Floating cart hint on mobile (products tab, cart not empty) ── */}
+      {/* Floating cart hint on mobile */}
       {mobileTab === "products" && cart.length > 0 && (
         <button
           className="lg:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-30 bg-primary text-primary-foreground rounded-full px-5 py-3 shadow-xl flex items-center gap-2.5 text-sm font-semibold active:scale-95 transition-transform"
@@ -472,7 +540,7 @@ export default function Pos() {
         </button>
       )}
 
-      {/* ── Edit Customer Dialog ── */}
+      {/* Edit Customer Dialog */}
       <Dialog open={isEditingCustomer} onOpenChange={setIsEditingCustomer}>
         <DialogContent>
           <DialogHeader>
@@ -509,7 +577,7 @@ export default function Pos() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Create Customer Dialog ── */}
+      {/* Create Customer Dialog */}
       <Dialog open={isCreatingCustomer} onOpenChange={(open) => { setIsCreatingCustomer(open); }}>
         <DialogContent>
           <DialogHeader>
@@ -548,6 +616,46 @@ export default function Pos() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bold payment link result dialog */}
+      <Dialog open={boldLinkOpen} onOpenChange={setBoldLinkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+              Link de pago Bold generado
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Comparte este link con el cliente para que realice el pago en línea.
+            </p>
+            <div className="flex gap-2">
+              <Input value={boldLinkUrl ?? ""} readOnly className="text-xs font-mono bg-muted" />
+              <Button variant="outline" size="icon" onClick={copyBoldLink} title="Copiar link">
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            {boldFeeAmount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Incluye {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(boldFeeAmount)} de comisión Bold (5%)
+              </p>
+            )}
+            {boldLinkUrl && (
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Aquí está tu link de pago: ${boldLinkUrl}`)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-[#25D366] hover:bg-[#20bf5b] text-white text-sm font-semibold transition-colors"
+              >
+                Compartir por WhatsApp
+              </a>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setBoldLinkOpen(false)}>Cerrar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

@@ -10,6 +10,7 @@ import Proveedores from "@/pages/proveedores";
 import OrdenesCompra from "@/pages/ordenes-compra";
 import CuentasPagar from "@/pages/cuentas-pagar";
 import Ventas from "@/pages/ventas";
+import Pedidos from "@/pages/pedidos";
 import CuentasCobrar from "@/pages/cuentas-cobrar";
 import Configuracion from "@/pages/configuracion";
 import Usuarios from "@/pages/usuarios";
@@ -50,6 +51,7 @@ export function AppRouter() {
       <Route path="/ventas"><ProtectedRoute component={Ventas} /></Route>
 
       {/* Admin Only */}
+      <Route path="/pedidos"><ProtectedRoute component={Pedidos} adminOnly /></Route>
       <Route path="/inventario"><ProtectedRoute component={Inventario} adminOnly /></Route>
       <Route path="/proveedores"><ProtectedRoute component={Proveedores} adminOnly /></Route>
       <Route path="/ordenes-compra"><ProtectedRoute component={OrdenesCompra} adminOnly /></Route>

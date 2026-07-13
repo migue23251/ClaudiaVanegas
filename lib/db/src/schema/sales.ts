@@ -14,6 +14,9 @@ export const salesTable = pgTable("sales", {
   voided: boolean("voided").notNull().default(false),
   voidedAt: timestamp("voided_at", { withTimezone: true }),
   voidReason: text("void_reason"),
+  paymentLink: text("payment_link"),
+  boldFee: numeric("bold_fee", { precision: 12, scale: 2 }),
+  catalogOrderId: integer("catalog_order_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

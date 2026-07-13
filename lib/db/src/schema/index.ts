@@ -6,3 +6,4 @@ export * from "./purchase_orders";
 export * from "./sales";
 export * from "./ledger";
 export * from "./settings";
+export * from "./catalog_orders";

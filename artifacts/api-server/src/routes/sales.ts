@@ -5,6 +5,7 @@ import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTab
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { sendInvoiceEmail } from "../lib/email";
 import { bogotaNow, bogotaToday } from "../lib/tz";
+import { createBoldPaymentLink } from "../lib/bold";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,9 @@ async function buildSaleResponse(saleId: number) {
   return {
     ...sale,
     total: parseFloat(sale.total),
+    boldFee: sale.boldFee ? parseFloat(sale.boldFee) : null,
+    paymentLink: sale.paymentLink ?? null,
+    catalogOrderId: sale.catalogOrderId ?? null,
     voided: sale.voided,
     voidedAt: sale.voidedAt,
     voidReason: sale.voidReason,
@@ -87,12 +91,13 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/sales", requireAuth, async (req, res): Promise<void> => {
-  const { customerId, paymentType, notes, items, advanceAmount } = req.body as {
+  const { customerId, paymentType, notes, items, advanceAmount, withBoldLink } = req.body as {
     customerId?: number;
     paymentType: "contado" | "credito";
     notes?: string;
     items: { productId: number; qty: number; unitPrice: number }[];
     advanceAmount?: number;
+    withBoldLink?: boolean;
   };
 
   if (!paymentType || !items?.length) {
@@ -182,7 +187,29 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
     return sale.id;
   });
 
-  const result = await buildSaleResponse(saleId);
+  let result = await buildSaleResponse(saleId);
+
+  // Generate Bold payment link if requested
+  if (withBoldLink && result) {
+    try {
+      const boldResult = await createBoldPaymentLink({
+        amountCOP: total,
+        description: `Factura #${saleId}`,
+        customer: {
+          fullName: result.customerName ?? undefined,
+          email: result.customerEmail ?? undefined,
+          phone: result.customerPhone ?? undefined,
+        },
+      });
+      await db.update(salesTable)
+        .set({ paymentLink: boldResult.url, boldFee: String(boldResult.fee) })
+        .where(eq(salesTable.id, saleId));
+      result = { ...result, paymentLink: boldResult.url, boldFee: boldResult.fee } as typeof result;
+    } catch (err) {
+      console.error("[bold] Error generando link:", (err as Error).message);
+    }
+  }
+
   res.status(201).json(result);
 
   // Fire-and-forget invoice email — does not block or affect the sale response

@@ -14,20 +14,22 @@ import {
   LogOut,
   Store,
   X,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Panel",            href: "/dashboard",       roles: ["admin", "cajero"] },
-  { icon: ShoppingCart,   label: "Punto de Venta",   href: "/pos",              roles: ["admin", "cajero"] },
-  { icon: FileText,       label: "Historial Ventas",  href: "/ventas",           roles: ["admin", "cajero"] },
-  { icon: Package,        label: "Inventario",        href: "/inventario",       roles: ["admin"] },
-  { icon: Truck,          label: "Proveedores",       href: "/proveedores",      roles: ["admin"] },
-  { icon: FileText,       label: "Órdenes de Compra", href: "/ordenes-compra",   roles: ["admin"] },
-  { icon: Briefcase,      label: "Cuentas por Cobrar",href: "/cuentas-cobrar",   roles: ["admin"] },
-  { icon: DollarSign,     label: "Cuentas por Pagar", href: "/cuentas-pagar",    roles: ["admin"] },
-  { icon: Settings,       label: "Configuración",     href: "/configuracion",    roles: ["admin"] },
-  { icon: UserCog,        label: "Usuarios",          href: "/usuarios",         roles: ["admin"] },
+  { icon: LayoutDashboard, label: "Panel",              href: "/dashboard",       roles: ["admin", "cajero"] },
+  { icon: ShoppingCart,    label: "Punto de Venta",     href: "/pos",             roles: ["admin", "cajero"] },
+  { icon: FileText,        label: "Historial Ventas",   href: "/ventas",          roles: ["admin", "cajero"] },
+  { icon: ClipboardList,   label: "Pedidos Catálogo",   href: "/pedidos",         roles: ["admin"] },
+  { icon: Package,         label: "Inventario",         href: "/inventario",      roles: ["admin"] },
+  { icon: Truck,           label: "Proveedores",        href: "/proveedores",     roles: ["admin"] },
+  { icon: FileText,        label: "Órdenes de Compra",  href: "/ordenes-compra",  roles: ["admin"] },
+  { icon: Briefcase,       label: "Cuentas por Cobrar", href: "/cuentas-cobrar",  roles: ["admin"] },
+  { icon: DollarSign,      label: "Cuentas por Pagar",  href: "/cuentas-pagar",   roles: ["admin"] },
+  { icon: Settings,        label: "Configuración",      href: "/configuracion",   roles: ["admin"] },
+  { icon: UserCog,         label: "Usuarios",           href: "/usuarios",        roles: ["admin"] },
 ];
 
 interface SidebarProps {

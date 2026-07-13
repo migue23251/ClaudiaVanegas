@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ShoppingBag, ChevronLeft, ChevronRight, LogIn, Tag,
-  Phone, MapPin, X, ZoomIn,
+  Phone, MapPin, X, ZoomIn, ShoppingCart, Plus, Minus, Trash2,
+  CheckCircle2, ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { applyBrandColor } from "@/lib/brand-color";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +38,14 @@ interface CatalogData {
   products: CatalogProduct[];
 }
 
+interface CartItem {
+  productId: number;
+  productName: string;
+  unitPrice: number;
+  qty: number;
+  image: string | null;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -46,63 +57,45 @@ const CATEGORY_LABELS: Record<string, string> = {
 const PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='64' fill='%23d1d5db'%3E👗%3C/text%3E%3C/svg%3E";
 
-// ─── Image carousel (shared by card + modal) ──────────────────────────────────
+// ─── Image carousel ───────────────────────────────────────────────────────────
 
 function Carousel({
   images,
   name,
   aspectClass = "aspect-[3/4]",
-  onClick,
+  large = false,
 }: {
   images: string[];
   name: string;
   aspectClass?: string;
-  onClick?: () => void;
+  large?: boolean;
 }) {
   const [idx, setIdx] = useState(0);
   const srcs = images.length > 0 ? images : [PLACEHOLDER];
   const multi = srcs.length > 1;
 
-  const prev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIdx((i) => (i - 1 + srcs.length) % srcs.length);
-  };
-  const next = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIdx((i) => (i + 1) % srcs.length);
-  };
+  const prev = (e: React.MouseEvent) => { e.stopPropagation(); setIdx(i => (i - 1 + srcs.length) % srcs.length); };
+  const next = (e: React.MouseEvent) => { e.stopPropagation(); setIdx(i => (i + 1) % srcs.length); };
 
   return (
-    <div
-      className={`relative ${aspectClass} overflow-hidden bg-muted group/img ${onClick ? "cursor-zoom-in" : ""}`}
-      onClick={onClick}
-    >
+    <div className={`relative ${aspectClass} overflow-hidden bg-muted group/img`}>
       <img
-        src={srcs[idx]}
-        alt={name}
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-        onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
+        src={srcs[idx]} alt={name}
+        className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
+        onError={e => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
       />
-
-      {onClick && (
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity bg-black/10">
-          <ZoomIn className="w-8 h-8 text-white drop-shadow" />
-        </div>
-      )}
-
       {multi && (
         <>
           <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-1.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className={large ? "w-5 h-5" : "w-4 h-4"} />
           </button>
           <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-1.5 opacity-0 group-hover/img:opacity-100 transition-opacity">
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className={large ? "w-5 h-5" : "w-4 h-4"} />
           </button>
           <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
             {srcs.map((_, i) => (
-              <button key={i} onClick={(e) => { e.stopPropagation(); setIdx(i); }}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${i === idx ? "bg-white scale-125" : "bg-white/50"}`}
-              />
+              <button key={i} onClick={e => { e.stopPropagation(); setIdx(i); }}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${i === idx ? "bg-white scale-125" : "bg-white/50"}`} />
             ))}
           </div>
           <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
@@ -119,104 +112,100 @@ function Carousel({
 function ProductModal({
   product,
   onClose,
+  onAddToCart,
+  cartQty,
 }: {
   product: CatalogProduct;
   onClose: () => void;
+  onAddToCart: (product: CatalogProduct) => void;
+  cartQty: number;
 }) {
   const srcs = product.images.length > 0 ? product.images : [PLACEHOLDER];
   const [mainIdx, setMainIdx] = useState(0);
 
-  const prev = useCallback(() => setMainIdx((i) => (i - 1 + srcs.length) % srcs.length), [srcs.length]);
-  const next = useCallback(() => setMainIdx((i) => (i + 1) % srcs.length), [srcs.length]);
+  const prev = useCallback(() => setMainIdx(i => (i - 1 + srcs.length) % srcs.length), [srcs.length]);
+  const next = useCallback(() => setMainIdx(i => (i + 1) % srcs.length), [srcs.length]);
 
-  // Keyboard navigation
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const h = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") prev();
       if (e.key === "ArrowRight") next();
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [prev, next]);
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent className="max-w-4xl w-full p-0 overflow-hidden rounded-2xl gap-0">
-        <div className="flex flex-col md:flex-row h-full max-h-[90vh]">
-
-          {/* ── Left: image viewer ── */}
+        <div className="flex flex-col md:flex-row max-h-[90vh]">
+          {/* Left: images */}
           <div className="md:w-1/2 bg-muted flex flex-col">
-            {/* Main image */}
-            <div className="relative flex-1 min-h-0 overflow-hidden group/main">
+            <div className="relative flex-1 min-h-0 overflow-hidden group/main" style={{ maxHeight: "60vh" }}>
               <img
-                src={srcs[mainIdx]}
-                alt={`${product.name} ${mainIdx + 1}`}
+                src={srcs[mainIdx]} alt={product.name}
                 className="w-full h-full object-contain"
-                style={{ maxHeight: "60vh" }}
-                onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
+                onError={e => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
               />
               {srcs.length > 1 && (
                 <>
-                  <button onClick={prev}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 opacity-0 group-hover/main:opacity-100 transition-opacity">
+                  <button onClick={prev} className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 opacity-0 group-hover/main:opacity-100 transition-opacity">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
-                  <button onClick={next}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 opacity-0 group-hover/main:opacity-100 transition-opacity">
+                  <button onClick={next} className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 opacity-0 group-hover/main:opacity-100 transition-opacity">
                     <ChevronRight className="w-5 h-5" />
                   </button>
-                  <div className="absolute bottom-3 left-0 right-0 text-center text-white text-xs bg-black/30 mx-auto w-fit px-3 py-1 rounded-full">
-                    {mainIdx + 1} / {srcs.length}
+                  <div className="absolute bottom-3 left-0 right-0 text-center">
+                    <span className="text-white text-xs bg-black/30 px-3 py-1 rounded-full">
+                      {mainIdx + 1} / {srcs.length}
+                    </span>
                   </div>
                 </>
               )}
             </div>
-
-            {/* Thumbnails */}
             {srcs.length > 1 && (
               <div className="flex gap-2 p-3 overflow-x-auto bg-muted/50 border-t border-border">
                 {srcs.map((src, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setMainIdx(i)}
-                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
+                  <button key={i} onClick={() => setMainIdx(i)}
+                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
                       i === mainIdx ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"
                     }`}
                   >
                     <img src={src} alt="" className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }} />
+                      onError={e => { (e.target as HTMLImageElement).src = PLACEHOLDER; }} />
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* ── Right: product info ── */}
+          {/* Right: info */}
           <div className="md:w-1/2 flex flex-col p-6 overflow-y-auto gap-4">
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-xl font-bold leading-tight">{product.name}</h2>
-              <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5">
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <div className="text-3xl font-bold text-primary">
               ${product.salePrice.toLocaleString("es-CO")}
             </div>
-
             <Badge variant="secondary" className="w-fit">
               <Tag className="w-3 h-3 mr-1" />
               {CATEGORY_LABELS[product.category] ?? product.category}
             </Badge>
-
             {product.description && (
-              <div>
-                <p className="text-sm font-medium text-foreground mb-1">Descripción</p>
-                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {product.description}
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
+                {product.description}
+              </p>
             )}
+            <Button
+              className="mt-auto w-full gap-2"
+              onClick={() => { onAddToCart(product); onClose(); }}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              {cartQty > 0 ? `Añadir otro (${cartQty} en carrito)` : "Añadir al carrito"}
+            </Button>
           </div>
         </div>
       </DialogContent>
@@ -229,32 +218,63 @@ function ProductModal({
 function ProductCard({
   product,
   onOpen,
+  onAddToCart,
+  cartQty,
 }: {
   product: CatalogProduct;
   onOpen: () => void;
+  onAddToCart: (e: React.MouseEvent) => void;
+  cartQty: number;
 }) {
   return (
-    <div
-      className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col cursor-pointer group"
-      onClick={onOpen}
-    >
-      <Carousel images={product.images} name={product.name} onClick={onOpen} />
+    <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col group">
+      {/* Image */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-muted cursor-pointer" onClick={onOpen}>
+        {product.images.length > 0 ? (
+          <img
+            src={product.images[0]} alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            onError={e => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-4xl select-none">👗</div>
+        )}
+        {product.images.length > 1 && (
+          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full">
+            1/{product.images.length}
+          </div>
+        )}
+        {/* Quick add button */}
+        <button
+          onClick={onAddToCart}
+          className="absolute bottom-2 right-2 bg-primary text-primary-foreground rounded-full w-9 h-9 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 active:scale-95"
+          title="Añadir al carrito"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+        {/* Zoom hint */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <ZoomIn className="w-6 h-6 text-white drop-shadow opacity-60" />
+        </div>
+      </div>
 
+      {/* Info */}
       <div className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-sm leading-snug line-clamp-2 flex-1 group-hover:text-primary transition-colors">
+          <h3
+            className="font-semibold text-sm leading-snug line-clamp-2 flex-1 cursor-pointer hover:text-primary transition-colors"
+            onClick={onOpen}
+          >
             {product.name}
           </h3>
           <span className="text-sm font-bold text-primary whitespace-nowrap">
             ${product.salePrice.toLocaleString("es-CO")}
           </span>
         </div>
-
         <Badge variant="secondary" className="w-fit text-xs">
           <Tag className="w-3 h-3 mr-1" />
           {CATEGORY_LABELS[product.category] ?? product.category}
         </Badge>
-
         {product.description && (
           <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
             {product.description}
@@ -280,19 +300,289 @@ function SkeletonCard() {
   );
 }
 
+// ─── Cart drawer ──────────────────────────────────────────────────────────────
+
+type CartStep = "cart" | "form" | "success";
+
+interface CheckoutForm {
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerAddress: string;
+  notes: string;
+}
+
+function CartDrawer({
+  open,
+  onClose,
+  cart,
+  onUpdateQty,
+  onRemove,
+  onClearCart,
+  store,
+}: {
+  open: boolean;
+  onClose: () => void;
+  cart: CartItem[];
+  onUpdateQty: (productId: number, delta: number) => void;
+  onRemove: (productId: number) => void;
+  onClearCart: () => void;
+  store?: StoreInfo;
+}) {
+  const { toast } = useToast();
+  const [step, setStep] = useState<CartStep>("cart");
+  const [orderId, setOrderId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<CheckoutForm>({
+    customerName: "", customerPhone: "", customerEmail: "",
+    customerAddress: "", notes: "",
+  });
+
+  const total = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+  const fmt = (n: number) => `$${n.toLocaleString("es-CO")}`;
+
+  // Reset step when drawer opens/closes
+  useEffect(() => {
+    if (!open) {
+      setTimeout(() => { if (!open) { setStep("cart"); setForm({ customerName: "", customerPhone: "", customerEmail: "", customerAddress: "", notes: "" }); } }, 300);
+    }
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.customerName.trim() || !form.customerPhone.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/catalog/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: form.customerName.trim(),
+          customerPhone: form.customerPhone.trim(),
+          customerEmail: form.customerEmail.trim() || undefined,
+          customerAddress: form.customerAddress.trim() || undefined,
+          notes: form.notes.trim() || undefined,
+          items: cart.map(i => ({ productId: i.productId, qty: i.qty })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error enviando pedido");
+      setOrderId(data.id);
+      setStep("success");
+      onClearCart();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className={`fixed inset-0 bg-black/50 z-30 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <div className={`fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-background border-l border-border shadow-2xl flex flex-col transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}>
+
+        {/* Cart step */}
+        {step === "cart" && (
+          <>
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <h2 className="font-bold text-lg flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5 text-primary" /> Mi pedido
+              </h2>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {cart.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-3 p-8">
+                <ShoppingBag className="w-12 h-12 opacity-20" />
+                <p className="font-medium">Tu carrito está vacío</p>
+                <p className="text-sm text-center">Agrega productos desde el catálogo</p>
+                <Button variant="outline" onClick={onClose}>Ver catálogo</Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {cart.map(item => (
+                    <div key={item.productId} className="flex gap-3 p-3 bg-card border border-border rounded-xl">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
+                        {item.image ? (
+                          <img src={item.image} alt={item.productName} className="w-full h-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).src = PLACEHOLDER; }} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xl">👗</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm line-clamp-2 leading-snug">{item.productName}</p>
+                        <p className="text-sm font-bold text-primary mt-1">${item.unitPrice.toLocaleString("es-CO")}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <button onClick={() => onUpdateQty(item.productId, -1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-6 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
+                          <button onClick={() => onUpdateQty(item.productId, 1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => onRemove(item.productId)} className="ml-auto text-muted-foreground hover:text-destructive transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 border-t border-border space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Total estimado</span>
+                    <span className="text-2xl font-bold text-primary">{fmt(total)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    El precio final puede variar. Un asesor confirmará tu pedido.
+                  </p>
+                  <Button className="w-full h-11 font-semibold gap-2" onClick={() => setStep("form")}>
+                    Continuar con mi pedido →
+                  </Button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* Checkout form step */}
+        {step === "form" && (
+          <>
+            <div className="flex items-center gap-3 p-4 border-b border-border">
+              <button onClick={() => setStep("cart")} className="text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h2 className="font-bold text-lg">Tus datos de contacto</h2>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground ml-auto">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
+              <div className="flex-1 p-4 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">Nombre completo <span className="text-destructive">*</span></label>
+                  <Input
+                    required placeholder="Tu nombre"
+                    value={form.customerName}
+                    onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">Celular <span className="text-destructive">*</span></label>
+                  <Input
+                    required type="tel" placeholder="3XX XXX XXXX"
+                    value={form.customerPhone}
+                    onChange={e => setForm(f => ({ ...f, customerPhone: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">Correo electrónico <span className="text-muted-foreground font-normal">(opcional)</span></label>
+                  <Input
+                    type="email" placeholder="correo@ejemplo.com"
+                    value={form.customerEmail}
+                    onChange={e => setForm(f => ({ ...f, customerEmail: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">Dirección <span className="text-muted-foreground font-normal">(opcional)</span></label>
+                  <Input
+                    placeholder="Tu dirección de entrega"
+                    value={form.customerAddress}
+                    onChange={e => setForm(f => ({ ...f, customerAddress: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold">Notas <span className="text-muted-foreground font-normal">(opcional)</span></label>
+                  <textarea
+                    placeholder="Talla, color, instrucciones especiales..."
+                    value={form.notes}
+                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    className="w-full h-20 px-3 py-2 text-sm border border-input rounded-md resize-none bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+
+                {/* Order summary */}
+                <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen del pedido</p>
+                  {cart.map(i => (
+                    <div key={i.productId} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{i.productName} ×{i.qty}</span>
+                      <span className="font-medium">${(i.unitPrice * i.qty).toLocaleString("es-CO")}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-border pt-2 flex justify-between font-bold">
+                    <span>Total estimado</span>
+                    <span className="text-primary">{fmt(total)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-border">
+                <Button type="submit" className="w-full h-11 font-semibold gap-2" disabled={loading}>
+                  {loading ? "Enviando pedido..." : "Enviar pedido"}
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
+
+        {/* Success step */}
+        {step === "success" && (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
+              <CheckCircle2 className="w-9 h-9 text-emerald-500" />
+            </div>
+            <h2 className="text-xl font-bold">¡Pedido recibido!</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Tu pedido <strong>#{orderId}</strong> fue enviado con éxito.
+              Pronto te contactaremos al número que indicaste para confirmar la disponibilidad.
+            </p>
+            {store?.phone && (
+              <a
+                href={`https://wa.me/${store.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola, acabo de hacer el pedido #${orderId} por el catálogo`)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-[#25D366] hover:bg-[#20bf5b] text-white text-sm font-semibold transition-colors"
+              >
+                Escribir por WhatsApp
+              </a>
+            )}
+            <Button variant="outline" className="w-full" onClick={() => { setStep("cart"); onClose(); }}>
+              Seguir viendo el catálogo
+            </Button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Catalogo() {
   const [, setLocation] = useLocation();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<CatalogProduct | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const { toast } = useToast();
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["catalog", activeCategory],
     queryFn: async (): Promise<CatalogData> => {
-      const url = activeCategory
-        ? `/api/catalog?category=${activeCategory}`
-        : "/api/catalog";
+      const url = activeCategory ? `/api/catalog?category=${activeCategory}` : "/api/catalog";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Error cargando catálogo");
       return res.json();
@@ -300,75 +590,107 @@ export default function Catalogo() {
     staleTime: 60_000,
   });
 
-  // Apply brand color whenever settings load
+  // Apply brand color from settings
   useEffect(() => {
-    if (data?.store?.primaryColor) {
-      applyBrandColor(data.store.primaryColor);
-    }
+    if (data?.store?.primaryColor) applyBrandColor(data.store.primaryColor);
   }, [data?.store?.primaryColor]);
 
   const store = data?.store;
 
+  // ── Cart operations ────────────────────────────────────────────────────────
+
+  const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
+
+  const addToCart = useCallback((product: CatalogProduct) => {
+    setCart(prev => {
+      const existing = prev.find(i => i.productId === product.id);
+      if (existing) {
+        return prev.map(i => i.productId === product.id ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, {
+        productId: product.id,
+        productName: product.name,
+        unitPrice: product.salePrice,
+        qty: 1,
+        image: product.images[0] ?? null,
+      }];
+    });
+    toast({ title: `${product.name} añadido al carrito`, className: "bg-emerald-500 text-white border-none" });
+  }, [toast]);
+
+  const updateQty = useCallback((productId: number, delta: number) => {
+    setCart(prev => prev.map(i => {
+      if (i.productId !== productId) return i;
+      const newQty = i.qty + delta;
+      return newQty < 1 ? i : { ...i, qty: newQty };
+    }));
+  }, []);
+
+  const removeFromCart = useCallback((productId: number) => {
+    setCart(prev => prev.filter(i => i.productId !== productId));
+  }, []);
+
+  const clearCart = useCallback(() => setCart([]), []);
+
+  const cartQtyFor = (productId: number) => cart.find(i => i.productId === productId)?.qty ?? 0;
+
   return (
     <div className="fixed inset-0 overflow-y-auto bg-background">
 
-      {/* ── Header ────────────────────────────────────────────────── */}
+      {/* ── Header ── */}
       <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-
-          {/* Logo + store name */}
           <div className="flex items-center gap-3 min-w-0">
             {store?.logoUrl ? (
-              <img
-                src={store.logoUrl}
-                alt={store.name}
-                className="h-10 w-10 object-contain rounded-lg shrink-0"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-              />
+              <img src={store.logoUrl} alt={store.name} className="h-10 w-10 object-contain rounded-lg shrink-0"
+                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
               <ShoppingBag className="w-7 h-7 text-primary shrink-0" />
             )}
-            <span
-              className="font-bold text-lg sm:text-xl tracking-tight truncate"
-              style={{ fontFamily: "'Playfair Display', serif" }}
-            >
+            <span className="font-bold text-lg sm:text-xl tracking-tight truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
               {store?.name ?? "Claudia Vanegas"}
             </span>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLocation("/login")}
-            className="shrink-0"
-          >
-            <LogIn className="w-4 h-4 mr-1.5" />
-            <span className="hidden sm:inline">Ingresar</span>
-            <span className="sm:hidden">POS</span>
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Cart button */}
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+              title="Ver carrito"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
+            </button>
+            <Button variant="outline" size="sm" onClick={() => setLocation("/login")}>
+              <LogIn className="w-4 h-4 mr-1.5" />
+              <span className="hidden sm:inline">Ingresar</span>
+              <span className="sm:hidden">POS</span>
+            </Button>
+          </div>
         </div>
 
-        {/* ── Category filter ── */}
+        {/* Category pills */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3">
           <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
             <button
               onClick={() => setActiveCategory(null)}
               className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                activeCategory === null
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/70"
+                activeCategory === null ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
               }`}
             >
               Todo
             </button>
-            {(data?.categories ?? Object.keys(CATEGORY_LABELS)).map((cat) => (
+            {(data?.categories ?? Object.keys(CATEGORY_LABELS)).map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
                 className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeCategory === cat
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/70"
+                  activeCategory === cat ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
                 }`}
               >
                 {CATEGORY_LABELS[cat] ?? cat}
@@ -378,7 +700,7 @@ export default function Catalogo() {
         </div>
       </header>
 
-      {/* ── Main content ──────────────────────────────────────────── */}
+      {/* ── Main content ── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -388,18 +710,13 @@ export default function Catalogo() {
           <div className="text-center py-24 text-muted-foreground">
             <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-20" />
             <p className="font-medium">No se pudo cargar el catálogo</p>
-            <p className="text-sm mt-1">Intenta recargar la página</p>
           </div>
         ) : !data?.products.length ? (
           <div className="text-center py-24 text-muted-foreground">
             <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p className="font-medium">
-              {activeCategory ? "No hay productos en esta categoría" : "El catálogo está vacío"}
-            </p>
+            <p className="font-medium">{activeCategory ? "No hay productos en esta categoría" : "El catálogo está vacío"}</p>
             {activeCategory && (
-              <button onClick={() => setActiveCategory(null)} className="text-sm text-primary mt-2 hover:underline">
-                Ver todo
-              </button>
+              <button onClick={() => setActiveCategory(null)} className="text-sm text-primary mt-2 hover:underline">Ver todo</button>
             )}
           </div>
         ) : (
@@ -409,11 +726,13 @@ export default function Catalogo() {
               {activeCategory && ` en ${CATEGORY_LABELS[activeCategory] ?? activeCategory}`}
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {data.products.map((product) => (
+              {data.products.map(product => (
                 <ProductCard
                   key={product.id}
                   product={product}
+                  cartQty={cartQtyFor(product.id)}
                   onOpen={() => setSelectedProduct(product)}
+                  onAddToCart={e => { e.stopPropagation(); addToCart(product); }}
                 />
               ))}
             </div>
@@ -421,7 +740,7 @@ export default function Catalogo() {
         )}
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────── */}
+      {/* ── Footer ── */}
       <footer className="border-t border-border mt-12 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
           <span className="font-medium" style={{ fontFamily: "'Playfair Display', serif" }}>
@@ -430,14 +749,12 @@ export default function Catalogo() {
           <div className="flex flex-wrap justify-center sm:justify-end gap-4">
             {store?.phone && (
               <a href={`tel:${store.phone}`} className="flex items-center gap-1.5 hover:text-foreground transition-colors">
-                <Phone className="w-4 h-4" />
-                {store.phone}
+                <Phone className="w-4 h-4" />{store.phone}
               </a>
             )}
             {store?.address && (
               <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 shrink-0" />
-                {store.address}
+                <MapPin className="w-4 h-4 shrink-0" />{store.address}
               </span>
             )}
           </div>
@@ -445,12 +762,36 @@ export default function Catalogo() {
         </div>
       </footer>
 
-      {/* ── Product detail modal ──────────────────────────────────── */}
+      {/* ── Product modal ── */}
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
+          onAddToCart={p => { addToCart(p); }}
+          cartQty={cartQtyFor(selectedProduct.id)}
         />
+      )}
+
+      {/* ── Cart drawer ── */}
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        cart={cart}
+        onUpdateQty={updateQty}
+        onRemove={removeFromCart}
+        onClearCart={clearCart}
+        store={store}
+      />
+
+      {/* ── Floating cart CTA ── */}
+      {cartCount > 0 && !cartOpen && (
+        <button
+          onClick={() => setCartOpen(true)}
+          className="fixed bottom-6 right-6 z-20 bg-primary text-primary-foreground rounded-full px-5 py-3 shadow-xl flex items-center gap-2.5 text-sm font-semibold hover:shadow-2xl hover:scale-105 active:scale-95 transition-all"
+        >
+          <ShoppingCart className="h-4 w-4" />
+          {cartCount} {cartCount === 1 ? "producto" : "productos"} · ${cart.reduce((s, i) => s + i.qty * i.unitPrice, 0).toLocaleString("es-CO")}
+        </button>
       )}
     </div>
   );

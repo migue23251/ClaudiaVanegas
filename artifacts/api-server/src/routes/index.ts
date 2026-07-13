@@ -4,6 +4,8 @@ import authRouter from "./auth";
 import usersRouter from "./users";
 import productsRouter from "./products";
 import catalogRouter from "./catalog";
+import catalogOrdersRouter from "./catalog_orders";
+import paymentLinksRouter from "./payment_links";
 import customersRouter from "./customers";
 import suppliersRouter from "./suppliers";
 import purchaseOrdersRouter from "./purchase_orders";
@@ -18,6 +20,8 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(catalogRouter);
+router.use(catalogOrdersRouter);
+router.use(paymentLinksRouter);
 router.use(authRouter);
 router.use(usersRouter);
 router.use(productsRouter);
