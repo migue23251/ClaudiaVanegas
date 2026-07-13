@@ -1,45 +1,44 @@
 ---
-name: POS Backend Patterns
-description: Critical patterns and gotchas for the Claudia Vanegas POS Express 5 backend.
+name: POS backend patterns
+description: Critical patterns for Express 5 routes, transactions, auth, and Bold integration in this project.
 ---
 
-## Express 5 param types
-`req.params.id` is `string | string[]` — always parse with:
+## Express 5 async routes
+All route handlers must be `async` — Express 5 does NOT auto-catch promise rejections in non-async handlers.
+
+## Transaction pattern (Drizzle + node-postgres)
 ```ts
-parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10)
+await db.transaction(async (tx) => {
+  // all queries use tx, not db
+});
 ```
 
-## JWT_SECRET enforcement
-Auth module throws at startup if JWT_SECRET is missing (no fallback).
-TypeScript narrowing workaround: assign to a second `const JWT_SECRET: string = _rawSecret` after the throw to appease the compiler.
+## Auth middleware
+```ts
+import { requireAuth, requireAdmin } from "../middleware/auth";
+router.get("/protected", requireAuth, requireAdmin, handler);
+```
+Public routes (e.g. `POST /catalog/order`, `GET /catalog`) skip both.
 
-## Role enforcement on financial endpoints
-- Accounts Receivable (list, get, post payment) — `requireAdmin` required.
-- Accounts Payable — `requireAdmin` required.
-- Sales GET list/by-id — `requireAuth` only; cajero is filtered to own sales in query logic.
+## Bold payment link integration
+- Helper: `artifacts/api-server/src/lib/bold.ts` → `createBoldPaymentLink({ amount, description, currency })`
+- Endpoint: `POST https://checkout.bold.co/integration/payment_links`
+- Auth header: `Authorization: x-api-key <BOLD_API_KEY>`
+- Amount in centavos (×100), currency `"COP"`
+- Response field: `payload.payment_link` (string URL)
+- Fee: 5% (`BOLD_FEE_RATE = 0.05`), stored in `sales.bold_fee`
+- **Bold failure is silent** — sale commits regardless; error is logged only
 
-## Transaction safety
-Sales creation and purchase-order creation/receiving are wrapped in `db.transaction(async tx => { ... })`.
-Pattern: validate all inputs *before* opening the transaction; fail fast with 400 if invalid.
+## Catalog orders flow
+1. Public `POST /api/catalog/order` → creates `catalog_orders` + `catalog_order_items` (status: `pending`)
+2. Admin `GET /api/catalog-orders` → list all with items joined
+3. Admin `POST /api/catalog-orders/:id/invoice` → checks stock, creates `sales` record, marks order `invoiced`
+4. Admin `PUT /api/catalog-orders/:id/cancel` → marks order `cancelled`
 
-**Why:** partial failures (header inserted, items not, stock not decremented) corrupt accounting/inventory — discovered in code review.
+## Sales `withBoldLink` param
+Pass `withBoldLink: true` in the request body of `POST /api/sales` to generate a Bold link after the sale transaction commits.
+Response includes `paymentLink`, `boldFee`, `catalogOrderId` fields.
 
-## Product auto-code generation — advisory lock required
-`nextProductCode(tx)` must be called **inside a `db.transaction`** and uses `SELECT pg_advisory_xact_lock(987654321)` to serialize concurrent creates.
-Without the lock, two simultaneous POSTs read the same MAX(code) and both try to insert the same code, hitting the unique constraint.
-
-**How to apply:** any route that auto-generates a product code must open a transaction first and pass `tx` to `nextProductCode`.
-
-## AR overpayment guard
-POST `/accounts-receivable/:id/payments` validates `payAmount <= remaining + 0.001` (float tolerance) before inserting.
-Rejects with 400 if exceeded. Do not rely on UI limits alone.
-
-## Dashboard trend queries — use aggregate, not per-bucket loop
-`billing-vs-collection` and `expenses-vs-income` use 3 parallel `GROUP BY DATE_TRUNC('month', ...)` queries, then merge results in JS using a `YYYY-MM` key map.
-Old per-bucket `Promise.all` pattern produced up to 100+ SQL calls for a 36-month range.
-
-**How to apply:** any new monthly-trend endpoint should follow the same pattern: aggregate queries + JS merge, never per-bucket loops.
-
-## Zustand auth store initialization
-`use-auth.ts` initializes from localStorage at module load time via `useAuth.setState(...)`.
-Do NOT call `useAuth` (the hook) inside inline render functions in wouter `<Route>` children — extract to a named component (`RootRedirect`, `ProtectedRoute`) to comply with React hook rules.
+## Why
+- Express 5 change caught us off-guard on earlier routes — always async.
+- Bold silent-failure keeps the sale from rolling back on gateway errors.

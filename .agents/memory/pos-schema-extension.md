@@ -1,24 +1,41 @@
 ---
 name: POS schema extension pattern
-description: How to safely add optional columns and update the full stack (DB → spec → codegen → frontend) in this project.
+description: How to safely add optional columns and new tables, and update the full stack.
 ---
 
-## Rule
-When adding optional fields to the customer/product/sale/PO schemas, follow this exact order:
+## Steps to extend the schema
 
-1. Edit `lib/db/src/schema/<table>.ts` (add nullable column, e.g. `phone: text("phone")`)
-2. Run `pnpm --filter @workspace/db run push` (applies the DDL migration safely)
-3. Edit `lib/api-spec/openapi.yaml` — update affected schemas (Customer, SaleItem, PurchaseOrderItem, etc.)
-4. Run `pnpm --filter @workspace/api-spec run codegen` (regenerates hooks + zod validators)
-5. Update backend routes (`artifacts/api-server/src/routes/*.ts`)
-6. Update frontend pages
+1. **Edit schema files** in `lib/db/src/schema/`
+   - New tables → new file, export from `index.ts`
+   - New columns → add to existing schema file (use `.default()` or nullable for backwards compat)
 
-**Why:** codegen generates TS types from the spec; if routes change before codegen runs, the types are wrong and tsc will fail. The DB push must precede codegen since Drizzle reflects the live schema.
+2. **Run migration**
+   ```bash
+   pnpm --filter @workspace/db run push
+   ```
+   Uses `drizzle-kit push` — applies changes directly to the dev DB.
 
-## Empty-string vs undefined in update handlers
-When a user clears an optional field (email, phone) in an edit form, send the field explicitly as an empty string `""` — NOT `|| undefined`. The backend uses `if (field !== undefined) updates.field = field || null`, which correctly converts `""` → `null` and skips the field when `undefined`. Sending `undefined` silently prevents clearing the field.
+3. **Update API routes** in `artifacts/api-server/src/routes/`
+   - Register new routers in `artifacts/api-server/src/routes/index.ts`
 
-**How to apply:** In edit form submit handlers, use `formData.get("email") as string` directly, not `(formData.get("email") as string) || undefined`.
+4. **Restart API server** if it doesn't auto-reload (it uses esbuild + node, not ts-node):
+   ```bash
+   # via WorkflowsRestart or restart the workflow
+   ```
 
-## as any casts for new fields
-After codegen, remove any `as any` casts added to access newly-generated fields (e.g. `customer.phone`). The generated types are in `lib/api-client-react/src/generated/api.schemas.ts`.
+5. **Codegen** (if new endpoints need TypeScript client types):
+   ```bash
+   pnpm --filter @workspace/api-client run generate
+   ```
+
+## Tables added in catalog-orders session
+- `catalog_orders` — id, status enum (pending/invoiced/cancelled), customer fields, total, invoiced_sale_id, timestamps
+- `catalog_order_items` — id, order_id FK, product_id (nullable), product_name snapshot, qty, unit_price, subtotal
+
+## Columns added to `sales`
+- `payment_link` (text, nullable) — Bold payment URL
+- `bold_fee` (numeric, nullable) — Bold fee amount in COP
+- `catalog_order_id` (integer, nullable, FK) — links sale back to originating catalog order
+
+## Why nullable / optional
+All new sales columns are nullable so existing sales records don't break on migration.
