@@ -24,7 +24,8 @@ router.put("/settings", requireAuth, requireAdmin, async (req, res): Promise<voi
   const {
     storeName, storeEmail, storePhone, storeAddress,
     smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom,
-    logoUrl, primaryColor,
+    logoUrl, primaryColor, instagramUrl, tiktokUrl,
+    sendInvoiceEmail, sendPaymentLinkEmail,
   } = req.body;
   const updates: Record<string, unknown> = {};
   if (storeName != null) updates.storeName = storeName;
@@ -32,12 +33,19 @@ router.put("/settings", requireAuth, requireAdmin, async (req, res): Promise<voi
   if (storePhone !== undefined) updates.storePhone = storePhone;
   if (storeAddress !== undefined) updates.storeAddress = storeAddress;
   if (smtpHost !== undefined) updates.smtpHost = smtpHost;
-  if (smtpPort != null) updates.smtpPort = parseInt(String(smtpPort), 10);
+  if (smtpPort !== undefined) {
+    const parsedPort = smtpPort === "" || smtpPort === null ? null : parseInt(String(smtpPort), 10);
+    updates.smtpPort = parsedPort != null && Number.isNaN(parsedPort) ? null : parsedPort;
+  }
   if (smtpUser !== undefined) updates.smtpUser = smtpUser;
   if (smtpPass && smtpPass !== "••••••••") updates.smtpPass = smtpPass;
   if (smtpFrom !== undefined) updates.smtpFrom = smtpFrom;
   if (logoUrl !== undefined) updates.logoUrl = logoUrl || null;
   if (primaryColor !== undefined) updates.primaryColor = primaryColor || null;
+  if (instagramUrl !== undefined) updates.instagramUrl = instagramUrl || null;
+  if (tiktokUrl !== undefined) updates.tiktokUrl = tiktokUrl || null;
+  if (sendInvoiceEmail !== undefined) updates.sendInvoiceEmail = !!sendInvoiceEmail;
+  if (sendPaymentLinkEmail !== undefined) updates.sendPaymentLinkEmail = !!sendPaymentLinkEmail;
 
   const [updated] = await db.update(settingsTable).set(updates).where(eq(settingsTable.id, settings.id)).returning();
   const { smtpPass: __, ...safeSettings } = updated;

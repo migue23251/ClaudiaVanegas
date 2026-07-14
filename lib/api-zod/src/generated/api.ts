@@ -1204,7 +1204,11 @@ export const GetSettingsResponse = zod.object({
   "smtpPass": zod.string().nullish(),
   "smtpFrom": zod.string().nullish(),
   "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string().nullish()
+  "primaryColor": zod.string().nullish(),
+  "instagramUrl": zod.string().nullish(),
+  "tiktokUrl": zod.string().nullish(),
+  "sendInvoiceEmail": zod.boolean().optional(),
+  "sendPaymentLinkEmail": zod.boolean().optional()
 })
 
 
@@ -1222,7 +1226,11 @@ export const UpdateSettingsBody = zod.object({
   "smtpPass": zod.string().optional(),
   "smtpFrom": zod.string().optional(),
   "logoUrl": zod.string().optional(),
-  "primaryColor": zod.string().optional()
+  "primaryColor": zod.string().optional(),
+  "instagramUrl": zod.string().optional(),
+  "tiktokUrl": zod.string().optional(),
+  "sendInvoiceEmail": zod.boolean().optional(),
+  "sendPaymentLinkEmail": zod.boolean().optional()
 })
 
 export const UpdateSettingsResponse = zod.object({
@@ -1237,7 +1245,11 @@ export const UpdateSettingsResponse = zod.object({
   "smtpPass": zod.string().nullish(),
   "smtpFrom": zod.string().nullish(),
   "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string().nullish()
+  "primaryColor": zod.string().nullish(),
+  "instagramUrl": zod.string().nullish(),
+  "tiktokUrl": zod.string().nullish(),
+  "sendInvoiceEmail": zod.boolean().optional(),
+  "sendPaymentLinkEmail": zod.boolean().optional()
 })
 
 

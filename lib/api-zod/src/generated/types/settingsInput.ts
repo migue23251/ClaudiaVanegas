@@ -18,4 +18,8 @@ export interface SettingsInput {
   smtpFrom?: string;
   logoUrl?: string;
   primaryColor?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
+  sendInvoiceEmail?: boolean;
+  sendPaymentLinkEmail?: boolean;
 }

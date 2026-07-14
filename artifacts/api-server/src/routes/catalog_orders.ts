@@ -8,6 +8,7 @@ import {
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { createBoldPaymentLink } from "../lib/bold";
 import { bogotaNow } from "../lib/tz";
+import { sendInvoiceEmail, sendPaymentLinkEmail } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -283,6 +284,52 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
   }
 
   res.status(201).json({ saleId, orderId, total, paymentLink, boldFee });
+
+  // Fire-and-forget invoice + payment link emails — do not block or affect the response
+  if (order.customerEmail) {
+    const [saleRow] = await db.select().from(salesTable).where(eq(salesTable.id, saleId));
+    const saleItems = await db.select({
+      productName: productsTable.name,
+      description: productsTable.description,
+      qty: saleItemsTable.qty,
+      unitPrice: saleItemsTable.unitPrice,
+      subtotal: saleItemsTable.subtotal,
+    }).from(saleItemsTable)
+      .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
+      .where(eq(saleItemsTable.saleId, saleId));
+
+    sendInvoiceEmail({
+      saleId,
+      createdAt: saleRow.createdAt,
+      paymentType,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      customerPhone: order.customerPhone,
+      items: saleItems.map(i => ({
+        productName: i.productName ?? "Desconocido",
+        description: i.description ?? null,
+        qty: i.qty,
+        unitPrice: parseFloat(i.unitPrice),
+        subtotal: parseFloat(i.subtotal),
+      })),
+      total,
+      notes: notes?.trim() || order.notes || null,
+    }).catch(err => {
+      console.error("[email] Error enviando factura:", err?.message ?? err);
+    });
+
+    if (paymentLink) {
+      sendPaymentLinkEmail({
+        saleId,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        total,
+        paymentLink,
+      }).catch(err => {
+        console.error("[email] Error enviando link de pago:", err?.message ?? err);
+      });
+    }
+  }
 });
 
 export default router;

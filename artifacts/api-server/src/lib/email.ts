@@ -191,10 +191,106 @@ function parseLogoAttachment(logoUrl: string): { content: Buffer; contentType: s
   return null;
 }
 
+interface PaymentLinkData {
+  saleId: number;
+  customerName: string;
+  customerEmail: string;
+  total: number;
+  paymentLink: string;
+}
+
+function buildPaymentLinkHtml(data: PaymentLinkData, storeName: string, hasCidLogo: boolean, primaryColor: string | null) {
+  const color = primaryColor ?? "#c2697a";
+  const logoHtml = hasCidLogo
+    ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:80px;max-width:200px;object-fit:contain;display:block;margin:0 auto 16px;" />`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Link de pago — Factura #${data.saleId} — ${storeName}</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="padding:36px;text-align:center;">
+            ${logoHtml}
+            <div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:4px;">${storeName}</div>
+            <p style="font-size:14px;color:#666;margin:16px 0 4px;">Hola ${data.customerName}, tu factura #${data.saleId} está lista.</p>
+            <p style="font-size:13px;color:#888;margin:0 0 20px;">Puedes completar tu pago de forma segura haciendo clic en el botón:</p>
+            <div style="font-size:26px;font-weight:700;color:${color};margin-bottom:20px;">${formatCOP(data.total)}</div>
+            <a href="${data.paymentLink}" target="_blank"
+               style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:8px;">
+              Pagar ahora
+            </a>
+            <p style="font-size:11px;color:#ccc;margin:24px 0 0;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br/>${data.paymentLink}</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export async function sendPaymentLinkEmail(data: PaymentLinkData): Promise<void> {
+  const [settings] = await db.select().from(settingsTable);
+  if (!settings) return;
+
+  if (!settings.sendPaymentLinkEmail) {
+    // Automatic payment-link email disabled in settings — skip silently
+    return;
+  }
+
+  const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, storeName, logoUrl, primaryColor } = settings;
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    // SMTP not configured — skip silently
+    return;
+  }
+
+  const logoAttachment = logoUrl ? parseLogoAttachment(logoUrl) : null;
+  const hasCidLogo = !!logoAttachment;
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort ?? 587,
+    secure: (smtpPort ?? 587) === 465,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
+
+  const html = buildPaymentLinkHtml(data, storeName, hasCidLogo, primaryColor ?? null);
+  const subject = `Link de pago — Factura #${data.saleId} — ${storeName}`;
+
+  await transporter.sendMail({
+    from: `"${storeName}" <${smtpFrom ?? smtpUser}>`,
+    to: data.customerEmail,
+    subject,
+    html,
+    attachments: logoAttachment
+      ? [{
+          filename: "logo.jpg",
+          content: logoAttachment.content,
+          contentType: logoAttachment.contentType,
+          cid: "store-logo",
+        }]
+      : [],
+  });
+}
+
 export async function sendInvoiceEmail(invoice: InvoiceData): Promise<void> {
   // Load settings fresh each time (allows changing SMTP without restart)
   const [settings] = await db.select().from(settingsTable);
   if (!settings) return;
+
+  if (!settings.sendInvoiceEmail) {
+    // Invoice email sending disabled in settings — skip silently
+    return;
+  }
 
   const { smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom, storeName, logoUrl, primaryColor } = settings;
 

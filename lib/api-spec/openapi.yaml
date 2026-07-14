@@ -1944,6 +1944,14 @@ components:
           type: ["string", "null"]
         primaryColor:
           type: ["string", "null"]
+        instagramUrl:
+          type: ["string", "null"]
+        tiktokUrl:
+          type: ["string", "null"]
+        sendInvoiceEmail:
+          type: boolean
+        sendPaymentLinkEmail:
+          type: boolean
 
     SettingsInput:
       type: object
@@ -1970,3 +1978,11 @@ components:
           type: string
         primaryColor:
           type: string
+        instagramUrl:
+          type: string
+        tiktokUrl:
+          type: string
+        sendInvoiceEmail:
+          type: boolean
+        sendPaymentLinkEmail:
+          type: boolean

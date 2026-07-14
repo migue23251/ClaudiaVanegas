@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
-import { Store, Mail, ImagePlus, Trash2, Palette, RotateCcw } from "lucide-react";
+import { Store, Mail, ImagePlus, Trash2, Palette, RotateCcw, Send, Link2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { applyBrandColor, hexToHsl, hslStringToHex } from "@/lib/brand-color";
+import { Switch } from "@/components/ui/switch";
 
 // Preset palette for quick selection
 const PRESETS = [
@@ -102,6 +103,39 @@ export default function Configuracion() {
   };
 
   const resetColor = () => applyAndSave(DEFAULT_HEX);
+
+  // ── Email notification toggles ─────────────────────────────────────
+  const [sendInvoiceEmail, setSendInvoiceEmail] = useState(true);
+  const [sendPaymentLinkEmail, setSendPaymentLinkEmail] = useState(true);
+
+  useEffect(() => {
+    if (settings) {
+      if (settings.sendInvoiceEmail !== undefined) setSendInvoiceEmail(!!settings.sendInvoiceEmail);
+      if (settings.sendPaymentLinkEmail !== undefined) setSendPaymentLinkEmail(!!settings.sendPaymentLinkEmail);
+    }
+  }, [settings]);
+
+  const toggleInvoiceEmail = (checked: boolean) => {
+    setSendInvoiceEmail(checked);
+    updateSettings.mutate({ data: { sendInvoiceEmail: checked } as any }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+        toast({ title: checked ? "Envío de facturas activado" : "Envío de facturas desactivado" });
+      },
+      onError: () => setSendInvoiceEmail(!checked),
+    });
+  };
+
+  const togglePaymentLinkEmail = (checked: boolean) => {
+    setSendPaymentLinkEmail(checked);
+    updateSettings.mutate({ data: { sendPaymentLinkEmail: checked } as any }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+        toast({ title: checked ? "Envío automático de links de pago activado" : "Envío automático de links de pago desactivado" });
+      },
+      onError: () => setSendPaymentLinkEmail(!checked),
+    });
+  };
 
   // ── Settings form ────────────────────────────────────────────────
   const { register, handleSubmit, reset } = useForm<SettingsInput>();
@@ -325,6 +359,49 @@ export default function Configuracion() {
             <div className="space-y-1.5">
               <label className="text-sm font-semibold">Teléfono</label>
               <Input {...register("storePhone")} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Instagram (URL)</label>
+                <Input {...register("instagramUrl")} placeholder="https://instagram.com/tu_tienda" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">TikTok (URL)</label>
+                <Input {...register("tiktokUrl")} placeholder="https://tiktok.com/@tu_tienda" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Notificaciones por Correo ── */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-primary" />
+              <CardTitle>Notificaciones por Correo</CardTitle>
+            </div>
+            <CardDescription>Controla qué correos se envían automáticamente a los clientes</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-border p-3.5">
+              <div className="flex items-start gap-3">
+                <Mail className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">Envío de facturas</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Envía la factura por correo al cliente después de cada venta</p>
+                </div>
+              </div>
+              <Switch checked={sendInvoiceEmail} onCheckedChange={toggleInvoiceEmail} />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-border p-3.5">
+              <div className="flex items-start gap-3">
+                <Link2 className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">Envío automático de links de pago</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Envía el link de pago Bold por correo automáticamente cuando se genera</p>
+                </div>
+              </div>
+              <Switch checked={sendPaymentLinkEmail} onCheckedChange={togglePaymentLinkEmail} />
             </div>
           </CardContent>
         </Card>

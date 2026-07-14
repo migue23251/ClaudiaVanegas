@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  ShoppingBag, ChevronLeft, ChevronRight, LogIn, Tag,
+  ShoppingBag, ChevronLeft, ChevronRight, Tag,
   Phone, MapPin, X, ZoomIn, ShoppingCart, Plus, Minus, Trash2,
-  CheckCircle2, ArrowLeft,
+  CheckCircle2, ArrowLeft, Instagram, Music2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,8 @@ interface StoreInfo {
   primaryColor: string | null;
   phone: string | null;
   address: string | null;
+  instagramUrl: string | null;
+  tiktokUrl: string | null;
 }
 
 interface CatalogProduct {
@@ -41,6 +43,7 @@ interface CatalogData {
 interface CartItem {
   productId: number;
   productName: string;
+  description: string | null;
   unitPrice: number;
   qty: number;
   image: string | null;
@@ -308,7 +311,6 @@ interface CheckoutForm {
   customerName: string;
   customerPhone: string;
   customerEmail: string;
-  customerAddress: string;
   notes: string;
 }
 
@@ -335,7 +337,7 @@ function CartDrawer({
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<CheckoutForm>({
     customerName: "", customerPhone: "", customerEmail: "",
-    customerAddress: "", notes: "",
+    notes: "",
   });
 
   const total = cart.reduce((s, i) => s + i.qty * i.unitPrice, 0);
@@ -344,7 +346,7 @@ function CartDrawer({
   // Reset step when drawer opens/closes
   useEffect(() => {
     if (!open) {
-      setTimeout(() => { if (!open) { setStep("cart"); setForm({ customerName: "", customerPhone: "", customerEmail: "", customerAddress: "", notes: "" }); } }, 300);
+      setTimeout(() => { if (!open) { setStep("cart"); setForm({ customerName: "", customerPhone: "", customerEmail: "", notes: "" }); } }, 300);
     }
   }, [open]);
 
@@ -360,7 +362,6 @@ function CartDrawer({
           customerName: form.customerName.trim(),
           customerPhone: form.customerPhone.trim(),
           customerEmail: form.customerEmail.trim() || undefined,
-          customerAddress: form.customerAddress.trim() || undefined,
           notes: form.notes.trim() || undefined,
           items: cart.map(i => ({ productId: i.productId, qty: i.qty })),
         }),
@@ -422,6 +423,9 @@ function CartDrawer({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm line-clamp-2 leading-snug">{item.productName}</p>
+                        {item.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.description}</p>
+                        )}
                         <p className="text-sm font-bold text-primary mt-1">${item.unitPrice.toLocaleString("es-CO")}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <button onClick={() => onUpdateQty(item.productId, -1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
@@ -497,14 +501,6 @@ function CartDrawer({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold">Dirección <span className="text-muted-foreground font-normal">(opcional)</span></label>
-                  <Input
-                    placeholder="Tu dirección de entrega"
-                    value={form.customerAddress}
-                    onChange={e => setForm(f => ({ ...f, customerAddress: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1.5">
                   <label className="text-sm font-semibold">Notas <span className="text-muted-foreground font-normal">(opcional)</span></label>
                   <textarea
                     placeholder="Talla, color, instrucciones especiales..."
@@ -518,9 +514,14 @@ function CartDrawer({
                 <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen del pedido</p>
                   {cart.map(i => (
-                    <div key={i.productId} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{i.productName} ×{i.qty}</span>
-                      <span className="font-medium">${(i.unitPrice * i.qty).toLocaleString("es-CO")}</span>
+                    <div key={i.productId} className="flex justify-between gap-2 text-sm">
+                      <span className="text-muted-foreground min-w-0">
+                        <span className="block">{i.productName} ×{i.qty}</span>
+                        {i.description && (
+                          <span className="block text-xs line-clamp-1 opacity-80">{i.description}</span>
+                        )}
+                      </span>
+                      <span className="font-medium shrink-0">${(i.unitPrice * i.qty).toLocaleString("es-CO")}</span>
                     </div>
                   ))}
                   <div className="border-t border-border pt-2 flex justify-between font-bold">
@@ -610,6 +611,7 @@ export default function Catalogo() {
       return [...prev, {
         productId: product.id,
         productName: product.name,
+        description: product.description,
         unitPrice: product.salePrice,
         qty: 1,
         image: product.images[0] ?? null,
@@ -639,38 +641,69 @@ export default function Catalogo() {
 
       {/* ── Header ── */}
       <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            {store?.logoUrl ? (
-              <img src={store.logoUrl} alt={store.name} className="h-10 w-10 object-contain rounded-lg shrink-0"
-                onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-            ) : (
-              <ShoppingBag className="w-7 h-7 text-primary shrink-0" />
-            )}
-            <span className="font-bold text-lg sm:text-xl tracking-tight truncate" style={{ fontFamily: "'Playfair Display', serif" }}>
-              {store?.name ?? "Claudia Vanegas"}
-            </span>
-          </div>
+        {/* Brand banner — mirrors the login screen's brand panel treatment */}
+        <div className="relative overflow-hidden bg-primary">
+          <div className="absolute -top-16 -left-16 w-48 h-48 rounded-full bg-white/5" />
+          <div className="absolute -bottom-20 -right-10 w-56 h-56 rounded-full bg-white/5" />
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Cart button */}
-            <button
-              onClick={() => setCartOpen(true)}
-              className="relative p-2 rounded-lg hover:bg-muted transition-colors"
-              title="Ver carrito"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {cartCount > 99 ? "99+" : cartCount}
-                </span>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-7 flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3 text-center sm:text-left">
+              {store?.logoUrl ? (
+                <img src={store.logoUrl} alt={store.name} className="h-14 w-14 sm:h-16 sm:w-16 object-contain rounded-2xl bg-white/10 p-1.5 shrink-0"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+              ) : (
+                <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur-sm shrink-0">
+                  <ShoppingBag className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                </div>
               )}
-            </button>
-            <Button variant="outline" size="sm" onClick={() => setLocation("/login")}>
-              <LogIn className="w-4 h-4 mr-1.5" />
-              <span className="hidden sm:inline">Ingresar</span>
-              <span className="sm:hidden">POS</span>
-            </Button>
+              <div>
+                <h1 className="font-bold text-2xl sm:text-3xl tracking-tight text-white leading-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
+                  {store?.name ?? "Claudia Vanegas"}
+                </h1>
+                {store?.address && (
+                  <p className="flex items-center justify-center sm:justify-start gap-1.5 text-white/70 text-xs sm:text-sm mt-1">
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    {store.address}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Social buttons */}
+              {store?.instagramUrl && (
+                <a href={store.instagramUrl} target="_blank" rel="noopener noreferrer" title="Instagram"
+                  className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
+                  <Instagram className="w-4 h-4" />
+                </a>
+              )}
+              {store?.tiktokUrl && (
+                <a href={store.tiktokUrl} target="_blank" rel="noopener noreferrer" title="TikTok"
+                  className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
+                  <Music2 className="w-4 h-4" />
+                </a>
+              )}
+              {store?.phone && (
+                <a href={`https://wa.me/${store.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" title="WhatsApp"
+                  className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
+                  <Phone className="w-4 h-4" />
+                </a>
+              )}
+
+              {/* Cart button */}
+              <button
+                onClick={() => setCartOpen(true)}
+                className="relative h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+                title="Ver carrito"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white text-primary text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

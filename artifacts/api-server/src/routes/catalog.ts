@@ -12,6 +12,8 @@ async function getPublicSettings() {
       primaryColor: settingsTable.primaryColor,
       storePhone: settingsTable.storePhone,
       storeAddress: settingsTable.storeAddress,
+      instagramUrl: settingsTable.instagramUrl,
+      tiktokUrl: settingsTable.tiktokUrl,
     })
     .from(settingsTable);
 
@@ -27,6 +29,8 @@ async function getPublicSettings() {
       primaryColor: settingsTable.primaryColor,
       storePhone: settingsTable.storePhone,
       storeAddress: settingsTable.storeAddress,
+      instagramUrl: settingsTable.instagramUrl,
+      tiktokUrl: settingsTable.tiktokUrl,
     });
   return created;
 }
@@ -77,6 +81,8 @@ router.get("/catalog", async (req, res): Promise<void> => {
       primaryColor: settingsResult.primaryColor ?? null,
       phone: settingsResult.storePhone ?? null,
       address: settingsResult.storeAddress ?? null,
+      instagramUrl: settingsResult.instagramUrl ?? null,
+      tiktokUrl: settingsResult.tiktokUrl ?? null,
     },
     categories: PRODUCT_CATEGORIES,
     products: products.map((p) => ({

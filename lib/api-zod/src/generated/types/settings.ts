@@ -29,4 +29,10 @@ export interface Settings {
   logoUrl?: string | null;
   /** @nullable */
   primaryColor?: string | null;
+  /** @nullable */
+  instagramUrl?: string | null;
+  /** @nullable */
+  tiktokUrl?: string | null;
+  sendInvoiceEmail?: boolean;
+  sendPaymentLinkEmail?: boolean;
 }

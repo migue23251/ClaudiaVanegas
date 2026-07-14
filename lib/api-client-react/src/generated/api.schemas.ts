@@ -500,8 +500,6 @@ export interface BillingVsCollectionPoint {
 export interface TopProduct {
   productId: number;
   productName: string;
-  /** @nullable */
-  description?: string | null;
   category: string;
   totalQty: number;
   totalRevenue: number;
@@ -547,8 +545,6 @@ export interface NetProfitTrendPoint {
 export interface SlowMovingProduct {
   id: number;
   name: string;
-  /** @nullable */
-  description?: string | null;
   code: string;
   category: string;
   stock: number;
@@ -583,6 +579,12 @@ export interface Settings {
   logoUrl?: string | null;
   /** @nullable */
   primaryColor?: string | null;
+  /** @nullable */
+  instagramUrl?: string | null;
+  /** @nullable */
+  tiktokUrl?: string | null;
+  sendInvoiceEmail?: boolean;
+  sendPaymentLinkEmail?: boolean;
 }
 
 export interface SettingsInput {
@@ -597,6 +599,10 @@ export interface SettingsInput {
   smtpFrom?: string;
   logoUrl?: string;
   primaryColor?: string;
+  instagramUrl?: string;
+  tiktokUrl?: string;
+  sendInvoiceEmail?: boolean;
+  sendPaymentLinkEmail?: boolean;
 }
 
 export type ListProductsParams = {

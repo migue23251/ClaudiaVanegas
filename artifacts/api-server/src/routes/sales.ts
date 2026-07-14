@@ -3,7 +3,7 @@ import { eq, and, gte, lte, or, ilike, desc, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
-import { sendInvoiceEmail } from "../lib/email";
+import { sendInvoiceEmail, sendPaymentLinkEmail } from "../lib/email";
 import { bogotaNow, bogotaToday } from "../lib/tz";
 import { createBoldPaymentLink } from "../lib/bold";
 
@@ -228,6 +228,19 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
     }).catch(err => {
       console.error("[email] Error enviando factura:", err?.message ?? err);
     });
+
+    // Fire-and-forget payment link email — only when a Bold link was generated
+    if (result.paymentLink) {
+      sendPaymentLinkEmail({
+        saleId: result.id,
+        customerName: result.customerName ?? result.customerEmail,
+        customerEmail: result.customerEmail,
+        total: result.total,
+        paymentLink: result.paymentLink,
+      }).catch(err => {
+        console.error("[email] Error enviando link de pago:", err?.message ?? err);
+      });
+    }
   }
 });
 
