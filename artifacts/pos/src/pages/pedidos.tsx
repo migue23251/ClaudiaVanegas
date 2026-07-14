@@ -1,9 +1,14 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, Phone, Mail, Calendar, MapPin, MessageSquare,
   Receipt, X, ChevronDown, ChevronUp, CheckCircle2, CreditCard, Copy,
+  UserSearch, UserPlus, Edit, Search,
 } from "lucide-react";
+import {
+  useListCustomers, getListCustomersQueryKey, useCreateCustomer,
+  Customer, CustomerInput,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -77,6 +82,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function Pedidos() {
   const { token } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [statusFilter, setStatusFilter] = useState("pending");
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -88,6 +94,17 @@ export default function Pedidos() {
   const [cancelOrderId, setCancelOrderId] = useState<number | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [boldResult, setBoldResult] = useState<{ url: string; fee: number; saleId: number } | null>(null);
+
+  // ── Customer selection (for invoicing) ────────────────────────────────────
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+
+  const { data: customers } = useListCustomers(
+    { search: customerSearch },
+    { query: { queryKey: getListCustomersQueryKey({ search: customerSearch }), enabled: !!invoiceOrder } }
+  );
+  const createCustomer = useCreateCustomer();
 
   // ── Data ──────────────────────────────────────────────────────────────────
 
@@ -128,10 +145,44 @@ export default function Pedidos() {
     setInvoiceItems(order.items.map(i => ({ ...i, editQty: i.qty, editPrice: i.unitPrice })));
     setPaymentType("contado");
     setUseBoldLink(false);
+    setSelectedCustomer(null);
+    setCustomerSearch(order.customerName);
+    setIsCreatingCustomer(false);
+  };
+
+  // ── Create customer (prefilled from the order's own data) ─────────────────
+
+  const handleCreateCustomerSave = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    createCustomer.mutate({
+      data: {
+        cedula: formData.get("cedula") as string,
+        firstName: formData.get("firstName") as string,
+        lastName: formData.get("lastName") as string,
+        email: (formData.get("email") as string) || undefined,
+        phone: (formData.get("phone") as string) || undefined,
+      } as CustomerInput
+    }, {
+      onSuccess: (created) => {
+        setSelectedCustomer(created);
+        setCustomerSearch("");
+        setIsCreatingCustomer(false);
+        queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() });
+        toast({ title: "Cliente creado y seleccionado" });
+      },
+      onError: (err: any) => {
+        toast({ title: "Error creando cliente", description: err.message, variant: "destructive" });
+      }
+    });
   };
 
   const handleInvoice = async () => {
     if (!invoiceOrder) return;
+    if (paymentType === "credito" && !selectedCustomer) {
+      toast({ title: "Selecciona o crea un cliente para facturar a crédito", variant: "destructive" });
+      return;
+    }
     setIsInvoicing(true);
     try {
       const res = await fetch(`/api/catalog-orders/${invoiceOrder.id}/invoice`, {
@@ -141,12 +192,15 @@ export default function Pedidos() {
           items: invoiceItems.map(i => ({ productId: i.productId, qty: i.editQty, unitPrice: i.editPrice })),
           paymentType,
           withBoldLink: useBoldLink,
+          customerId: selectedCustomer?.id,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error facturando");
 
       setInvoiceOrder(null);
+      setSelectedCustomer(null);
+      setCustomerSearch("");
       refetch();
 
       if (data.paymentLink) {
@@ -399,6 +453,74 @@ export default function Pedidos() {
           </DialogHeader>
 
           <div className="space-y-4 py-1">
+            {/* Customer */}
+            <div>
+              <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <UserSearch className="h-4 w-4 text-primary" />
+                Cliente
+                {paymentType === "credito" && <span className="text-destructive">*</span>}
+              </p>
+              {selectedCustomer ? (
+                <div className="flex items-center justify-between bg-accent p-3 rounded-lg">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">{selectedCustomer.firstName} {selectedCustomer.lastName}</p>
+                    <p className="text-xs text-muted-foreground font-mono">CC: {selectedCustomer.cedula}</p>
+                    <p className="text-xs text-muted-foreground font-mono">📱 {selectedCustomer.phone ?? "—"}</p>
+                    {selectedCustomer.email && (
+                      <p className="text-xs text-muted-foreground truncate">{selectedCustomer.email}</p>
+                    )}
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { setSelectedCustomer(null); setCustomerSearch(invoiceOrder?.customerName ?? ""); }}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nombre o cédula..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="pl-8 h-9 text-sm"
+                  />
+                  {customerSearch && customers && customers.length > 0 && (
+                    <div className="absolute top-full left-0 w-full mt-1 bg-popover border shadow-md rounded-md z-50 max-h-48 overflow-y-auto">
+                      {customers.map(c => (
+                        <div
+                          key={c.id}
+                          className="p-2.5 hover:bg-accent cursor-pointer text-sm"
+                          onClick={() => { setSelectedCustomer(c); setCustomerSearch(""); }}
+                        >
+                          <div className="font-medium">{c.firstName} {c.lastName}</div>
+                          <div className="text-xs text-muted-foreground">{c.cedula}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {customerSearch.length > 1 && customers?.length === 0 && (
+                    <div className="absolute top-full left-0 w-full mt-1 bg-popover border shadow-md rounded-md z-50">
+                      <div className="p-3 text-sm text-muted-foreground text-center">
+                        No se encontró ningún cliente
+                      </div>
+                      <div className="border-t p-2">
+                        <Button
+                          variant="ghost" size="sm"
+                          className="w-full gap-2 text-primary hover:text-primary hover:bg-primary/10"
+                          onClick={() => setIsCreatingCustomer(true)}
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Crear cliente con los datos del pedido
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Puedes facturar sin seleccionar un cliente si el pago es de contado.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Items editable */}
             <div>
               <p className="text-sm font-semibold mb-2">Artículos — puedes ajustar cantidades y precios</p>
@@ -529,6 +651,51 @@ export default function Pedidos() {
               }
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Create customer from order data ───────────────────────────────── */}
+      <Dialog open={isCreatingCustomer} onOpenChange={setIsCreatingCustomer}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Nuevo Cliente
+            </DialogTitle>
+            <DialogDescription>
+              Prellenado con la información que envió el cliente en su pedido.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateCustomerSave} className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Cédula <span className="text-destructive">*</span></label>
+              <Input name="cedula" placeholder="Número de cédula" required autoFocus />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nombres <span className="text-destructive">*</span></label>
+                <Input name="firstName" defaultValue={invoiceOrder?.customerName.split(" ")[0] ?? ""} placeholder="Nombres" required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Apellidos <span className="text-destructive">*</span></label>
+                <Input name="lastName" defaultValue={invoiceOrder?.customerName.split(" ").slice(1).join(" ") ?? ""} placeholder="Apellidos" required />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Correo Electrónico</label>
+              <Input name="email" type="email" defaultValue={invoiceOrder?.customerEmail ?? ""} placeholder="correo@ejemplo.com" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Teléfono</label>
+              <Input name="phone" type="tel" defaultValue={invoiceOrder?.customerPhone ?? ""} placeholder="300 000 0000" />
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setIsCreatingCustomer(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createCustomer.isPending}>
+                {createCustomer.isPending ? "Creando..." : "Crear cliente"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
