@@ -726,7 +726,7 @@ export default function Catalogo() {
         </div>
 
         {/* Category pills */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-3 pb-3">
           <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
             <button
               onClick={() => setActiveCategory(null)}
