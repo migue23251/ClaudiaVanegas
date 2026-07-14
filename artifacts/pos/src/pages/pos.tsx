@@ -394,7 +394,7 @@ export default function Pos() {
 
         {/* Payment footer */}
         <div className="p-3 border-t bg-muted/30 space-y-3 shrink-0">
-          <Select value={paymentType} onValueChange={(v: "contado" | "credito") => { setPaymentType(v); setAdvanceAmount(0); }}>
+          <Select value={paymentType} onValueChange={(v: "contado" | "credito") => { setPaymentType(v); setAdvanceAmount(0); if (v === "credito") setUseBoldLink(false); }}>
             <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder="Tipo de Pago" />
             </SelectTrigger>
@@ -427,24 +427,26 @@ export default function Pos() {
             </div>
           )}
 
-          {/* Bold link toggle */}
-          <div
-            className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-colors ${
-              useBoldLink ? "border-primary bg-primary/5" : "border-border bg-background"
-            }`}
-            onClick={() => setUseBoldLink(!useBoldLink)}
-          >
-            <div>
-              <p className="text-xs font-semibold flex items-center gap-1.5">
-                <CreditCard className="h-3.5 w-3.5 text-primary" />
-                Link de pago Bold
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">+5% comisión</p>
+          {/* Bold link toggle — only for cash (contado) payments */}
+          {paymentType === "contado" && (
+            <div
+              className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                useBoldLink ? "border-primary bg-primary/5" : "border-border bg-background"
+              }`}
+              onClick={() => setUseBoldLink(!useBoldLink)}
+            >
+              <div>
+                <p className="text-xs font-semibold flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5 text-primary" />
+                  Link de pago Bold
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">+5% comisión</p>
+              </div>
+              <div className={`relative h-5 w-9 rounded-full transition-colors ${useBoldLink ? "bg-primary" : "bg-muted"}`}>
+                <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${useBoldLink ? "translate-x-4" : ""}`} />
+              </div>
             </div>
-            <div className={`relative h-5 w-9 rounded-full transition-colors ${useBoldLink ? "bg-primary" : "bg-muted"}`}>
-              <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${useBoldLink ? "translate-x-4" : ""}`} />
-            </div>
-          </div>
+          )}
 
           {/* Totals */}
           {useBoldLink ? (

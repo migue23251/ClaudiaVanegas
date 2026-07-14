@@ -451,7 +451,7 @@ export default function Pedidos() {
                 {(["contado", "credito"] as const).map(pt => (
                   <button
                     key={pt}
-                    onClick={() => setPaymentType(pt)}
+                    onClick={() => { setPaymentType(pt); if (pt === "credito") setUseBoldLink(false); }}
                     className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                       paymentType === pt
                         ? "bg-primary text-primary-foreground border-primary"
@@ -464,34 +464,36 @@ export default function Pedidos() {
               </div>
             </div>
 
-            {/* Bold link toggle */}
-            <div
-              className={`flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer ${
-                useBoldLink ? "border-primary bg-primary/5" : "border-border"
-              }`}
-              onClick={() => setUseBoldLink(!useBoldLink)}
-            >
-              <div>
-                <p className="text-sm font-semibold flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-primary" />
-                  Generar link de pago Bold
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Se añade el 5% de comisión Bold al total
-                </p>
-              </div>
+            {/* Bold link toggle — only for cash (contado) payments */}
+            {paymentType === "contado" && (
               <div
-                className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
-                  useBoldLink ? "bg-primary" : "bg-muted"
+                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer ${
+                  useBoldLink ? "border-primary bg-primary/5" : "border-border"
                 }`}
+                onClick={() => setUseBoldLink(!useBoldLink)}
               >
-                <span
-                  className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                    useBoldLink ? "translate-x-5" : ""
+                <div>
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                    Generar link de pago Bold
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Se añade el 5% de comisión Bold al total
+                  </p>
+                </div>
+                <div
+                  className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
+                    useBoldLink ? "bg-primary" : "bg-muted"
                   }`}
-                />
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      useBoldLink ? "translate-x-5" : ""
+                    }`}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Total breakdown */}
             <div className="rounded-xl border border-border bg-card p-3.5 space-y-2 text-sm">
