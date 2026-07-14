@@ -146,7 +146,7 @@ export default function Pedidos() {
     setPaymentType("contado");
     setUseBoldLink(false);
     setSelectedCustomer(null);
-    setCustomerSearch(order.customerName);
+    setCustomerSearch("");
     setIsCreatingCustomer(false);
   };
 
@@ -470,7 +470,7 @@ export default function Pedidos() {
                       <p className="text-xs text-muted-foreground truncate">{selectedCustomer.email}</p>
                     )}
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { setSelectedCustomer(null); setCustomerSearch(invoiceOrder?.customerName ?? ""); }}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { setSelectedCustomer(null); setCustomerSearch(""); }}>
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -514,10 +514,12 @@ export default function Pedidos() {
                       </div>
                     </div>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1.5">
-                    Puedes facturar sin seleccionar un cliente si el pago es de contado.
-                  </p>
                 </div>
+              )}
+              {!selectedCustomer && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Puedes facturar sin seleccionar un cliente si el pago es de contado.
+                </p>
               )}
             </div>
 
