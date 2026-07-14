@@ -57,6 +57,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   zapatos: "Zapatos", bolsos: "Bolsos", accesorios: "Accesorios",
 };
 
+/** Builds a wa.me link for a Colombian number, always prefixing the +57 country code. */
+function toWhatsAppLink(phone: string, text?: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const local = digits.startsWith("57") ? digits.slice(2) : digits;
+  const url = `https://wa.me/57${local}`;
+  return text ? `${url}?text=${encodeURIComponent(text)}` : url;
+}
+
 const PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='64' fill='%23d1d5db'%3E👗%3C/text%3E%3C/svg%3E";
 
@@ -553,7 +561,7 @@ function CartDrawer({
             </p>
             {store?.phone && (
               <a
-                href={`https://wa.me/${store.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hola, acabo de hacer el pedido #${orderId} por el catálogo`)}`}
+                href={toWhatsAppLink(store.phone, `Hola, acabo de hacer el pedido #${orderId} por el catálogo`)}
                 target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-[#25D366] hover:bg-[#20bf5b] text-white text-sm font-semibold transition-colors"
               >
@@ -684,7 +692,7 @@ export default function Catalogo() {
                 </a>
               )}
               {store?.phone && (
-                <a href={`https://wa.me/${store.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" title="WhatsApp"
+                <a href={toWhatsAppLink(store.phone)} target="_blank" rel="noopener noreferrer" title="WhatsApp"
                   className="h-9 w-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors">
                   <Phone className="w-4 h-4" />
                 </a>
