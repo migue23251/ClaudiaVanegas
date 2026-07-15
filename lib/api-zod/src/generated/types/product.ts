@@ -18,5 +18,7 @@ export interface Product {
   stock: number;
   category: ProductCategory;
   images: string[];
+  /** Whether the product is shown in the public catalog */
+  isVisible: boolean;
   createdAt: Date;
 }

@@ -54,6 +54,7 @@ export * from './productMovementOut';
 export * from './productMovements';
 export * from './productUpdate';
 export * from './productUpdateCategory';
+export * from './productVisibilityInput';
 export * from './purchaseOrder';
 export * from './purchaseOrderInput';
 export * from './purchaseOrderInputPaymentType';

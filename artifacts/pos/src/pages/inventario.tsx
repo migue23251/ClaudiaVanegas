@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   useListProducts, getListProductsQueryKey, useCreateProduct, useUpdateProduct, useDeleteProduct,
+  useSetProductVisibility,
   useGetProductMovements, getGetProductMovementsQueryKey,
   ProductInput, Product,
 } from "@workspace/api-client-react";
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, History } from "lucide-react";
+import { Plus, Search, Edit, Trash2, History, Eye, EyeOff } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -73,6 +74,7 @@ export default function Inventario() {
   const createProd = useCreateProduct();
   const updateProd = useUpdateProduct();
   const deleteProd = useDeleteProduct();
+  const setVisibility = useSetProductVisibility();
 
   const { data: movements, isLoading: movementsLoading } = useGetProductMovements(movementsProduct?.id!, {
     query: { enabled: !!movementsProduct, queryKey: getGetProductMovementsQueryKey(movementsProduct?.id!) },
@@ -131,6 +133,15 @@ export default function Inventario() {
   const openEdit = (prod: Product) => { setEditingProduct(prod); setIsDialogOpen(true); };
   const openCreate = () => { setEditingProduct(null); setIsDialogOpen(true); };
 
+  const handleToggleVisibility = (product: Product) => {
+    setVisibility.mutate({ id: product.id, data: { isVisible: !product.isVisible } }, {
+      onSuccess: () => {
+        toast({ title: product.isVisible ? "Producto oculto del catálogo" : "Producto visible en el catálogo" });
+        queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+      }
+    });
+  };
+
   const paginated = (products ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const catLabel = (val: string) => CATEGORIES.find(c => c.value === val)?.label ?? val;
 
@@ -181,17 +192,18 @@ export default function Inventario() {
               <TableHead className="text-right">Costo</TableHead>
               <TableHead className="text-right">Venta</TableHead>
               <TableHead className="text-right">Stock</TableHead>
+              <TableHead className="text-center">Catálogo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
             ) : paginated.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No se encontraron productos</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No se encontraron productos</TableCell></TableRow>
             ) : (
               paginated.map((product) => (
-                <TableRow key={product.id}>
+                <TableRow key={product.id} className={!product.isVisible ? "opacity-60" : undefined}>
                   <TableCell className="font-mono text-xs">{product.code}</TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
                   <TableCell><Badge variant="secondary" className="capitalize">{catLabel(product.category)}</Badge></TableCell>
@@ -199,6 +211,21 @@ export default function Inventario() {
                   <TableCell className="text-right font-serif font-bold">{formatCurrency(product.salePrice)}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant={product.stock <= 5 ? "destructive" : "outline"}>{product.stock}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={product.isVisible ? "Visible en el catálogo — clic para ocultar" : "Oculto del catálogo — clic para mostrar"}
+                      disabled={setVisibility.isPending}
+                      onClick={() => handleToggleVisibility(product)}
+                    >
+                      {product.isVisible ? (
+                        <Eye className="h-4 w-4 text-primary" />
+                      ) : (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" title="Historial de movimientos" onClick={() => setMovementsProduct(product)}>

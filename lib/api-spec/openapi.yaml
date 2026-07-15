@@ -311,6 +311,33 @@ paths:
         "204":
           description: Deleted
 
+  /products/{id}/visibility:
+    patch:
+      operationId: setProductVisibility
+      tags: [products]
+      summary: Show or hide a product in the public catalog
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVisibilityInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
   # ─── CUSTOMERS ───────────────────────────────────────────────────────────────
   /customers:
     get:
@@ -1260,7 +1287,7 @@ components:
     # ─── PRODUCT ─────────────────────────────────────────────────────────────
     Product:
       type: object
-      required: [id, code, name, costPrice, salePrice, stock, category, images, createdAt]
+      required: [id, code, name, costPrice, salePrice, stock, category, images, isVisible, createdAt]
       properties:
         id:
           type: integer
@@ -1283,6 +1310,9 @@ components:
           type: array
           items:
             type: string
+        isVisible:
+          type: boolean
+          description: Whether the product is shown in the public catalog
         createdAt:
           type: string
           format: date-time
@@ -1308,6 +1338,9 @@ components:
           type: array
           items:
             type: string
+        isVisible:
+          type: boolean
+          description: Whether the product is shown in the public catalog
 
     ProductUpdate:
       type: object
@@ -1329,6 +1362,16 @@ components:
           type: array
           items:
             type: string
+        isVisible:
+          type: boolean
+          description: Whether the product is shown in the public catalog
+
+    ProductVisibilityInput:
+      type: object
+      required: [isVisible]
+      properties:
+        isVisible:
+          type: boolean
 
     ProductMovementIn:
       type: object

@@ -15,4 +15,6 @@ export interface ProductUpdate {
   stock?: number;
   category?: ProductUpdateCategory;
   images?: string[];
+  /** Whether the product is shown in the public catalog */
+  isVisible?: boolean;
 }

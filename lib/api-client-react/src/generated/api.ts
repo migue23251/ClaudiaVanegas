@@ -54,6 +54,7 @@ import type {
   ProductInput,
   ProductMovements,
   ProductUpdate,
+  ProductVisibilityInput,
   PurchaseOrder,
   PurchaseOrderInput,
   PurchaseOrderUpdate,
@@ -1215,6 +1216,77 @@ export const useDeleteProduct = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteProductMutationOptions(options));
+    }
+
+export const getSetProductVisibilityUrl = (id: number,) => {
+
+
+
+
+  return `/api/products/${id}/visibility`
+}
+
+/**
+ * @summary Show or hide a product in the public catalog
+ */
+export const setProductVisibility = async (id: number,
+    productVisibilityInput: ProductVisibilityInput, options?: RequestInit): Promise<Product> => {
+
+  return customFetch<Product>(getSetProductVisibilityUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(productVisibilityInput)
+  }
+);}
+
+
+
+
+export const getSetProductVisibilityMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProductVisibility>>, TError,{id: number;data: BodyType<ProductVisibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setProductVisibility>>, TError,{id: number;data: BodyType<ProductVisibilityInput>}, TContext> => {
+
+const mutationKey = ['setProductVisibility'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setProductVisibility>>, {id: number;data: BodyType<ProductVisibilityInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setProductVisibility(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetProductVisibilityMutationResult = NonNullable<Awaited<ReturnType<typeof setProductVisibility>>>
+    export type SetProductVisibilityMutationBody = BodyType<ProductVisibilityInput>
+    export type SetProductVisibilityMutationError = ErrorType<void>
+
+    /**
+ * @summary Show or hide a product in the public catalog
+ */
+export const useSetProductVisibility = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProductVisibility>>, TError,{id: number;data: BodyType<ProductVisibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setProductVisibility>>,
+        TError,
+        {id: number;data: BodyType<ProductVisibilityInput>},
+        TContext
+      > => {
+      return useMutation(getSetProductVisibilityMutationOptions(options));
     }
 
 export const getListCustomersUrl = (params?: ListCustomersParams,) => {

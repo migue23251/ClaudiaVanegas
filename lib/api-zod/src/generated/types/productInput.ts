@@ -15,4 +15,6 @@ export interface ProductInput {
   stock: number;
   category: ProductInputCategory;
   images?: string[];
+  /** Whether the product is shown in the public catalog */
+  isVisible?: boolean;
 }

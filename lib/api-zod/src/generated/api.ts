@@ -148,6 +148,7 @@ export const ListProductsResponseItem = zod.object({
   "stock": zod.number(),
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
+  "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
   "createdAt": zod.coerce.date()
 })
 export const ListProductsResponse = zod.array(ListProductsResponseItem)
@@ -163,7 +164,8 @@ export const CreateProductBody = zod.object({
   "salePrice": zod.number(),
   "stock": zod.number(),
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
-  "images": zod.array(zod.string()).optional()
+  "images": zod.array(zod.string()).optional(),
+  "isVisible": zod.boolean().optional().describe('Whether the product is shown in the public catalog')
 })
 
 export const CreateProductResponse = zod.object({
@@ -176,6 +178,7 @@ export const CreateProductResponse = zod.object({
   "stock": zod.number(),
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
+  "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
   "createdAt": zod.coerce.date()
 })
 
@@ -242,6 +245,7 @@ export const GetProductResponse = zod.object({
   "stock": zod.number(),
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
+  "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
   "createdAt": zod.coerce.date()
 })
 
@@ -260,7 +264,8 @@ export const UpdateProductBody = zod.object({
   "salePrice": zod.number().optional(),
   "stock": zod.number().optional(),
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']).optional(),
-  "images": zod.array(zod.string()).optional()
+  "images": zod.array(zod.string()).optional(),
+  "isVisible": zod.boolean().optional().describe('Whether the product is shown in the public catalog')
 })
 
 export const UpdateProductResponse = zod.object({
@@ -273,6 +278,7 @@ export const UpdateProductResponse = zod.object({
   "stock": zod.number(),
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
+  "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
   "createdAt": zod.coerce.date()
 })
 
@@ -285,6 +291,32 @@ export const DeleteProductParams = zod.object({
 })
 
 export const DeleteProductResponse = zod.void()
+
+
+/**
+ * @summary Show or hide a product in the public catalog
+ */
+export const SetProductVisibilityParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SetProductVisibilityBody = zod.object({
+  "isVisible": zod.boolean()
+})
+
+export const SetProductVisibilityResponse = zod.object({
+  "id": zod.number(),
+  "code": zod.string(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "costPrice": zod.number(),
+  "salePrice": zod.number(),
+  "stock": zod.number(),
+  "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
+  "images": zod.array(zod.string()),
+  "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
+  "createdAt": zod.coerce.date()
+})
 
 
 /**

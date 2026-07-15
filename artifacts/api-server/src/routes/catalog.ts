@@ -55,6 +55,8 @@ router.get("/catalog", async (req, res): Promise<void> => {
     );
   }
 
+  conditions.push(eq(productsTable.isVisible, true));
+
   const base = db
     .select({
       id: productsTable.id,
@@ -68,7 +70,7 @@ router.get("/catalog", async (req, res): Promise<void> => {
 
   const [settingsResult, products] = await Promise.all([
     getPublicSettings(),
-    (conditions.length > 0 ? base.where(and(...conditions)) : base).orderBy(
+    base.where(and(...conditions)).orderBy(
       productsTable.category,
       productsTable.name
     ),

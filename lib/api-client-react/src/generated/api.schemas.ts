@@ -91,6 +91,8 @@ export interface Product {
   stock: number;
   category: ProductCategory;
   images: string[];
+  /** Whether the product is shown in the public catalog */
+  isVisible: boolean;
   createdAt: string;
 }
 
@@ -117,6 +119,8 @@ export interface ProductInput {
   stock: number;
   category: ProductInputCategory;
   images?: string[];
+  /** Whether the product is shown in the public catalog */
+  isVisible?: boolean;
 }
 
 export type ProductUpdateCategory = typeof ProductUpdateCategory[keyof typeof ProductUpdateCategory];
@@ -142,6 +146,12 @@ export interface ProductUpdate {
   stock?: number;
   category?: ProductUpdateCategory;
   images?: string[];
+  /** Whether the product is shown in the public catalog */
+  isVisible?: boolean;
+}
+
+export interface ProductVisibilityInput {
+  isVisible: boolean;
 }
 
 export interface ProductMovementIn {

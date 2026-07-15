@@ -54,6 +54,19 @@ router.get("/products", requireAuth, async (req, res): Promise<void> => {
   })));
 });
 
+router.patch("/products/:id/visibility", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const { isVisible } = req.body;
+  if (typeof isVisible !== "boolean") {
+    res.status(400).json({ error: "isVisible debe ser booleano" });
+    return;
+  }
+
+  const [product] = await db.update(productsTable).set({ isVisible }).where(eq(productsTable.id, id)).returning();
+  if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+  res.json({ ...product, costPrice: parseFloat(product.costPrice), salePrice: parseFloat(product.salePrice) });
+});
+
 router.post("/products", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const { name, description, costPrice, salePrice, stock, category, images } = req.body;
   if (!name || costPrice == null || salePrice == null || stock == null || !category) {
@@ -169,6 +182,7 @@ router.put("/products/:id", requireAuth, requireAdmin, async (req, res): Promise
   if (stock != null) updates.stock = parseInt(String(stock), 10);
   if (category != null) updates.category = category;
   if (images != null) updates.images = images;
+  if (req.body.isVisible != null) updates.isVisible = req.body.isVisible;
 
   const [product] = await db.update(productsTable).set(updates).where(eq(productsTable.id, id)).returning();
   if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
