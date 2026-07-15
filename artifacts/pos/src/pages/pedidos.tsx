@@ -488,12 +488,8 @@ export default function Pedidos() {
       )}
 
       {/* ── Invoice modal ──────────────────────────────────────────────────── */}
-      <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open && !supplierDialogProduct) setInvoiceOrder(null); }}>
-        <DialogContent
-          className="max-w-2xl max-h-[90vh] overflow-y-auto"
-          onInteractOutside={e => { if (supplierDialogProduct) e.preventDefault(); }}
-          onEscapeKeyDown={e => { if (supplierDialogProduct) e.preventDefault(); }}
-        >
+      <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open) { setInvoiceOrder(null); setSupplierDialogProduct(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
@@ -506,6 +502,56 @@ export default function Pedidos() {
           </DialogHeader>
 
           <div className="space-y-4 py-1">
+            {/* Supplier inline panel */}
+            {supplierDialogProduct && (
+              <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-primary" />
+                    Proveedor — {supplierDialogProduct.name}
+                  </p>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                    onClick={() => setSupplierDialogProduct(null)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                {isLoadingSupplier ? (
+                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Buscando proveedor...
+                  </div>
+                ) : productSupplier ? (
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Nombre</p>
+                      <p className="font-semibold">{productSupplier.name}</p>
+                    </div>
+                    {productSupplier.contact && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Contacto</p>
+                        <p>{productSupplier.contact}</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-4">
+                      {productSupplier.phone && (
+                        <a href={`tel:${productSupplier.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                          <Phone className="h-3.5 w-3.5" />{productSupplier.phone}
+                        </a>
+                      )}
+                      {productSupplier.email && (
+                        <a href={`mailto:${productSupplier.email}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                          <Mail className="h-3.5 w-3.5" />{productSupplier.email}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No hay compras registradas para este producto, así que no se puede determinar su proveedor.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Customer */}
             <div>
               <p className="text-sm font-semibold mb-2 flex items-center gap-2">
@@ -995,62 +1041,7 @@ export default function Pedidos() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Supplier info dialog ───────────────────────────────────────────── */}
-      <Dialog open={!!supplierDialogProduct} onOpenChange={open => { if (!open) setSupplierDialogProduct(null); }} modal={false}>
-        <DialogContent onEscapeKeyDown={e => { e.stopPropagation(); setSupplierDialogProduct(null); }}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Truck className="h-5 w-5 text-primary" />
-              Proveedor
-            </DialogTitle>
-            <DialogDescription>{supplierDialogProduct?.name}</DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            {isLoadingSupplier ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Buscando proveedor...
-              </div>
-            ) : productSupplier ? (
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Nombre</p>
-                  <p className="text-sm font-semibold">{productSupplier.name}</p>
-                </div>
-                {productSupplier.contact && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Contacto</p>
-                    <p className="text-sm">{productSupplier.contact}</p>
-                  </div>
-                )}
-                {productSupplier.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <a href={`tel:${productSupplier.phone}`} className="text-sm text-primary hover:underline">
-                      {productSupplier.phone}
-                    </a>
-                  </div>
-                )}
-                {productSupplier.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <a href={`mailto:${productSupplier.email}`} className="text-sm text-primary hover:underline">
-                      {productSupplier.email}
-                    </a>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">
-                No hay compras registradas para este producto, así que no se puede determinar su proveedor.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSupplierDialogProduct(null)}>Cerrar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }
