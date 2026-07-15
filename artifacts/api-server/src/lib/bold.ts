@@ -1,18 +1,20 @@
 /**
  * Bold (bold.co) payment link generator — Colombia
  *
- * Endpoint: POST https://checkout.bold.co/integration/payment_links
- * Docs:     https://developer.bold.co/docs/payment-links
+ * Docs: https://developers.bold.co/pagos-en-linea/api-link-de-pagos
  *
- * If Bold ever changes their endpoint or auth scheme, update BOLD_API_URL
- * and the Authorization header below.
+ * Base URL : https://integrations.api.bold.co
+ * Endpoint : POST /online/link/v1
+ * Auth     : Authorization: x-api-key <llave_de_identidad>
+ * Amount   : COP (NOT centavos) in amount.total_amount
+ * Expiry   : nanoseconds from Unix epoch
  */
 
-const BOLD_API_URL = "https://checkout.bold.co/integration/payment_links";
+const BOLD_BASE_URL = "https://integrations.api.bold.co";
 const BOLD_FEE_RATE = 0.05; // 5 % charged by Bold
 
 export interface BoldLinkParams {
-  /** Total in COP (pesos, NOT centavos — we multiply ×100 internally) */
+  /** Total in COP (pesos colombianos, NOT centavos) */
   amountCOP: number;
   description: string;
   customer?: {
@@ -20,24 +22,19 @@ export interface BoldLinkParams {
     email?: string;
     phone?: string;
   };
-  /** ISO-8601 expiry; defaults to 7 days from now */
-  expiresAt?: string;
+  /** Expiry in milliseconds from now; defaults to 7 days */
+  expiresInMs?: number;
 }
 
 export interface BoldLinkResult {
+  /** Full checkout URL, e.g. https://checkout.bold.co/LNK_xxx */
   url: string;
-  /** Bold's internal link/order ID — use to match webhook events back to this sale */
+  /** Bold's internal link ID, e.g. "LNK_H7S4xxx" — used to match webhooks */
   linkId: string | null;
   /** Amount actually charged (includes Bold fee) */
   totalWithFee: number;
   /** Fee amount in COP */
   fee: number;
-}
-
-function defaultExpiry(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 7);
-  return d.toISOString();
 }
 
 export async function createBoldPaymentLink(
@@ -48,25 +45,31 @@ export async function createBoldPaymentLink(
 
   const fee = Math.round(params.amountCOP * BOLD_FEE_RATE);
   const totalWithFee = params.amountCOP + fee;
-  // Bold uses centavos (x100) for COP
-  const amountInCents = totalWithFee * 100;
+
+  // Expiration date in nanoseconds from Unix epoch
+  const expiresInMs = params.expiresInMs ?? 7 * 24 * 60 * 60 * 1000; // 7 days
+  const expirationNs = (Date.now() + expiresInMs) * 1_000_000;
+
+  // Truncate description to Bold's 100-char limit
+  const description = params.description.slice(0, 100);
 
   const body: Record<string, unknown> = {
-    amount_in_cents: amountInCents,
-    currency: "COP",
-    description: params.description,
-    expiration_date: params.expiresAt ?? defaultExpiry(),
+    amount_type: "CLOSE",
+    amount: {
+      currency: "COP",
+      total_amount: totalWithFee,
+      tip_amount: 0,
+    },
+    description,
+    expiration_date: expirationNs,
   };
 
-  if (params.customer?.fullName || params.customer?.email || params.customer?.phone) {
-    body.customer = {
-      ...(params.customer.fullName ? { full_name: params.customer.fullName } : {}),
-      ...(params.customer.email    ? { email: params.customer.email }         : {}),
-      ...(params.customer.phone    ? { phone_number: params.customer.phone }  : {}),
-    };
+  // Add customer email if available (Bold sends the link by email)
+  if (params.customer?.email) {
+    body.payer_email = params.customer.email;
   }
 
-  const response = await fetch(BOLD_API_URL, {
+  const response = await fetch(`${BOLD_BASE_URL}/online/link/v1`, {
     method: "POST",
     headers: {
       "Authorization": `x-api-key ${apiKey}`,
@@ -81,36 +84,18 @@ export async function createBoldPaymentLink(
   }
 
   const data = await response.json() as {
-    payload?: { payment_link?: string; url?: string; id?: string; order_id?: string; order?: { id?: string } };
-    url?: string;
-    payment_link?: string;
-    id?: string;
-    order_id?: string;
+    payload?: { payment_link?: string; url?: string };
+    errors?: unknown[];
   };
 
-  // Normalize different response shapes Bold may return
-  const url =
-    data?.payload?.payment_link ??
-    data?.payload?.url ??
-    data?.url ??
-    data?.payment_link;
+  const linkId = data?.payload?.payment_link ?? null;
+  const url = data?.payload?.url ?? (linkId ? `https://checkout.bold.co/${linkId}` : null);
 
   if (!url) {
-    throw new Error("Bold no devolvió un link de pago válido");
+    throw new Error(`Bold no devolvió un link de pago válido. Respuesta: ${JSON.stringify(data)}`);
   }
 
-  // Extract Bold's internal link/order ID (used to match webhook events)
-  const linkId =
-    data?.payload?.id ??
-    data?.payload?.order_id ??
-    data?.payload?.order?.id ??
-    data?.id ??
-    data?.order_id ??
-    // Fall back to extracting the ID from the URL path (e.g. /payment/LNK_xxx)
-    url.split("/").pop() ??
-    null;
-
-  return { url, linkId: linkId ?? null, totalWithFee, fee };
+  return { url, linkId, totalWithFee, fee };
 }
 
 export { BOLD_FEE_RATE };
