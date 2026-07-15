@@ -692,10 +692,15 @@ export default function Catalogo() {
                   {store?.name ?? "Claudia Vanegas"}
                 </h1>
                 {store?.address && (
-                  <p className="flex items-center justify-center sm:justify-start gap-1.5 text-white/70 text-xs sm:text-sm mt-1">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center sm:justify-start gap-1.5 text-white/70 hover:text-white text-xs sm:text-sm mt-1 transition-colors"
+                  >
                     <MapPin className="w-3.5 h-3.5 shrink-0" />
                     {store.address}
-                  </p>
+                  </a>
                 )}
               </div>
             </div>
