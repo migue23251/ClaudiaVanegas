@@ -166,6 +166,59 @@ router.put("/catalog-orders/:id/cancel", requireAuth, requireAdmin, async (req, 
   res.json({ id, status: "cancelled" });
 });
 
+// ── AUTH: Update items of a pending catalog order ────────────────────────────
+
+router.put("/catalog-orders/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const orderId = parseInt(req.params.id as string, 10);
+  const { items } = req.body as {
+    items: { productId: number; qty: number; unitPrice: number }[];
+  };
+
+  if (!items?.length) {
+    res.status(400).json({ error: "El pedido debe tener al menos un artículo" }); return;
+  }
+
+  const [order] = await db.select().from(catalogOrdersTable).where(eq(catalogOrdersTable.id, orderId));
+  if (!order) { res.status(404).json({ error: "Pedido no encontrado" }); return; }
+  if (order.status !== "pending") {
+    res.status(400).json({ error: "Solo se pueden editar pedidos pendientes" }); return;
+  }
+
+  for (const item of items) {
+    if (item.qty <= 0 || item.unitPrice < 0) {
+      res.status(400).json({ error: "Cantidad o precio inválido" }); return;
+    }
+    const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
+    if (!product) { res.status(400).json({ error: `Producto ${item.productId} no existe` }); return; }
+  }
+
+  const total = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+  const productIds = items.map(i => i.productId);
+  const products = await db.select({ id: productsTable.id, name: productsTable.name })
+    .from(productsTable).where(inArray(productsTable.id, productIds));
+  const productMap = new Map(products.map(p => [p.id, p.name]));
+
+  await db.transaction(async (tx) => {
+    await tx.delete(catalogOrderItemsTable).where(eq(catalogOrderItemsTable.orderId, orderId));
+    await tx.insert(catalogOrderItemsTable).values(
+      items.map(i => ({
+        orderId,
+        productId: i.productId,
+        productName: productMap.get(i.productId) ?? "Producto",
+        qty: i.qty,
+        unitPrice: String(i.unitPrice),
+        subtotal: String(i.qty * i.unitPrice),
+      }))
+    );
+    await tx.update(catalogOrdersTable)
+      .set({ total: String(total) })
+      .where(eq(catalogOrdersTable.id, orderId));
+  });
+
+  const result = await buildOrderResponse(orderId);
+  res.json(result);
+});
+
 // ── AUTH: Invoice a catalog order (convert to sale) ───────────────────────────
 
 router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req, res): Promise<void> => {

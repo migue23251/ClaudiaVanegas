@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, Phone, Mail, Calendar, MapPin, MessageSquare,
   Receipt, X, ChevronDown, ChevronUp, CheckCircle2, CreditCard, Copy,
-  UserSearch, UserPlus, Edit, Search, Package, Truck, Loader2,
+  UserSearch, UserPlus, Edit, Search, Package, Truck, Loader2, Trash2, Plus, Save,
 } from "lucide-react";
 import {
   useListCustomers, getListCustomersQueryKey, useCreateCustomer,
@@ -98,6 +98,9 @@ export default function Pedidos() {
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [boldResult, setBoldResult] = useState<{ url: string; fee: number; saleId: number } | null>(null);
   const [supplierDialogProduct, setSupplierDialogProduct] = useState<{ id: number; name: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [addProductSearch, setAddProductSearch] = useState("");
+  const [showAddProduct, setShowAddProduct] = useState(false);
 
   // ── Stock lookup (for the invoicing table) ─────────────────────────────────
   const { data: allProducts = [] } = useListProducts(undefined, {
@@ -168,6 +171,31 @@ export default function Pedidos() {
     setSelectedCustomer(null);
     setCustomerSearch("");
     setIsCreatingCustomer(false);
+    setAddProductSearch("");
+    setShowAddProduct(false);
+  };
+
+  const handleSaveOrder = async () => {
+    if (!invoiceOrder) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/catalog-orders/${invoiceOrder.id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: invoiceItems.map(i => ({ productId: i.productId, qty: i.editQty, unitPrice: i.editPrice })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Error guardando");
+      setInvoiceOrder(null);
+      refetch();
+      toast({ title: `Pedido #${invoiceOrder.id} guardado`, description: "Los artículos fueron actualizados." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // ── Create customer (prefilled from the order's own data) ─────────────────
@@ -550,7 +578,7 @@ export default function Pedidos() {
 
             {/* Items editable */}
             <div>
-              <p className="text-sm font-semibold mb-2">Artículos — puedes ajustar cantidades y precios</p>
+              <p className="text-sm font-semibold mb-2">Artículos — ajusta cantidades, precios o agrega/elimina artículos</p>
               <div className="rounded-lg border border-border overflow-hidden text-sm">
                 <table className="w-full">
                   <thead className="bg-muted/50">
@@ -561,6 +589,7 @@ export default function Pedidos() {
                       <th className="text-right px-3 py-2 font-medium">Precio</th>
                       <th className="text-right px-3 py-2 font-medium">Subtotal</th>
                       <th className="text-center px-3 py-2 font-medium">Proveedor</th>
+                      <th className="w-8" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -623,12 +652,106 @@ export default function Pedidos() {
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
+                        <td className="px-1 py-1.5 align-top text-center">
+                          <Button
+                            type="button" variant="ghost" size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setInvoiceItems(prev => prev.filter((_, i) => i !== idx))}
+                            disabled={invoiceItems.length <= 1}
+                            title="Eliminar artículo"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
                       </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
+
+              {/* Add product picker */}
+              {showAddProduct ? (
+                <div className="mt-2 border border-border rounded-lg p-3 bg-muted/30 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        autoFocus
+                        placeholder="Buscar producto..."
+                        value={addProductSearch}
+                        onChange={e => setAddProductSearch(e.target.value)}
+                        className="pl-8 h-8 text-sm"
+                      />
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+                      onClick={() => { setShowAddProduct(false); setAddProductSearch(""); }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {addProductSearch.length > 0 && (() => {
+                    const filtered = allProducts
+                      .filter(p => p.name.toLowerCase().includes(addProductSearch.toLowerCase()))
+                      .slice(0, 8);
+                    if (filtered.length === 0)
+                      return <p className="text-xs text-muted-foreground text-center py-2">Sin resultados</p>;
+                    return (
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {filtered.map(p => {
+                          const alreadyAdded = invoiceItems.some(i => i.productId === p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              disabled={alreadyAdded}
+                              onClick={() => {
+                                if (alreadyAdded) return;
+                                setInvoiceItems(prev => [...prev, {
+                                  id: -(Date.now()),
+                                  productId: p.id,
+                                  productName: p.name,
+                                  description: (p as any).description ?? null,
+                                  qty: 1,
+                                  unitPrice: parseFloat((p as any).salePrice ?? "0"),
+                                  subtotal: parseFloat((p as any).salePrice ?? "0"),
+                                  editQty: 1,
+                                  editPrice: parseFloat((p as any).salePrice ?? "0"),
+                                }]);
+                                setAddProductSearch("");
+                                setShowAddProduct(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                                alreadyAdded
+                                  ? "opacity-40 cursor-not-allowed"
+                                  : "hover:bg-accent cursor-pointer"
+                              }`}
+                            >
+                              <div>
+                                <span className="font-medium">{p.name}</span>
+                                {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">ya agregado</span>}
+                              </div>
+                              <div className="flex items-center gap-3 text-muted-foreground text-xs tabular-nums shrink-0">
+                                <span className="flex items-center gap-1">
+                                  <Package className="h-3 w-3" />{p.stock}
+                                </span>
+                                <span>{fmt(parseFloat((p as any).salePrice ?? "0"))}</span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <Button
+                  type="button" variant="outline" size="sm"
+                  className="mt-2 gap-2 w-full border-dashed text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowAddProduct(true)}
+                >
+                  <Plus className="h-4 w-4" /> Agregar artículo
+                </Button>
+              )}
             </div>
 
             {/* Payment type */}
@@ -735,11 +858,19 @@ export default function Pedidos() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setInvoiceOrder(null)}>Cancelar</Button>
+          <DialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setInvoiceOrder(null)} className="mr-auto">Cancelar</Button>
+            <Button
+              variant="outline"
+              onClick={handleSaveOrder}
+              disabled={isSaving || isInvoicing || invoiceItems.length === 0}
+              className="gap-2"
+            >
+              {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Guardando...</> : <><Save className="h-4 w-4" /> Guardar para después</>}
+            </Button>
             <Button
               onClick={handleInvoice}
-              disabled={isInvoicing || invoiceItems.length === 0}
+              disabled={isInvoicing || isSaving || invoiceItems.length === 0}
               className="gap-2"
             >
               {isInvoicing
