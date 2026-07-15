@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Store, Mail, ImagePlus, Trash2, Palette, RotateCcw, Send, Link2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { applyBrandColor, hexToHsl, hslStringToHex } from "@/lib/brand-color";
+import { useBrandSettings } from "@/hooks/use-brand-settings";
 import { Switch } from "@/components/ui/switch";
 
 // Preset palette for quick selection
@@ -30,10 +31,13 @@ export default function Configuracion() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const setBrandLogo = useBrandSettings((s) => s.setLogo);
+  const setBrandColor = useBrandSettings((s) => s.setPrimaryColor);
 
   // ── Logo state ──────────────────────────────────────────────────
-  // Prefer DB logoUrl; fallback to localStorage for preview before settings load
-  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
+  // Prefer DB logoUrl; fallback to the shared store's cached value for
+  // preview before settings load
+  const storedLogo = useBrandSettings((s) => s.logoUrl);
   const [logo, setLogo] = useState<string | null>(storedLogo);
 
   // Sync logo from DB settings when loaded
@@ -75,8 +79,7 @@ export default function Configuracion() {
   const applyAndSave = (hex: string) => {
     const valid = /^#[0-9a-fA-F]{6}$/.test(hex);
     if (!valid) return;
-    applyBrandColor(hex);
-    localStorage.setItem("pos_brand_color", hex);
+    setBrandColor(hex);
     setColorHex(hex);
     saveColorToDb(hex);
     toast({ title: "Color de marca actualizado" });
@@ -160,7 +163,7 @@ export default function Configuracion() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
-      localStorage.setItem("pos_logo", base64);
+      setBrandLogo(base64);
       setLogo(base64);
       // Save to DB so all users see the logo
       updateSettings.mutate({ data: { logoUrl: base64 } as any }, {
@@ -175,7 +178,7 @@ export default function Configuracion() {
   };
 
   const handleRemoveLogo = () => {
-    localStorage.removeItem("pos_logo");
+    setBrandLogo(null);
     setLogo(null);
     updateSettings.mutate({ data: { logoUrl: "" } as any }, {
       onSuccess: () => {
@@ -234,7 +237,6 @@ export default function Configuracion() {
                 onChange={(e) => {
                   const hex = e.target.value;
                   applyBrandColor(hex);
-                  localStorage.setItem("pos_brand_color", hex);
                   setColorHex(hex);
                 }}
                 onBlur={(e) => applyAndSave(e.target.value)}

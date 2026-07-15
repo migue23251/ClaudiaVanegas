@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Store, Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useBrandSettings } from "@/hooks/use-brand-settings";
 
 const loginSchema = z.object({
   email: z.string().email("Correo electrónico inválido"),
@@ -23,7 +24,7 @@ export default function Login() {
   const { toast } = useToast();
   const [showPass, setShowPass] = useState(false);
 
-  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
+  const logoUrl = useBrandSettings((s) => s.logoUrl);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -62,9 +63,9 @@ export default function Login() {
 
         {/* Brand content */}
         <div className="relative z-10 text-center text-primary-foreground">
-          {storedLogo ? (
+          {logoUrl ? (
             <img
-              src={storedLogo}
+              src={logoUrl}
               alt="Logo"
               className="mx-auto h-16 w-16 md:h-24 md:w-24 rounded-2xl object-contain shadow-xl mb-4 md:mb-8 bg-white/10 p-2"
             />

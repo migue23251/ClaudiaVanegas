@@ -17,6 +17,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBrandSettings } from "@/hooks/use-brand-settings";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Panel",              href: "/dashboard",       roles: ["admin", "cajero"] },
@@ -43,7 +44,7 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
 
   if (!user) return null;
 
-  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
+  const logoUrl = useBrandSettings((s) => s.logoUrl);
   const filtered = menuItems.filter(item => item.roles.includes(user.role));
 
   return (
@@ -51,8 +52,8 @@ export function Sidebar({ onClose, isMobileOpen }: SidebarProps) {
       {/* Header */}
       <div className="flex h-[62px] shrink-0 items-center justify-between px-5 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5 min-w-0">
-          {storedLogo ? (
-            <img src={storedLogo} alt="Logo" className="h-8 w-8 rounded-md object-contain shrink-0" />
+          {logoUrl ? (
+            <img src={logoUrl} alt="Logo" className="h-8 w-8 rounded-md object-contain shrink-0" />
           ) : (
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12 shrink-0">
               <Store className="h-4 w-4 text-primary" />

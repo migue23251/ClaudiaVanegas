@@ -2,26 +2,16 @@ import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Menu, Store } from "lucide-react";
-import { useGetSettings } from "@workspace/api-client-react";
-import { applyBrandColor } from "@/lib/brand-color";
+import { useBrandSettings } from "@/hooks/use-brand-settings";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user } = useAuth();
 
-  // Load settings from DB (brand color + logo)
-  const { data: settings } = useGetSettings();
-
-  // Apply brand color from DB settings on load / whenever settings change
-  useEffect(() => {
-    if (settings?.primaryColor) {
-      applyBrandColor(settings.primaryColor);
-    }
-  }, [settings?.primaryColor]);
-
-  // Fallback: logo from localStorage (set by configuracion on upload)
-  const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
-  const logo = settings?.logoUrl || storedLogo;
+  // Logo + brand color are kept in sync with the database by the global
+  // store (synced once at app boot in App.tsx) — no per-page fetch needed.
+  const logo = useBrandSettings((s) => s.logoUrl);
+  const storeName = useBrandSettings((s) => s.storeName);
 
   // Close sidebar on Escape key
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -96,7 +86,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </div>
             )}
             <span className="font-serif text-base font-semibold text-foreground truncate">
-              {settings?.storeName ?? "Claudia Vanegas"}
+              {storeName ?? "Claudia Vanegas"}
             </span>
           </div>
 

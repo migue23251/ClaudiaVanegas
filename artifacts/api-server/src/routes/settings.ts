@@ -19,6 +19,18 @@ router.get("/settings", requireAuth, async (_req, res): Promise<void> => {
   res.json({ ...safeSettings, smtpPass: settings.smtpPass ? "••••••••" : null });
 });
 
+// Public, unauthenticated subset — used to render the logo/brand color on the
+// login screen and app shell before a user has signed in, and to keep every
+// browser/device in sync with what's stored in the database (not localStorage).
+router.get("/settings/public", async (_req, res): Promise<void> => {
+  const settings = await getOrCreateSettings();
+  res.json({
+    storeName: settings.storeName,
+    logoUrl: settings.logoUrl,
+    primaryColor: settings.primaryColor,
+  });
+});
+
 router.put("/settings", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const settings = await getOrCreateSettings();
   const {
