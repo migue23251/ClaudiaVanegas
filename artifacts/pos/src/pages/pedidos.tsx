@@ -3,10 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, Phone, Mail, Calendar, MapPin, MessageSquare,
   Receipt, X, ChevronDown, ChevronUp, CheckCircle2, CreditCard, Copy,
-  UserSearch, UserPlus, Edit, Search,
+  UserSearch, UserPlus, Edit, Search, Package, Truck, Loader2,
 } from "lucide-react";
 import {
   useListCustomers, getListCustomersQueryKey, useCreateCustomer,
+  useListProducts, useGetProductSupplier,
   Customer, CustomerInput,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,22 @@ export default function Pedidos() {
   const [cancelOrderId, setCancelOrderId] = useState<number | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [boldResult, setBoldResult] = useState<{ url: string; fee: number; saleId: number } | null>(null);
+  const [supplierDialogProduct, setSupplierDialogProduct] = useState<{ id: number; name: string } | null>(null);
+
+  // ── Stock lookup (for the invoicing table) ─────────────────────────────────
+  const { data: allProducts = [] } = useListProducts(undefined, {
+    query: { queryKey: ["catalog-order-invoice-products"], enabled: !!invoiceOrder },
+  });
+  const stockByProductId = useMemo(
+    () => new Map(allProducts.map(p => [p.id, p.stock])),
+    [allProducts]
+  );
+
+  // ── Supplier lookup (fetched on demand when "Ver proveedor" is clicked) ────
+  const { data: productSupplier, isLoading: isLoadingSupplier } = useGetProductSupplier(
+    supplierDialogProduct?.id ?? 0,
+    { query: { queryKey: ["product-supplier", supplierDialogProduct?.id], enabled: !!supplierDialogProduct } }
+  );
 
   // ── Customer selection (for invoicing) ────────────────────────────────────
   const [customerSearch, setCustomerSearch] = useState("");
@@ -532,18 +549,36 @@ export default function Pedidos() {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="text-left px-3 py-2 font-medium">Producto</th>
+                      <th className="text-center px-3 py-2 font-medium">Stock</th>
                       <th className="text-center px-3 py-2 font-medium">Cant.</th>
                       <th className="text-right px-3 py-2 font-medium">Precio</th>
                       <th className="text-right px-3 py-2 font-medium">Subtotal</th>
+                      <th className="text-center px-3 py-2 font-medium">Proveedor</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {invoiceItems.map((item, idx) => (
+                    {invoiceItems.map((item, idx) => {
+                      const stock = item.productId != null ? stockByProductId.get(item.productId) : undefined;
+                      return (
                       <tr key={item.id}>
                         <td className="px-3 py-2 align-top">
                           <div className="font-medium">{item.productName}</div>
                           {item.description && (
                             <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</div>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 align-top text-center">
+                          {stock == null ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                              stock <= 5
+                                ? "bg-red-100 text-red-700 border-red-200"
+                                : "bg-muted text-muted-foreground border-border"
+                            }`}>
+                              <Package className="h-3 w-3" />
+                              {stock}
+                            </span>
                           )}
                         </td>
                         <td className="px-2 py-1.5 align-top">
@@ -567,8 +602,23 @@ export default function Pedidos() {
                         <td className="px-3 py-2 text-right font-medium tabular-nums align-top">
                           {fmt(item.editQty * item.editPrice)}
                         </td>
+                        <td className="px-2 py-1.5 align-top text-center">
+                          {item.productId != null ? (
+                            <Button
+                              type="button" variant="ghost" size="sm"
+                              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => setSupplierDialogProduct({ id: item.productId!, name: item.productName })}
+                            >
+                              <Truck className="h-3.5 w-3.5" />
+                              Ver
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -764,6 +814,63 @@ export default function Pedidos() {
           </div>
           <DialogFooter>
             <Button onClick={() => setBoldResult(null)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Supplier info dialog ───────────────────────────────────────────── */}
+      <Dialog open={!!supplierDialogProduct} onOpenChange={open => { if (!open) setSupplierDialogProduct(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5 text-primary" />
+              Proveedor
+            </DialogTitle>
+            <DialogDescription>{supplierDialogProduct?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {isLoadingSupplier ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Buscando proveedor...
+              </div>
+            ) : productSupplier ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Nombre</p>
+                  <p className="text-sm font-semibold">{productSupplier.name}</p>
+                </div>
+                {productSupplier.contact && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Contacto</p>
+                    <p className="text-sm">{productSupplier.contact}</p>
+                  </div>
+                )}
+                {productSupplier.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <a href={`tel:${productSupplier.phone}`} className="text-sm text-primary hover:underline">
+                      {productSupplier.phone}
+                    </a>
+                  </div>
+                )}
+                {productSupplier.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <a href={`mailto:${productSupplier.email}`} className="text-sm text-primary hover:underline">
+                      {productSupplier.email}
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No hay compras registradas para este producto, así que no se puede determinar su proveedor.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSupplierDialogProduct(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

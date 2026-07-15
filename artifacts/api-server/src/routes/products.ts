@@ -135,6 +135,28 @@ router.get("/products/:id/movements", requireAuth, requireAdmin, async (req, res
   });
 });
 
+router.get("/products/:id/supplier", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, id));
+  if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
+
+  const [supplier] = await db.select({
+    id: suppliersTable.id,
+    name: suppliersTable.name,
+    contact: suppliersTable.contact,
+    email: suppliersTable.email,
+    phone: suppliersTable.phone,
+    createdAt: suppliersTable.createdAt,
+  }).from(purchaseOrderItemsTable)
+    .innerJoin(purchaseOrdersTable, eq(purchaseOrderItemsTable.purchaseOrderId, purchaseOrdersTable.id))
+    .innerJoin(suppliersTable, eq(purchaseOrdersTable.supplierId, suppliersTable.id))
+    .where(and(eq(purchaseOrderItemsTable.productId, id), sql`${purchaseOrdersTable.status} != 'cancelled'`))
+    .orderBy(desc(purchaseOrdersTable.createdAt))
+    .limit(1);
+
+  res.json(supplier ?? null);
+});
+
 router.put("/products/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { name, description, costPrice, salePrice, stock, category, images } = req.body;

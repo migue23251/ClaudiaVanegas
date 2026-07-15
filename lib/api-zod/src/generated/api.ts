@@ -209,6 +209,23 @@ export const GetProductMovementsResponse = zod.object({
 
 
 /**
+ * @summary Get the most recent supplier that has sold this product (from purchase order history)
+ */
+export const GetProductSupplierParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetProductSupplierResponse = zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "contact": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+}),zod.null()])
+
+
+/**
  * @summary Get a product by ID
  */
 export const GetProductParams = zod.object({

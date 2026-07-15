@@ -231,6 +231,29 @@ paths:
         "404":
           description: Not found
 
+  /products/{id}/supplier:
+    get:
+      operationId: getProductSupplier
+      tags: [products]
+      summary: Get the most recent supplier that has sold this product (from purchase order history)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Most recent supplier for this product, or null if it has never been purchased
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/Supplier"
+                  - type: "null"
+        "404":
+          description: Not found
+
   /products/{id}:
     get:
       operationId: getProduct
