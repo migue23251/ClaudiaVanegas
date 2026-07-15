@@ -24,6 +24,7 @@ interface OrderItem {
   id: number;
   productId: number | null;
   productName: string;
+  description: string | null;
   qty: number;
   unitPrice: number;
   subtotal: number;
@@ -539,8 +540,13 @@ export default function Pedidos() {
                   <tbody className="divide-y divide-border">
                     {invoiceItems.map((item, idx) => (
                       <tr key={item.id}>
-                        <td className="px-3 py-2 font-medium">{item.productName}</td>
-                        <td className="px-2 py-1.5">
+                        <td className="px-3 py-2 align-top">
+                          <div className="font-medium">{item.productName}</div>
+                          {item.description && (
+                            <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</div>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 align-top">
                           <Input
                             type="number" min={1} value={item.editQty}
                             onChange={e => setInvoiceItems(prev => prev.map((it, i) =>
@@ -549,7 +555,7 @@ export default function Pedidos() {
                             className="h-8 w-16 text-center text-sm mx-auto"
                           />
                         </td>
-                        <td className="px-2 py-1.5">
+                        <td className="px-2 py-1.5 align-top">
                           <Input
                             type="number" min={0} step={1000} value={item.editPrice}
                             onChange={e => setInvoiceItems(prev => prev.map((it, i) =>
@@ -558,7 +564,7 @@ export default function Pedidos() {
                             className="h-8 w-28 text-right text-sm ml-auto"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right font-medium tabular-nums">
+                        <td className="px-3 py-2 text-right font-medium tabular-nums align-top">
                           {fmt(item.editQty * item.editPrice)}
                         </td>
                       </tr>

@@ -14,14 +14,24 @@ const router: IRouter = Router();
 
 // ── Helper: build full order response ──────────────────────────────────────────
 
+async function attachDescriptions<T extends { productId: number | null }>(items: T[]): Promise<(T & { description: string | null })[]> {
+  const productIds = [...new Set(items.map(i => i.productId).filter((id): id is number => id != null))];
+  if (productIds.length === 0) return items.map(i => ({ ...i, description: null }));
+  const products = await db.select({ id: productsTable.id, description: productsTable.description })
+    .from(productsTable).where(inArray(productsTable.id, productIds));
+  const descByProductId = new Map(products.map(p => [p.id, p.description]));
+  return items.map(i => ({ ...i, description: i.productId != null ? descByProductId.get(i.productId) ?? null : null }));
+}
+
 async function buildOrderResponse(orderId: number) {
   const [order] = await db.select().from(catalogOrdersTable).where(eq(catalogOrdersTable.id, orderId));
   if (!order) return null;
   const items = await db.select().from(catalogOrderItemsTable).where(eq(catalogOrderItemsTable.orderId, orderId));
+  const itemsWithDesc = await attachDescriptions(items);
   return {
     ...order,
     total: parseFloat(order.total),
-    items: items.map(i => ({
+    items: itemsWithDesc.map(i => ({
       ...i,
       unitPrice: parseFloat(i.unitPrice),
       subtotal: parseFloat(i.subtotal),
@@ -119,10 +129,11 @@ router.get("/catalog-orders", requireAuth, requireAdmin, async (req, res): Promi
   const withItems = await Promise.all(orders.map(async (order) => {
     const items = await db.select().from(catalogOrderItemsTable)
       .where(eq(catalogOrderItemsTable.orderId, order.id));
+    const itemsWithDesc = await attachDescriptions(items);
     return {
       ...order,
       total: parseFloat(order.total),
-      items: items.map(i => ({
+      items: itemsWithDesc.map(i => ({
         ...i,
         unitPrice: parseFloat(i.unitPrice),
         subtotal: parseFloat(i.subtotal),
