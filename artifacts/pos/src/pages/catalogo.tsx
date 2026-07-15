@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -156,16 +156,32 @@ function ProductModal({
     return () => window.removeEventListener("keydown", h);
   }, [prev, next]);
 
+  const touchStartX = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const delta = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(delta) > 40) delta > 0 ? next() : prev();
+    touchStartX.current = null;
+  };
+
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent className="max-w-4xl w-full p-0 overflow-hidden rounded-2xl gap-0">
         <div className="flex flex-col md:flex-row max-h-[90vh]">
           {/* Left: images */}
           <div className="md:w-1/2 bg-muted flex flex-col">
-            <div className="relative flex-1 min-h-0 overflow-hidden group/main" style={{ maxHeight: "60vh" }}>
+            <div
+              className="relative flex-1 min-h-0 overflow-hidden group/main select-none"
+              style={{ maxHeight: "60vh" }}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
               <img
                 src={srcs[mainIdx]} alt={product.name}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain pointer-events-none"
                 onError={e => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
               />
               {srcs.length > 1 && (
