@@ -202,11 +202,8 @@ function ProductModal({
 
           {/* Right: info */}
           <div className="md:w-1/2 flex flex-col p-6 overflow-y-auto gap-4">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
               <h2 className="text-xl font-bold leading-tight">{product.name}</h2>
-              <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0 mt-0.5">
-                <X className="w-5 h-5" />
-              </button>
             </div>
             <div className="text-3xl font-bold text-primary">
               ${product.salePrice.toLocaleString("es-CO")}
