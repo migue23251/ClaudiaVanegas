@@ -16,6 +16,8 @@ export const salesTable = pgTable("sales", {
   voidReason: text("void_reason"),
   paymentLink: text("payment_link"),
   boldFee: numeric("bold_fee", { precision: 12, scale: 2 }),
+  boldLinkId: text("bold_link_id"),
+  boldPaymentStatus: text("bold_payment_status", { enum: ["pending", "paid", "failed", "expired"] }),
   catalogOrderId: integer("catalog_order_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

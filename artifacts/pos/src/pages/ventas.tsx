@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Receipt, Search, Ban } from "lucide-react";
+import { Eye, Receipt, Search, Ban, Link2, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -62,6 +62,24 @@ export default function Ventas() {
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
+
+  function BoldStatusBadge({ status }: { status: string | null | undefined }) {
+    if (!status) return null;
+    const map: Record<string, { label: string; className: string; Icon: React.ElementType }> = {
+      pending:  { label: "Bold: pendiente", className: "bg-amber-100 text-amber-700 border-amber-200",   Icon: Clock },
+      paid:     { label: "Bold: pagado",    className: "bg-emerald-100 text-emerald-700 border-emerald-200", Icon: CheckCircle2 },
+      failed:   { label: "Bold: rechazado", className: "bg-red-100 text-red-700 border-red-200",         Icon: XCircle },
+      expired:  { label: "Bold: expirado",  className: "bg-gray-100 text-gray-600 border-gray-200",      Icon: AlertTriangle },
+    };
+    const cfg = map[status];
+    if (!cfg) return null;
+    const { label, className, Icon } = cfg;
+    return (
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${className}`}>
+        <Icon className="h-3 w-3" />{label}
+      </span>
+    );
+  }
 
   // Reset page when filters change
   const handlePaymentType = (v: string) => { setPaymentType(v); setPage(1); };
@@ -155,6 +173,12 @@ export default function Ventas() {
                     <Badge variant={sale.paymentType === 'contado' ? "outline" : "secondary"}>
                       {sale.paymentType === 'contado' ? 'Contado' : 'Crédito'}
                     </Badge>
+                    {(sale as any).paymentLink && (
+                      <div className="flex items-center gap-1">
+                        <Link2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <BoldStatusBadge status={(sale as any).boldPaymentStatus} />
+                      </div>
+                    )}
                     {sale.voided && (
                       <Badge variant="destructive" className="block w-fit">Anulada</Badge>
                     )}
@@ -225,6 +249,31 @@ export default function Ventas() {
                   </Badge>
                 </div>
               </div>
+
+              {(saleDetail as any).paymentLink && (
+                <div className="bg-muted/40 border rounded-lg p-4 text-sm space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <Link2 className="h-4 w-4 text-primary" />
+                      Link de Pago Bold
+                    </p>
+                    <BoldStatusBadge status={(saleDetail as any).boldPaymentStatus} />
+                  </div>
+                  <a
+                    href={(saleDetail as any).paymentLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-mono text-primary underline break-all"
+                  >
+                    {(saleDetail as any).paymentLink}
+                  </a>
+                  {(saleDetail as any).boldFee != null && (
+                    <p className="text-xs text-muted-foreground">
+                      Comisión Bold: {formatCurrency((saleDetail as any).boldFee)}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {saleDetail.voided && (
                 <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 text-sm">

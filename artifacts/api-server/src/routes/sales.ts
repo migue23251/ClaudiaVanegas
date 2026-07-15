@@ -34,6 +34,7 @@ async function buildSaleResponse(saleId: number) {
     boldFee: sale.boldFee ? parseFloat(sale.boldFee) : null,
     paymentLink: sale.paymentLink ?? null,
     catalogOrderId: sale.catalogOrderId ?? null,
+    boldPaymentStatus: sale.boldPaymentStatus ?? null,
     voided: sale.voided,
     voidedAt: sale.voidedAt,
     voidReason: sale.voidReason,
@@ -202,9 +203,19 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
         },
       });
       await db.update(salesTable)
-        .set({ paymentLink: boldResult.url, boldFee: String(boldResult.fee) })
+        .set({
+          paymentLink: boldResult.url,
+          boldFee: String(boldResult.fee),
+          boldLinkId: boldResult.linkId ?? undefined,
+          boldPaymentStatus: "pending",
+        })
         .where(eq(salesTable.id, saleId));
-      result = { ...result, paymentLink: boldResult.url, boldFee: boldResult.fee } as typeof result;
+      result = {
+        ...result,
+        paymentLink: boldResult.url,
+        boldFee: boldResult.fee,
+        boldPaymentStatus: "pending",
+      } as typeof result;
     } catch (err) {
       console.error("[bold] Error generando link:", (err as Error).message);
     }

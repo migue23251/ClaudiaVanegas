@@ -13,5 +13,7 @@ export interface SaleInput {
   paymentType: SaleInputPaymentType;
   notes?: string;
   advanceAmount?: number;
+  /** When true, generates a Bold payment link and attaches it to the sale */
+  withBoldLink?: boolean;
   items: SaleItemInput[];
 }

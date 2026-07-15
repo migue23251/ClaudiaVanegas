@@ -287,7 +287,12 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
       paymentLink = boldResult.url;
       boldFee = boldResult.fee;
       await db.update(salesTable)
-        .set({ paymentLink, boldFee: String(boldFee) })
+        .set({
+          paymentLink,
+          boldFee: String(boldFee),
+          boldLinkId: boldResult.linkId ?? undefined,
+          boldPaymentStatus: "pending",
+        })
         .where(eq(salesTable.id, saleId));
     } catch (err) {
       console.error("[bold] Error generando link:", (err as Error).message);

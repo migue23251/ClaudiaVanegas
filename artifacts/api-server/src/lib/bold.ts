@@ -26,6 +26,8 @@ export interface BoldLinkParams {
 
 export interface BoldLinkResult {
   url: string;
+  /** Bold's internal link/order ID — use to match webhook events back to this sale */
+  linkId: string | null;
   /** Amount actually charged (includes Bold fee) */
   totalWithFee: number;
   /** Fee amount in COP */
@@ -79,9 +81,11 @@ export async function createBoldPaymentLink(
   }
 
   const data = await response.json() as {
-    payload?: { payment_link?: string; url?: string };
+    payload?: { payment_link?: string; url?: string; id?: string; order_id?: string; order?: { id?: string } };
     url?: string;
     payment_link?: string;
+    id?: string;
+    order_id?: string;
   };
 
   // Normalize different response shapes Bold may return
@@ -95,7 +99,18 @@ export async function createBoldPaymentLink(
     throw new Error("Bold no devolvió un link de pago válido");
   }
 
-  return { url, totalWithFee, fee };
+  // Extract Bold's internal link/order ID (used to match webhook events)
+  const linkId =
+    data?.payload?.id ??
+    data?.payload?.order_id ??
+    data?.payload?.order?.id ??
+    data?.id ??
+    data?.order_id ??
+    // Fall back to extracting the ID from the URL path (e.g. /payment/LNK_xxx)
+    url.split("/").pop() ??
+    null;
+
+  return { url, linkId: linkId ?? null, totalWithFee, fee };
 }
 
 export { BOLD_FEE_RATE };

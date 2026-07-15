@@ -75,6 +75,15 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
 
+## Bold Webhook
+
+- Endpoint: `POST /api/webhooks/bold` (público — Bold lo llama desde sus servidores)
+- URL de producción: `https://<tu-dominio>/api/webhooks/bold`
+- Para verificar firma HMAC-SHA256, agrega el secret del dashboard Bold como `BOLD_WEBHOOK_SECRET` en Replit Secrets
+- Si `BOLD_WEBHOOK_SECRET` no está configurado, el webhook acepta eventos sin verificar (útil en desarrollo)
+- El estado del pago (`boldPaymentStatus`: pending / paid / failed / expired) se actualiza en la venta cuando Bold envía el evento
+- Tipos de evento Bold que se mapean: `APPROVED`→paid, `REJECTED/FAILED`→failed, `EXPIRED`→expired, `PENDING`→pending
+
 ## Gotchas
 
 - Run `pnpm --filter @workspace/api-spec run codegen` after every OpenAPI spec change before touching frontend code

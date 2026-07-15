@@ -5,6 +5,7 @@
  * Claudia Vanegas POS API
  * OpenAPI spec version: 0.1.0
  */
+import type { SaleBoldPaymentStatus } from './saleBoldPaymentStatus';
 import type { SaleItem } from './saleItem';
 import type { SalePaymentType } from './salePaymentType';
 
@@ -27,6 +28,21 @@ export interface Sale {
   total: number;
   /** @nullable */
   notes?: string | null;
+  /**
+     * Bold payment link URL (only present when withBoldLink was requested)
+     * @nullable
+     */
+  paymentLink?: string | null;
+  /**
+     * Bold transaction fee in COP
+     * @nullable
+     */
+  boldFee?: number | null;
+  /**
+     * Status of the Bold payment link (updated via webhook)
+     * @nullable
+     */
+  boldPaymentStatus?: SaleBoldPaymentStatus;
   voided: boolean;
   /** @nullable */
   voidedAt?: Date | null;

@@ -1716,6 +1716,16 @@ components:
           type: number
         notes:
           type: ["string", "null"]
+        paymentLink:
+          type: ["string", "null"]
+          description: Bold payment link URL (only present when withBoldLink was requested)
+        boldFee:
+          type: ["number", "null"]
+          description: Bold transaction fee in COP
+        boldPaymentStatus:
+          type: ["string", "null"]
+          enum: [pending, paid, failed, expired]
+          description: Status of the Bold payment link (updated via webhook)
         voided:
           type: boolean
         voidedAt:
@@ -1751,6 +1761,9 @@ components:
           type: string
         advanceAmount:
           type: number
+        withBoldLink:
+          type: boolean
+          description: When true, generates a Bold payment link and attaches it to the sale
         items:
           type: array
           items:

@@ -26,6 +26,11 @@ app.use(
   }),
 );
 app.use(cors());
+
+// Bold webhook needs the raw body for HMAC-SHA256 signature verification.
+// Register the raw parser BEFORE express.json() so this path gets a Buffer.
+app.use("/api/webhooks/bold", express.raw({ type: "application/json" }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

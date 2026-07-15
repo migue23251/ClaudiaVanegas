@@ -403,6 +403,20 @@ export const SalePaymentType = {
   credito: 'credito',
 } as const;
 
+/**
+ * Status of the Bold payment link (updated via webhook)
+ * @nullable
+ */
+export type SaleBoldPaymentStatus = typeof SaleBoldPaymentStatus[keyof typeof SaleBoldPaymentStatus] | null;
+
+
+export const SaleBoldPaymentStatus = {
+  pending: 'pending',
+  paid: 'paid',
+  failed: 'failed',
+  expired: 'expired',
+} as const;
+
 export interface Sale {
   id: number;
   userId: number;
@@ -422,6 +436,21 @@ export interface Sale {
   total: number;
   /** @nullable */
   notes?: string | null;
+  /**
+     * Bold payment link URL (only present when withBoldLink was requested)
+     * @nullable
+     */
+  paymentLink?: string | null;
+  /**
+     * Bold transaction fee in COP
+     * @nullable
+     */
+  boldFee?: number | null;
+  /**
+     * Status of the Bold payment link (updated via webhook)
+     * @nullable
+     */
+  boldPaymentStatus?: SaleBoldPaymentStatus;
   voided: boolean;
   /** @nullable */
   voidedAt?: string | null;
@@ -448,6 +477,8 @@ export interface SaleInput {
   paymentType: SaleInputPaymentType;
   notes?: string;
   advanceAmount?: number;
+  /** When true, generates a Bold payment link and attaches it to the sale */
+  withBoldLink?: boolean;
   items: SaleItemInput[];
 }
 

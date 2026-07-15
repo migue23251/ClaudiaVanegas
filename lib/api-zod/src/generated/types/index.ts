@@ -67,6 +67,7 @@ export * from './purchaseOrderUpdateStatus';
 export * from './receiveItemInput';
 export * from './receiveOrderInput';
 export * from './sale';
+export * from './saleBoldPaymentStatus';
 export * from './saleInput';
 export * from './saleInputPaymentType';
 export * from './saleItem';
