@@ -197,6 +197,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
       const boldResult = await createBoldPaymentLink({
         amountCOP: total,
         description: `Factura #${saleId}`,
+        reference: `sale-${saleId}`,
         customer: {
           fullName: result.customerName ?? undefined,
           email: result.customerEmail ?? undefined,

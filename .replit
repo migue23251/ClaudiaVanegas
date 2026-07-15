@@ -25,4 +25,4 @@ channel = "stable-25_05"
 
 [userenv.shared]
 BASE_PATH = "/"
-BOLD_API_KEY = "DZSkDqh2iWmpYQg204C2fLigQerhPGXAcm5WyujxwYH"
+BOLD_API_KEY = "LUFa8lUf2xLRC6ijgpNP2dFihAadKA8TOq8gM0pPXF4"

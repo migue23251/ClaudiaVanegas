@@ -24,6 +24,9 @@ export interface BoldLinkParams {
   };
   /** Expiry in milliseconds from now; defaults to 7 days */
   expiresInMs?: number;
+  /** Unique reference for this transaction, e.g. `sale-<id>`. Bold recommends
+   *  appending a timestamp to avoid collisions; we do that automatically. */
+  reference?: string;
 }
 
 export interface BoldLinkResult {
@@ -46,7 +49,9 @@ export async function createBoldPaymentLink(
   if (!apiKey) throw new Error("BOLD_API_KEY no está configurado");
 
   const fee = Math.round(params.amountCOP * BOLD_FEE_RATE);
-  const totalWithFee = params.amountCOP + fee;
+  // Bold requires an integer amount (no decimals) — guard against floating
+  // point totals coming from product prices with cents.
+  const totalWithFee = Math.round(params.amountCOP + fee);
 
   // Expiration date in nanoseconds from Unix epoch
   const expiresInMs = params.expiresInMs ?? 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -55,6 +60,12 @@ export async function createBoldPaymentLink(
   // Truncate description to Bold's 100-char limit
   const description = params.description.slice(0, 100);
 
+  // Bold recommends a unique reference per link (alphanumeric, _ and -, max
+  // 60 chars) including a timestamp to avoid collisions between retries.
+  const reference = (params.reference ?? "sale")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .slice(0, 40) + `-${Date.now()}`;
+
   const body: Record<string, unknown> = {
     amount_type: "CLOSE",
     amount: {
@@ -62,6 +73,7 @@ export async function createBoldPaymentLink(
       total_amount: totalWithFee,
       tip_amount: 0,
     },
+    reference: reference.slice(0, 60),
     description,
     expiration_date: expirationNs,
   };
@@ -82,7 +94,12 @@ export async function createBoldPaymentLink(
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`Bold API error ${response.status}: ${text}`);
+    // Log the exact request body alongside the failure so a 403/400 from
+    // Bold can be diagnosed from server logs without guessing.
+    console.error(
+      `[bold] ${response.status} creating payment link. Request body: ${JSON.stringify(body)}. Response: ${text}`
+    );
+    throw new Error(`Bold API error ${response.status}: ${text || "sin detalle"}`);
   }
 
   const data = await response.json() as {
