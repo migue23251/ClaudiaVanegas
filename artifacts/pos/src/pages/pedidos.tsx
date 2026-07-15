@@ -570,8 +570,10 @@ export default function Pedidos() {
                 </div>
               )}
               {!selectedCustomer && (
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Puedes facturar sin seleccionar un cliente si el pago es de contado.
+                <p className={`text-xs mt-1.5 ${paymentType === "credito" ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                  {paymentType === "credito"
+                    ? "Debes seleccionar un cliente para facturar a crédito."
+                    : "Puedes facturar sin seleccionar un cliente si el pago es de contado."}
                 </p>
               )}
             </div>
@@ -870,7 +872,7 @@ export default function Pedidos() {
             </Button>
             <Button
               onClick={handleInvoice}
-              disabled={isInvoicing || isSaving || invoiceItems.length === 0}
+              disabled={isInvoicing || isSaving || invoiceItems.length === 0 || (paymentType === "credito" && !selectedCustomer)}
               className="gap-2"
             >
               {isInvoicing
