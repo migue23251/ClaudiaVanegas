@@ -95,6 +95,7 @@ export default function Pedidos() {
   const [isInvoicing, setIsInvoicing] = useState(false);
   const [cancelOrderId, setCancelOrderId] = useState<number | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [boldResult, setBoldResult] = useState<{ url: string; fee: number; saleId: number } | null>(null);
   const [supplierDialogProduct, setSupplierDialogProduct] = useState<{ id: number; name: string } | null>(null);
 
@@ -162,6 +163,7 @@ export default function Pedidos() {
     setInvoiceOrder(order);
     setInvoiceItems(order.items.map(i => ({ ...i, editQty: i.qty, editPrice: i.unitPrice })));
     setPaymentType("contado");
+    setAdvanceAmount(0);
     setUseBoldLink(false);
     setSelectedCustomer(null);
     setCustomerSearch("");
@@ -211,6 +213,7 @@ export default function Pedidos() {
           paymentType,
           withBoldLink: useBoldLink,
           customerId: selectedCustomer?.id,
+          advanceAmount: paymentType === "credito" && advanceAmount > 0 ? advanceAmount : undefined,
         }),
       });
       const data = await res.json();
@@ -458,7 +461,11 @@ export default function Pedidos() {
 
       {/* ── Invoice modal ──────────────────────────────────────────────────── */}
       <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open) setInvoiceOrder(null); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={e => { if (supplierDialogProduct) e.preventDefault(); }}
+          onEscapeKeyDown={e => { if (supplierDialogProduct) e.preventDefault(); }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
@@ -631,7 +638,7 @@ export default function Pedidos() {
                 {(["contado", "credito"] as const).map(pt => (
                   <button
                     key={pt}
-                    onClick={() => { setPaymentType(pt); if (pt === "credito") setUseBoldLink(false); }}
+                    onClick={() => { setPaymentType(pt); setAdvanceAmount(0); if (pt === "credito") setUseBoldLink(false); }}
                     className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
                       paymentType === pt
                         ? "bg-primary text-primary-foreground border-primary"
@@ -643,6 +650,28 @@ export default function Pedidos() {
                 ))}
               </div>
             </div>
+
+            {/* Advance amount — only for credit payments */}
+            {paymentType === "credito" && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Anticipo (opcional)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                  <Input
+                    type="number" min={0} max={invoiceSubtotal} step={1000}
+                    value={advanceAmount}
+                    onChange={(e) => setAdvanceAmount(Math.max(0, Math.min(Number(e.target.value), invoiceSubtotal)))}
+                    className="pl-7 h-9 text-sm"
+                    placeholder="0"
+                  />
+                </div>
+                {advanceAmount > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Saldo pendiente: {fmt(invoiceSubtotal - advanceAmount)} · Vence en 15 días
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Bold link toggle — only for cash (contado) payments */}
             {paymentType === "contado" && (
@@ -691,6 +720,18 @@ export default function Pedidos() {
                 <span>Total a cobrar</span>
                 <span className="text-primary tabular-nums">{fmt(invoiceTotal)}</span>
               </div>
+              {paymentType === "credito" && advanceAmount > 0 && (
+                <>
+                  <div className="flex justify-between text-emerald-600 font-medium pt-1 border-t border-border">
+                    <span>Anticipo</span>
+                    <span className="tabular-nums">− {fmt(advanceAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Saldo pendiente (15 días)</span>
+                    <span className="tabular-nums">{fmt(invoiceSubtotal - advanceAmount)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -820,7 +861,7 @@ export default function Pedidos() {
 
       {/* ── Supplier info dialog ───────────────────────────────────────────── */}
       <Dialog open={!!supplierDialogProduct} onOpenChange={open => { if (!open) setSupplierDialogProduct(null); }}>
-        <DialogContent>
+        <DialogContent onEscapeKeyDown={e => e.stopPropagation()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-primary" />
