@@ -41,6 +41,7 @@ export default function Pos() {
   const [boldLinkOpen, setBoldLinkOpen] = useState(false);
   const [boldLinkUrl, setBoldLinkUrl] = useState<string | null>(null);
   const [boldFeeAmount, setBoldFeeAmount] = useState(0);
+  const [boldLinkError, setBoldLinkError] = useState<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -143,11 +144,18 @@ export default function Pos() {
     }, {
       onSuccess: (result: any) => {
         const hasLink = !!(result?.paymentLink);
+        const hasBoldError = !!(result?.boldError);
         if (hasLink) {
           setBoldLinkUrl(result.paymentLink);
           setBoldFeeAmount(result.boldFee ? parseFloat(String(result.boldFee)) : 0);
+          setBoldLinkError(null);
           setBoldLinkOpen(true);
           toast({ title: "Venta registrada y link de pago generado", className: "bg-emerald-500 text-white border-none" });
+        } else if (hasBoldError) {
+          setBoldLinkUrl(null);
+          setBoldLinkError(result.boldError);
+          setBoldLinkOpen(true);
+          toast({ title: "Venta registrada, pero el link Bold falló", variant: "destructive" });
         } else {
           toast({ title: "Venta registrada con éxito", className: "bg-emerald-500 text-white border-none" });
         }
@@ -621,37 +629,55 @@ export default function Pos() {
       </Dialog>
 
       {/* Bold payment link result dialog */}
-      <Dialog open={boldLinkOpen} onOpenChange={(open) => { setBoldLinkOpen(open); if (!open) setBoldLinkUrl(null); }}>
+      <Dialog open={boldLinkOpen} onOpenChange={(open) => { setBoldLinkOpen(open); if (!open) { setBoldLinkUrl(null); setBoldLinkError(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-              Link de pago Bold generado
+              {boldLinkError ? (
+                <>
+                  <span className="h-5 w-5 text-destructive">⚠️</span>
+                  Error al generar link Bold
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  Link de pago Bold generado
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
-              Comparte este link con el cliente para que realice el pago en línea.
-            </p>
-            <div className="flex gap-2">
-              <Input value={boldLinkUrl ?? ""} readOnly className="text-xs font-mono bg-muted" />
-              <Button variant="outline" size="icon" onClick={copyBoldLink} title="Copiar link">
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            {boldFeeAmount > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Incluye {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(boldFeeAmount)} de comisión Bold (5%)
-              </p>
-            )}
-            {boldLinkUrl && (
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(`Aquí está tu link de pago: ${boldLinkUrl}`)}`}
-                target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-[#25D366] hover:bg-[#20bf5b] text-white text-sm font-semibold transition-colors"
-              >
-                Compartir por WhatsApp
-              </a>
+            {boldLinkError ? (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-4 text-sm space-y-1">
+                <p className="font-semibold text-destructive">La venta se registró correctamente, pero no se pudo generar el link de pago.</p>
+                <p className="text-muted-foreground font-mono text-xs break-all">{boldLinkError}</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Comparte este link con el cliente para que realice el pago en línea.
+                </p>
+                <div className="flex gap-2">
+                  <Input value={boldLinkUrl ?? ""} readOnly className="text-xs font-mono bg-muted" />
+                  <Button variant="outline" size="icon" onClick={copyBoldLink} title="Copiar link">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                {boldFeeAmount > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Incluye {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(boldFeeAmount)} de comisión Bold (5%)
+                  </p>
+                )}
+                {boldLinkUrl && (
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Aquí está tu link de pago: ${boldLinkUrl}`)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-[#25D366] hover:bg-[#20bf5b] text-white text-sm font-semibold transition-colors"
+                  >
+                    Compartir por WhatsApp
+                  </a>
+                )}
+              </>
             )}
           </div>
           <DialogFooter>

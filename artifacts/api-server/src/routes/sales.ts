@@ -189,6 +189,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
   });
 
   let result = await buildSaleResponse(saleId);
+  let boldError: string | null = null;
 
   // Generate Bold payment link if requested
   if (withBoldLink && result) {
@@ -217,11 +218,12 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
         boldPaymentStatus: "pending",
       } as typeof result;
     } catch (err) {
-      console.error("[bold] Error generando link:", (err as Error).message);
+      boldError = (err as Error).message ?? "Error generando link de pago Bold";
+      console.error("[bold] Error generando link:", boldError);
     }
   }
 
-  res.status(201).json(result);
+  res.status(201).json({ ...result, boldError });
 
   // Fire-and-forget invoice email — does not block or affect the sale response
   if (result?.customerEmail) {
