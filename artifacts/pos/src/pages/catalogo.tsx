@@ -816,11 +816,6 @@ export default function Catalogo() {
                 <Phone className="w-4 h-4" />{store.phone}
               </a>
             )}
-            {store?.address && (
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 shrink-0" />{store.address}
-              </span>
-            )}
           </div>
           <span className="text-xs">© {new Date().getFullYear()}</span>
         </div>
