@@ -731,6 +731,9 @@ export default function Pedidos() {
                               <div>
                                 <span className="font-medium">{p.name}</span>
                                 {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">ya agregado</span>}
+                                {(p as any).description && (
+                                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{(p as any).description}</div>
+                                )}
                               </div>
                               <div className="flex items-center gap-3 text-muted-foreground text-xs tabular-nums shrink-0">
                                 <span className="flex items-center gap-1">
