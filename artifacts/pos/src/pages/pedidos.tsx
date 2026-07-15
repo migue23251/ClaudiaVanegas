@@ -488,7 +488,7 @@ export default function Pedidos() {
       )}
 
       {/* ── Invoice modal ──────────────────────────────────────────────────── */}
-      <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open) setInvoiceOrder(null); }}>
+      <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open && !supplierDialogProduct) setInvoiceOrder(null); }}>
         <DialogContent
           className="max-w-2xl max-h-[90vh] overflow-y-auto"
           onInteractOutside={e => { if (supplierDialogProduct) e.preventDefault(); }}
