@@ -996,8 +996,8 @@ export default function Pedidos() {
       </Dialog>
 
       {/* ── Supplier info dialog ───────────────────────────────────────────── */}
-      <Dialog open={!!supplierDialogProduct} onOpenChange={open => { if (!open) setSupplierDialogProduct(null); }}>
-        <DialogContent onEscapeKeyDown={e => e.stopPropagation()}>
+      <Dialog open={!!supplierDialogProduct} onOpenChange={open => { if (!open) setSupplierDialogProduct(null); }} modal={false}>
+        <DialogContent onEscapeKeyDown={e => { e.stopPropagation(); setSupplierDialogProduct(null); }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-primary" />
