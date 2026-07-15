@@ -21,13 +21,15 @@ router.get("/protected", requireAuth, requireAdmin, handler);
 Public routes (e.g. `POST /catalog/order`, `GET /catalog`) skip both.
 
 ## Bold payment link integration
-- Helper: `artifacts/api-server/src/lib/bold.ts` → `createBoldPaymentLink({ amount, description, currency })`
-- Endpoint: `POST https://checkout.bold.co/integration/payment_links`
-- Auth header: `Authorization: x-api-key <BOLD_API_KEY>`
-- Amount in centavos (×100), currency `"COP"`
-- Response field: `payload.payment_link` (string URL)
+- Helper: `artifacts/api-server/src/lib/bold.ts` → `createBoldPaymentLink({ amountCOP, description, reference, customer })`
+- Endpoint: `POST https://integrations.api.bold.co/online/link/v1`
+- Auth header: `Authorization: x-api-key <BOLD_API_KEY>` (the literal string "x-api-key" goes inside the `Authorization` header value, not as its own header)
+- Amount in whole COP (pesos, NOT centavos) — **must be an integer**, Bold has rejected requests with 403 when `total_amount` had decimals; always round before sending. See [Bold link 403 troubleshooting](bold-payment-link-403.md).
+- A unique `reference` field (alphanumeric/`_`/`-`, ≤60 chars) should be included per Bold's docs to avoid collisions — we append a timestamp.
+- Response field: `payload.payment_link` / `payload.url`
 - Fee: 5% (`BOLD_FEE_RATE = 0.05`), stored in `sales.bold_fee`
 - **Bold failure is silent** — sale commits regardless; error is logged only
+- On any non-OK response, the exact request body and Bold's response body are logged server-side — check API server logs first when debugging Bold errors instead of guessing.
 
 ## Catalog orders flow
 1. Public `POST /api/catalog/order` → creates `catalog_orders` + `catalog_order_items` (status: `pending`)
