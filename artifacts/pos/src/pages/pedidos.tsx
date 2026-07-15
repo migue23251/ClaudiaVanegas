@@ -3,11 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ClipboardList, Phone, Mail, Calendar, MapPin, MessageSquare,
   Receipt, X, ChevronDown, ChevronUp, CheckCircle2, CreditCard, Copy,
-  UserSearch, UserPlus, Edit, Search, Package, Truck, Loader2, Trash2, Plus, Save,
+  UserSearch, UserPlus, Edit, Search, Package, Loader2, Trash2, Plus, Save,
 } from "lucide-react";
 import {
   useListCustomers, getListCustomersQueryKey, useCreateCustomer,
-  useListProducts, useGetProductSupplier,
+  useListProducts,
   Customer, CustomerInput,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -97,7 +97,6 @@ export default function Pedidos() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [boldResult, setBoldResult] = useState<{ url: string; fee: number; saleId: number } | null>(null);
-  const [supplierDialogProduct, setSupplierDialogProduct] = useState<{ id: number; name: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [addProductSearch, setAddProductSearch] = useState("");
   const [showAddProduct, setShowAddProduct] = useState(false);
@@ -111,11 +110,6 @@ export default function Pedidos() {
     [allProducts]
   );
 
-  // ── Supplier lookup (fetched on demand when "Ver proveedor" is clicked) ────
-  const { data: productSupplier, isLoading: isLoadingSupplier } = useGetProductSupplier(
-    supplierDialogProduct?.id ?? 0,
-    { query: { queryKey: ["product-supplier", supplierDialogProduct?.id], enabled: !!supplierDialogProduct } }
-  );
 
   // ── Customer selection (for invoicing) ────────────────────────────────────
   const [customerSearch, setCustomerSearch] = useState("");
@@ -488,7 +482,7 @@ export default function Pedidos() {
       )}
 
       {/* ── Invoice modal ──────────────────────────────────────────────────── */}
-      <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open) { setInvoiceOrder(null); setSupplierDialogProduct(null); } }}>
+      <Dialog open={!!invoiceOrder} onOpenChange={open => { if (!open) setInvoiceOrder(null); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -502,56 +496,6 @@ export default function Pedidos() {
           </DialogHeader>
 
           <div className="space-y-4 py-1">
-            {/* Supplier inline panel */}
-            {supplierDialogProduct && (
-              <div className="rounded-xl border border-border bg-muted/30 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-primary" />
-                    Proveedor — {supplierDialogProduct.name}
-                  </p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"
-                    onClick={() => setSupplierDialogProduct(null)}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                {isLoadingSupplier ? (
-                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Buscando proveedor...
-                  </div>
-                ) : productSupplier ? (
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Nombre</p>
-                      <p className="font-semibold">{productSupplier.name}</p>
-                    </div>
-                    {productSupplier.contact && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Contacto</p>
-                        <p>{productSupplier.contact}</p>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-4">
-                      {productSupplier.phone && (
-                        <a href={`tel:${productSupplier.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                          <Phone className="h-3.5 w-3.5" />{productSupplier.phone}
-                        </a>
-                      )}
-                      {productSupplier.email && (
-                        <a href={`mailto:${productSupplier.email}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                          <Mail className="h-3.5 w-3.5" />{productSupplier.email}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No hay compras registradas para este producto, así que no se puede determinar su proveedor.
-                  </p>
-                )}
-              </div>
-            )}
-
             {/* Customer */}
             <div>
               <p className="text-sm font-semibold mb-2 flex items-center gap-2">
@@ -636,7 +580,6 @@ export default function Pedidos() {
                       <th className="text-center px-3 py-2 font-medium">Cant.</th>
                       <th className="text-right px-3 py-2 font-medium">Precio</th>
                       <th className="text-right px-3 py-2 font-medium">Subtotal</th>
-                      <th className="text-center px-3 py-2 font-medium">Proveedor</th>
                       <th className="w-8" />
                     </tr>
                   </thead>
@@ -685,20 +628,6 @@ export default function Pedidos() {
                         </td>
                         <td className="px-3 py-2 text-right font-medium tabular-nums align-top">
                           {fmt(item.editQty * item.editPrice)}
-                        </td>
-                        <td className="px-2 py-1.5 align-top text-center">
-                          {item.productId != null ? (
-                            <Button
-                              type="button" variant="ghost" size="sm"
-                              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-                              onClick={() => setSupplierDialogProduct({ id: item.productId!, name: item.productName })}
-                            >
-                              <Truck className="h-3.5 w-3.5" />
-                              Ver
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
                         </td>
                         <td className="px-1 py-1.5 align-top text-center">
                           <Button
