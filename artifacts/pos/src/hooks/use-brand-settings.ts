@@ -25,6 +25,29 @@ interface BrandSettingsState {
 const storedLogo = typeof localStorage !== "undefined" ? localStorage.getItem("pos_logo") : null;
 const storedColor = typeof localStorage !== "undefined" ? localStorage.getItem("pos_brand_color") : null;
 
+/** Point the browser tab's favicon at the store's logo, falling back to the default svg icon. */
+function applyFavicon(logoUrl: string | null) {
+  if (typeof document === "undefined") return;
+  const href = logoUrl || "/favicon.svg";
+  const existing = document.querySelectorAll<HTMLLinkElement>("link[rel~='icon']");
+  if (existing.length === 0) {
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = href;
+    document.head.appendChild(link);
+    return;
+  }
+  existing.forEach((link) => {
+    link.href = href;
+    // Data URIs aren't SVG/ico — clear a stale type attribute so browsers don't ignore it.
+    if (logoUrl) link.removeAttribute("type");
+  });
+}
+
+// Apply immediately from the local cache so the tab icon is correct before
+// the network round-trip in syncFromServer() below resolves.
+applyFavicon(storedLogo);
+
 export const useBrandSettings = create<BrandSettingsState>((set) => ({
   logoUrl: storedLogo,
   primaryColor: storedColor,
@@ -34,6 +57,7 @@ export const useBrandSettings = create<BrandSettingsState>((set) => ({
   setLogo: (logo) => {
     if (logo) localStorage.setItem("pos_logo", logo);
     else localStorage.removeItem("pos_logo");
+    applyFavicon(logo);
     set({ logoUrl: logo });
   },
 
@@ -57,6 +81,7 @@ export const useBrandSettings = create<BrandSettingsState>((set) => ({
 
       if (logo) localStorage.setItem("pos_logo", logo);
       else localStorage.removeItem("pos_logo");
+      applyFavicon(logo);
 
       if (color) {
         localStorage.setItem("pos_brand_color", color);
