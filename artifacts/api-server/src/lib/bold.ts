@@ -74,7 +74,7 @@ export async function createBoldPaymentLink(
   const response = await fetch(`${BOLD_BASE_URL}/online/link/v1`, {
     method: "POST",
     headers: {
-      "Authorization": `x-api-key ${apiKey}`,
+      Authorization: `x-api-key ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
