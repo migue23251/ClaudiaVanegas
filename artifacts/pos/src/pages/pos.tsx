@@ -116,7 +116,6 @@ export default function Pos() {
     setAdvanceAmount(0);
     setMobileTab("products");
     setUseBoldLink(false);
-    setBoldLinkUrl(null);
   };
 
   // ── Checkout ───────────────────────────────────────────────────────────────
@@ -622,7 +621,7 @@ export default function Pos() {
       </Dialog>
 
       {/* Bold payment link result dialog */}
-      <Dialog open={boldLinkOpen} onOpenChange={setBoldLinkOpen}>
+      <Dialog open={boldLinkOpen} onOpenChange={(open) => { setBoldLinkOpen(open); if (!open) setBoldLinkUrl(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
