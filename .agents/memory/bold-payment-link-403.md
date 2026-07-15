@@ -14,3 +14,6 @@ The request body didn't send an integer `amount.total_amount` (a float/decimal C
 
 ## Debugging tip
 `artifacts/api-server/src/lib/bold.ts` now logs the full outgoing request body and Bold's raw response body whenever the API call fails — check API server workflow logs first instead of re-guessing the payload.
+
+## Related: sales stuck on "pending" (webhook)
+This 403 fix is unrelated to sales staying `pending` forever after a Bold payment link is paid — see [Bold webhook real shape](bold-webhook-shape.md) for that issue (wrong signature algorithm + wrong payload shape were both guessed incorrectly in an earlier session, never verified against Bold's actual docs).

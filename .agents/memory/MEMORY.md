@@ -1,3 +1,4 @@
 - [POS backend patterns](pos-backend-patterns.md) — critical patterns for Express 5 routes, transactions, and auth in this project.
 - [POS environment setup](pos-environment-setup.md) — JWT_SECRET/seed-user handling when (re)provisioning this project after import.
 - [POS schema extension pattern](pos-schema-extension.md) — how to safely add optional columns and update the full stack (DB → spec → codegen → frontend).
+- [Bold webhook shape](bold-webhook-shape.md) — real signature algorithm (base64-then-HMAC) and CloudEvents payload; sales matched by `bold_reference`, not link ID.

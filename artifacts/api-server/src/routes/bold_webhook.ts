@@ -1,30 +1,36 @@
 /**
  * POST /webhooks/bold
  *
- * Receives Bold payment-link webhook events and updates the boldPaymentStatus
- * on the corresponding sale.
+ * Receives Bold webhook events (CloudEvents-style) and updates the
+ * boldPaymentStatus on the corresponding sale, matched via
+ * `data.metadata.reference` (the exact `reference` we sent when creating
+ * the payment link — Bold never echoes back the link ID itself).
  *
  * This route is PUBLIC (no JWT auth) — Bold calls it from their servers.
  * Signature verification uses HMAC-SHA256 with BOLD_WEBHOOK_SECRET if set.
  *
- * Bold webhook payload (approximate — they may vary by API version):
+ * Real Bold webhook payload shape (https://developers.bold.co/webhook):
  * {
- *   type: "PAYMENT",
- *   event: "PURCHASE" | "REJECTED" | "ABANDONED" | ...,
+ *   id: string,               // notification UUID
+ *   type: "SALE_APPROVED" | "SALE_REJECTED" | "VOID_APPROVED" | "VOID_REJECTED",
+ *   subject: string,          // Bold transaction ID
+ *   source: string,
+ *   spec_version: "1.0",
+ *   time: number,              // POSIX time (nanoseconds)
  *   data: {
- *     order: { id: string, status: "APPROVED"|"REJECTED"|"PENDING"|"EXPIRED", ... }
+ *     payment_id: string,
+ *     merchant_id: string,
+ *     amount: { currency: string, total: number, taxes: unknown[], tip: number },
+ *     metadata: { reference: string | null },
+ *     payment_method: string,
+ *     ...
  *   }
- * }
- * or newer event shape:
- * {
- *   event: "payment_link.paid" | "payment_link.expired" | ...,
- *   data: { id: string, status: "APPROVED"|..., payment_link?: string }
  * }
  */
 
 import { Router, type IRouter, type Request, type Response } from "express";
 import crypto from "node:crypto";
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, salesTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -33,17 +39,30 @@ const router: IRouter = Router();
 
 type BoldPaymentStatus = "pending" | "paid" | "failed" | "expired";
 
-function normaliseBoldStatus(raw: string | undefined): BoldPaymentStatus | null {
-  if (!raw) return null;
-  const s = raw.toUpperCase();
-  if (s === "APPROVED" || s === "PAID" || s === "COMPLETED" || s === "SUCCESS") return "paid";
-  if (s === "REJECTED" || s === "DECLINED" || s === "FAILED" || s === "ERROR") return "failed";
-  if (s === "EXPIRED") return "expired";
-  if (s === "PENDING" || s === "IN_PROGRESS") return "pending";
-  return null;
+function normaliseBoldType(type: string | undefined): BoldPaymentStatus | null {
+  switch (type) {
+    case "SALE_APPROVED":
+      return "paid";
+    case "SALE_REJECTED":
+      return "failed";
+    case "VOID_APPROVED":
+      // Payment was reversed after approval — no longer counts as paid.
+      return "failed";
+    case "VOID_REJECTED":
+      // Void attempt failed — the original payment status is unaffected.
+      return null;
+    default:
+      return null;
+  }
 }
 
 // ── Signature verification ────────────────────────────────────────────────────
+//
+// Per Bold's docs, the signature is NOT a plain HMAC of the raw body. It is:
+//   1. Base64-encode the raw request body (as a UTF-8 string).
+//   2. HMAC-SHA256 that base64 string using the webhook secret key.
+//   3. Hex-encode the result and compare against the `x-bold-signature` header
+//      (sent as a bare hex string, no "sha256=" prefix).
 
 function verifySignature(rawBody: Buffer, signatureHeader: string | undefined): boolean {
   const secret = process.env.BOLD_WEBHOOK_SECRET;
@@ -53,22 +72,18 @@ function verifySignature(rawBody: Buffer, signatureHeader: string | undefined): 
     return true;
   }
   if (!signatureHeader) {
-    console.warn("[bold-webhook] Missing signature header — rejecting");
+    console.warn("[bold-webhook] Missing x-bold-signature header — rejecting");
     return false;
   }
 
-  // Bold sends "sha256=<hex>" or just the hex digest
-  const receivedSig = signatureHeader.startsWith("sha256=")
-    ? signatureHeader.slice(7)
-    : signatureHeader;
-
+  const encodedBody = Buffer.from(rawBody.toString("utf8"), "utf8").toString("base64");
   const expected = crypto
     .createHmac("sha256", secret)
-    .update(rawBody)
+    .update(encodedBody)
     .digest("hex");
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(receivedSig, "hex"), Buffer.from(expected, "hex"));
+    return crypto.timingSafeEqual(Buffer.from(signatureHeader, "hex"), Buffer.from(expected, "hex"));
   } catch {
     return false;
   }
@@ -80,20 +95,22 @@ router.post("/webhooks/bold", async (req: Request, res: Response): Promise<void>
   // Body is raw Buffer (registered in app.ts before express.json())
   const rawBody: Buffer = req.body as unknown as Buffer;
 
-  // Verify signature
-  const sigHeader =
-    (req.headers["x-bold-signature"] as string | undefined) ??
-    (req.headers["bold-signature"] as string | undefined);
+  const sigHeader = req.headers["x-bold-signature"] as string | undefined;
 
   if (!verifySignature(rawBody, sigHeader)) {
-    res.status(401).json({ error: "Invalid signature" });
+    res.status(400).json({ error: "Invalid signature" });
     return;
   }
 
   // Parse body
-  let payload: Record<string, unknown>;
+  let payload: {
+    id?: string;
+    type?: string;
+    subject?: string;
+    data?: { payment_id?: string; metadata?: { reference?: string | null } };
+  };
   try {
-    payload = JSON.parse(rawBody.toString("utf8")) as Record<string, unknown>;
+    payload = JSON.parse(rawBody.toString("utf8"));
   } catch {
     res.status(400).json({ error: "Invalid JSON body" });
     return;
@@ -101,65 +118,36 @@ router.post("/webhooks/bold", async (req: Request, res: Response): Promise<void>
 
   console.info("[bold-webhook] Event received:", JSON.stringify(payload));
 
-  // ── Extract event data (handle multiple payload shapes) ──────────────────
+  const reference = payload.data?.metadata?.reference;
+  const status = normaliseBoldType(payload.type);
 
-  // Shape A: { type, event, data: { order: { id, status } } }
-  // Shape B: { event, data: { id, status, payment_link } }
-
-  const data = payload.data as Record<string, unknown> | undefined;
-  const order = (data?.order as Record<string, unknown> | undefined) ?? data;
-
-  const boldId =
-    (order?.id as string | undefined) ??
-    (order?.payment_link_id as string | undefined) ??
-    (data?.id as string | undefined);
-
-  const boldStatusRaw =
-    (order?.status as string | undefined) ??
-    (data?.status as string | undefined);
-
-  const paymentLinkUrl =
-    (order?.payment_link as string | undefined) ??
-    (data?.payment_link as string | undefined);
-
-  const status = normaliseBoldStatus(boldStatusRaw);
-
+  // Bold must always be acknowledged with 200 within 2s, even for events we
+  // don't act on (unknown type, void-rejected, missing reference) — otherwise
+  // Bold treats the webhook as failed and may retry indefinitely.
   if (!status) {
-    // Unknown status — acknowledge but do nothing
-    console.warn("[bold-webhook] Unrecognised status:", boldStatusRaw, "— skipping update");
+    console.warn(`[bold-webhook] Type '${payload.type}' does not change payment status — acknowledging only`);
     res.status(200).json({ received: true, updated: false });
     return;
   }
 
-  // ── Find the sale ─────────────────────────────────────────────────────────
-
-  let sale: (typeof salesTable.$inferSelect) | undefined;
-
-  const conditions = [];
-  if (boldId) conditions.push(eq(salesTable.boldLinkId, boldId));
-  if (paymentLinkUrl) conditions.push(eq(salesTable.paymentLink, paymentLinkUrl));
-
-  if (conditions.length > 0) {
-    const rows = await db
-      .select()
-      .from(salesTable)
-      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
-      .limit(1);
-    sale = rows[0];
+  if (!reference) {
+    console.warn("[bold-webhook] Event missing data.metadata.reference — cannot match a sale");
+    res.status(200).json({ received: true, updated: false });
+    return;
   }
+
+  const [sale] = await db.select().from(salesTable).where(eq(salesTable.boldReference, reference)).limit(1);
 
   if (!sale) {
-    console.warn("[bold-webhook] No matching sale found for boldId:", boldId, "url:", paymentLinkUrl);
-    // Respond 200 so Bold doesn't retry (the event may be for an unknown link)
+    console.warn(`[bold-webhook] No sale found with boldReference='${reference}' (bold subject='${payload.subject}')`);
+    // Respond 200 so Bold doesn't retry (the event may be for an unknown reference)
     res.status(200).json({ received: true, updated: false });
     return;
   }
-
-  // ── Update payment status ─────────────────────────────────────────────────
 
   await db
     .update(salesTable)
-    .set({ boldPaymentStatus: status })
+    .set({ boldPaymentStatus: status, boldLinkId: payload.data?.payment_id ?? sale.boldLinkId })
     .where(eq(salesTable.id, sale.id));
 
   console.info(`[bold-webhook] Sale #${sale.id} boldPaymentStatus → ${status}`);

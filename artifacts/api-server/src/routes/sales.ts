@@ -209,6 +209,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
           paymentLink: boldResult.url,
           boldFee: String(boldResult.fee),
           boldLinkId: boldResult.linkId ?? undefined,
+          boldReference: boldResult.reference,
           boldPaymentStatus: "pending",
         })
         .where(eq(salesTable.id, saleId));

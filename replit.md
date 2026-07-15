@@ -78,9 +78,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 ## Bold Webhook
 
 - Endpoint: `POST /api/webhooks/bold` (público — Bold lo llama desde sus servidores)
-- URL de producción: `https://<tu-dominio>/api/webhooks/bold`
-- Para verificar firma HMAC-SHA256, agrega el secret del dashboard Bold como `BOLD_WEBHOOK_SECRET` en Replit Secrets
-- Si `BOLD_WEBHOOK_SECRET` no está configurado, el webhook acepta eventos sin verificar (útil en desarrollo)
+- URL de pruebas: `https://<tu-dominio-dev>.replit.dev/api/webhooks/bold` — debes registrarla en el Panel de Comercios de Bold (sección Integraciones) para que Bold empiece a llamarla; el código funcionando no sirve de nada si Bold no tiene la URL configurada.
+- URL de producción: `https://<tu-dominio-publicado>/api/webhooks/bold` — regístrala también en Bold cuando publiques.
+- Firma: Bold NO firma el cuerpo crudo directamente. Firma es HMAC-SHA256 sobre el **body codificado en Base64**, comparado en hexadecimal contra el header `x-bold-signature` (sin prefijo `sha256=`).
+- Agrega el secret del dashboard Bold como `BOLD_WEBHOOK_SECRET` en Replit Secrets. Si no está configurado, el webhook acepta eventos sin verificar (útil en desarrollo).
+- Payload real (CloudEvents): `{ type: "SALE_APPROVED"|"SALE_REJECTED"|"VOID_APPROVED"|"VOID_REJECTED", data: { payment_id, metadata: { reference } } }`. Se hace match con la venta por `sales.bold_reference` (el `reference` exacto que enviamos al crear el link), NO por link ID — Bold nunca devuelve el link ID en el webhook.
 - El estado del pago (`boldPaymentStatus`: pending / paid / failed / expired) se actualiza en la venta cuando Bold envía el evento
 - Tipos de evento Bold que se mapean: `APPROVED`→paid, `REJECTED/FAILED`→failed, `EXPIRED`→expired, `PENDING`→pending
 

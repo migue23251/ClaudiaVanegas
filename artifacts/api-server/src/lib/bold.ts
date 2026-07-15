@@ -32,8 +32,12 @@ export interface BoldLinkParams {
 export interface BoldLinkResult {
   /** Full checkout URL, e.g. https://checkout.bold.co/LNK_xxx */
   url: string;
-  /** Bold's internal link ID, e.g. "LNK_H7S4xxx" — used to match webhooks */
+  /** Bold's internal link ID, e.g. "LNK_H7S4xxx" — informational only, NOT sent back in webhooks */
   linkId: string | null;
+  /** The exact `reference` sent to Bold. Webhooks report this back under
+   *  `data.metadata.reference` — it's the only reliable key to match a sale
+   *  to a webhook event (Bold does not echo the link ID). */
+  reference: string;
   /** Amount actually charged (includes Bold fee) */
   totalWithFee: number;
   /** Fee amount in COP */
@@ -114,7 +118,7 @@ export async function createBoldPaymentLink(
     throw new Error(`Bold no devolvió un link de pago válido. Respuesta: ${JSON.stringify(data)}`);
   }
 
-  return { url, linkId, totalWithFee, fee };
+  return { url, linkId, reference: body.reference as string, totalWithFee, fee };
 }
 
 export { BOLD_FEE_RATE };
