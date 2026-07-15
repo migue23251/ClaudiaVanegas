@@ -40,8 +40,10 @@ export interface BoldLinkResult {
 export async function createBoldPaymentLink(
   params: BoldLinkParams
 ): Promise<BoldLinkResult> {
-  const apiKey = process.env.BOLD_API_KEY;
-  if (!apiKey) throw new Error("BOLD_API_KEY no está configurado");
+  // Bold uses the secret key (llave secreta) for server-to-server API calls.
+  // The identity key (llave de identidad) is only for client-side embeds.
+  const apiKey = process.env.BOLD_SECRET_KEY ?? process.env.BOLD_API_KEY;
+  if (!apiKey) throw new Error("BOLD_SECRET_KEY no está configurado");
 
   const fee = Math.round(params.amountCOP * BOLD_FEE_RATE);
   const totalWithFee = params.amountCOP + fee;
