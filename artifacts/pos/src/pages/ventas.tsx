@@ -53,11 +53,29 @@ export default function Ventas() {
   };
 
   const { data: sales, isLoading } = useListSales(queryParams, {
-    query: { queryKey: getListSalesQueryKey(queryParams) }
+    query: {
+      queryKey: getListSalesQueryKey(queryParams),
+      // Poll every 10 s while any sale has a pending Bold payment
+      refetchInterval: (query) => {
+        const data = query.state.data as typeof sales;
+        const hasPending = data?.sales?.some(
+          (s: any) => s.boldPaymentStatus === "pending"
+        );
+        return hasPending ? 10_000 : false;
+      },
+    }
   });
 
   const { data: saleDetail } = useGetSale(selectedSaleId!, {
-    query: { enabled: !!selectedSaleId, queryKey: getGetSaleQueryKey(selectedSaleId!) }
+    query: {
+      enabled: !!selectedSaleId,
+      queryKey: getGetSaleQueryKey(selectedSaleId!),
+      // Keep the detail dialog in sync while the selected sale is pending
+      refetchInterval: (query) => {
+        const data = query.state.data as typeof saleDetail;
+        return (data as any)?.boldPaymentStatus === "pending" ? 10_000 : false;
+      },
+    }
   });
 
   const formatCurrency = (val: number) =>
