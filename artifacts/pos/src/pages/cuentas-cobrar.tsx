@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, AlertCircle } from "lucide-react";
+import { DollarSign, AlertCircle, History } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -33,6 +33,7 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 export default function CuentasCobrar() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedAr, setSelectedAr] = useState<any>(null);
   const [page, setPage] = useState(1);
 
@@ -153,15 +154,24 @@ export default function CuentasCobrar() {
                     <TableCell className="text-right font-bold text-destructive">{formatCurrency(balance)}</TableCell>
                     <TableCell>{getStatusBadge(ar.status, ar.dueDate ?? null)}</TableCell>
                     <TableCell className="text-right">
-                      {balance > 0 && (
+                      <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="outline" size="sm"
-                          className="h-8 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
-                          onClick={() => { setSelectedAr(ar); setIsPaymentOpen(true); }}
+                          className="h-8"
+                          onClick={() => { setSelectedAr(ar); setIsHistoryOpen(true); }}
                         >
-                          <DollarSign className="h-3.5 w-3.5 mr-1" /> Pago
+                          <History className="h-3.5 w-3.5 mr-1" /> Historial
                         </Button>
-                      )}
+                        {balance > 0 && (
+                          <Button
+                            variant="outline" size="sm"
+                            className="h-8 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                            onClick={() => { setSelectedAr(ar); setIsPaymentOpen(true); }}
+                          >
+                            <DollarSign className="h-3.5 w-3.5 mr-1" /> Pago
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -175,6 +185,62 @@ export default function CuentasCobrar() {
           </div>
         )}
       </div>
+
+      {/* Historial de abonos */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Historial de Abonos</DialogTitle>
+          </DialogHeader>
+          {selectedAr && (
+            <div className="space-y-4 py-2">
+              <div className="bg-muted/50 p-3 rounded-md space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cliente:</span>
+                  <span className="font-medium">{selectedAr.customerName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total venta:</span>
+                  <span>{formatCurrency(selectedAr.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total abonado:</span>
+                  <span className="text-emerald-600 font-semibold">{formatCurrency(selectedAr.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between border-t pt-1">
+                  <span className="text-muted-foreground font-semibold">Saldo pendiente:</span>
+                  <span className="font-bold text-destructive">
+                    {formatCurrency(selectedAr.totalAmount - selectedAr.paidAmount)}
+                  </span>
+                </div>
+              </div>
+
+              {(selectedAr.payments ?? []).length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-6">
+                  Esta cuenta no tiene abonos registrados.
+                </p>
+              ) : (
+                <div className="divide-y rounded-md border overflow-hidden">
+                  {(selectedAr.payments as { id: number; amount: number; notes: string | null; paidAt: string }[]).map((p) => (
+                    <div key={p.id} className="flex items-center justify-between px-4 py-3 text-sm bg-card">
+                      <div>
+                        <p className="font-medium text-emerald-700">{formatCurrency(p.amount)}</p>
+                        {p.notes && <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(p.paidAt), "dd/MM/yyyy HH:mm")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsHistoryOpen(false)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
         <DialogContent className="sm:max-w-[400px]">
