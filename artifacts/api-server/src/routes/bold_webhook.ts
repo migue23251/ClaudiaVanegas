@@ -97,19 +97,6 @@ router.post("/webhooks/bold", async (req: Request, res: Response): Promise<void>
 
   const sigHeader = req.headers["x-bold-signature"] as string | undefined;
 
-  // --- TEMP DIAGNOSTICS ---
-  console.info("[bold-webhook] content-type:", req.headers["content-type"]);
-  console.info("[bold-webhook] body is Buffer:", Buffer.isBuffer(rawBody));
-  console.info("[bold-webhook] body length:", Buffer.isBuffer(rawBody) ? rawBody.length : typeof rawBody);
-  console.info("[bold-webhook] x-bold-signature:", sigHeader ?? "(missing)");
-  if (Buffer.isBuffer(rawBody) && process.env.BOLD_WEBHOOK_SECRET) {
-    const encodedBody = Buffer.from(rawBody.toString("utf8"), "utf8").toString("base64");
-    const expected = crypto.createHmac("sha256", process.env.BOLD_WEBHOOK_SECRET).update(encodedBody).digest("hex");
-    console.info("[bold-webhook] computed signature:", expected);
-    console.info("[bold-webhook] signatures match:", sigHeader === expected);
-  }
-  // --- END TEMP DIAGNOSTICS ---
-
   if (!verifySignature(rawBody, sigHeader)) {
     res.status(400).json({ error: "Invalid signature" });
     return;
