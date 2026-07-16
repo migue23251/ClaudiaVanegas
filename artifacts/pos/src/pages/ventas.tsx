@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useListSales, getListSalesQueryKey, useGetSale, getGetSaleQueryKey, useVoidSale,
 } from "@workspace/api-client-react";
+import type { Sale, SaleItem } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -56,10 +57,10 @@ export default function Ventas() {
     query: {
       queryKey: getListSalesQueryKey(queryParams),
       // Poll every 10 s while any sale has a pending Bold payment
-      refetchInterval: (query) => {
-        const data = query.state.data as typeof sales;
-        const hasPending = data?.sales?.some(
-          (s: any) => s.boldPaymentStatus === "pending"
+      refetchInterval: (query): number | false => {
+        const data = query.state.data as Sale[] | undefined;
+        const hasPending = data?.some(
+          (s) => s.boldPaymentStatus === "pending"
         );
         return hasPending ? 10_000 : false;
       },
@@ -71,9 +72,9 @@ export default function Ventas() {
       enabled: !!selectedSaleId,
       queryKey: getGetSaleQueryKey(selectedSaleId!),
       // Keep the detail dialog in sync while the selected sale is pending
-      refetchInterval: (query) => {
-        const data = query.state.data as typeof saleDetail;
-        return (data as any)?.boldPaymentStatus === "pending" ? 10_000 : false;
+      refetchInterval: (query): number | false => {
+        const data = query.state.data as Sale | undefined;
+        return data?.boldPaymentStatus === "pending" ? 10_000 : false;
       },
     }
   });
@@ -306,7 +307,7 @@ export default function Ventas() {
               <div>
                 <h4 className="font-serif font-semibold mb-3">Artículos</h4>
                 <div className="space-y-3">
-                  {saleDetail.items.map(item => (
+                  {saleDetail.items.map((item: SaleItem) => (
                     <div key={item.id} className="flex justify-between items-start text-sm border-b pb-2 last:border-0">
                       <div className="flex gap-3 min-w-0">
                         <span className="font-medium shrink-0">{item.qty}x</span>
