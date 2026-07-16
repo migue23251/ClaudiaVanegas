@@ -18,7 +18,21 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-const BOLD_FEE_RATE = 0.05;
+type PaymentType = "efectivo" | "transferencia" | "credito" | "datafono" | "link";
+
+const calcChargedTotal = (base: number, method: PaymentType): number => {
+  if (method === "datafono") return Math.floor((base + 300) / 0.9451);
+  if (method === "link") return Math.floor((base + 900) / 0.9421);
+  return base;
+};
+
+const PAYMENT_LABELS: Record<PaymentType, string> = {
+  efectivo: "Efectivo",
+  transferencia: "Transferencia",
+  credito: "Crédito",
+  datafono: "Datáfono",
+  link: "Link de pago",
+};
 
 interface CartItem extends Product {
   cartQty: number;
@@ -29,7 +43,7 @@ export default function Pos() {
   const [searchTerm, setSearchTerm] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentType, setPaymentType] = useState<"contado" | "credito">("contado");
+  const [paymentType, setPaymentType] = useState<PaymentType>("efectivo");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [advanceAmount, setAdvanceAmount] = useState<number>(0);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -37,10 +51,8 @@ export default function Pos() {
   const [mobileTab, setMobileTab] = useState<"products" | "cart">("products");
 
   // Bold link state
-  const [useBoldLink, setUseBoldLink] = useState(false);
   const [boldLinkOpen, setBoldLinkOpen] = useState(false);
   const [boldLinkUrl, setBoldLinkUrl] = useState<string | null>(null);
-  const [boldFeeAmount, setBoldFeeAmount] = useState(0);
   const [boldLinkError, setBoldLinkError] = useState<string | null>(null);
 
   const { toast } = useToast();
@@ -105,18 +117,17 @@ export default function Pos() {
   };
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + (item.cartQty * item.cartPrice), 0), [cart]);
-  const boldFee = useBoldLink ? Math.round(total * BOLD_FEE_RATE) : 0;
-  const totalWithBold = total + boldFee;
+  const chargedTotal = useMemo(() => calcChargedTotal(total, paymentType), [total, paymentType]);
+  const surcharge = chargedTotal - total;
 
   const resetCart = () => {
     setCart([]);
     setSelectedCustomer(null);
     setCustomerSearch("");
     setSearchTerm("");
-    setPaymentType("contado");
+    setPaymentType("efectivo");
     setAdvanceAmount(0);
     setMobileTab("products");
-    setUseBoldLink(false);
   };
 
   // ── Checkout ───────────────────────────────────────────────────────────────
@@ -134,7 +145,7 @@ export default function Pos() {
         customerId: selectedCustomer?.id,
         paymentType,
         advanceAmount: advance > 0 ? advance : undefined,
-        withBoldLink: useBoldLink || undefined,
+        chargedAmount: surcharge > 0 ? chargedTotal : undefined,
         items: cart.map(item => ({
           productId: item.id,
           qty: item.cartQty,
@@ -147,7 +158,6 @@ export default function Pos() {
         const hasBoldError = !!(result?.boldError);
         if (hasLink) {
           setBoldLinkUrl(result.paymentLink);
-          setBoldFeeAmount(result.boldFee ? parseFloat(String(result.boldFee)) : 0);
           setBoldLinkError(null);
           setBoldLinkOpen(true);
           toast({ title: "Venta registrada y link de pago generado", className: "bg-emerald-500 text-white border-none" });
@@ -401,13 +411,16 @@ export default function Pos() {
 
         {/* Payment footer */}
         <div className="p-3 border-t bg-muted/30 space-y-3 shrink-0">
-          <Select value={paymentType} onValueChange={(v: "contado" | "credito") => { setPaymentType(v); setAdvanceAmount(0); if (v === "credito") setUseBoldLink(false); }}>
+          <Select value={paymentType} onValueChange={(v: PaymentType) => { setPaymentType(v); setAdvanceAmount(0); }}>
             <SelectTrigger className="h-9 text-sm">
-              <SelectValue placeholder="Tipo de Pago" />
+              <SelectValue placeholder="Método de pago" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="contado">Contado</SelectItem>
+              <SelectItem value="efectivo">Efectivo</SelectItem>
+              <SelectItem value="transferencia">Transferencia</SelectItem>
               <SelectItem value="credito">Crédito</SelectItem>
+              <SelectItem value="datafono">Datáfono</SelectItem>
+              <SelectItem value="link">Link de pago</SelectItem>
             </SelectContent>
           </Select>
 
@@ -434,42 +447,21 @@ export default function Pos() {
             </div>
           )}
 
-          {/* Bold link toggle — only for cash (contado) payments */}
-          {paymentType === "contado" && (
-            <div
-              className={`flex items-center justify-between p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                useBoldLink ? "border-primary bg-primary/5" : "border-border bg-background"
-              }`}
-              onClick={() => setUseBoldLink(!useBoldLink)}
-            >
-              <div>
-                <p className="text-xs font-semibold flex items-center gap-1.5">
-                  <CreditCard className="h-3.5 w-3.5 text-primary" />
-                  Link de pago Bold
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">+5% comisión</p>
-              </div>
-              <div className={`relative h-5 w-9 rounded-full transition-colors ${useBoldLink ? "bg-primary" : "bg-muted"}`}>
-                <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${useBoldLink ? "translate-x-4" : ""}`} />
-              </div>
-            </div>
-          )}
-
           {/* Totals */}
-          {useBoldLink ? (
+          {surcharge > 0 ? (
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{formatCurrency(total)}</span>
               </div>
               <div className="flex justify-between text-amber-600 font-medium">
-                <span>Comisión Bold (5%)</span>
-                <span className="tabular-nums">+ {formatCurrency(boldFee)}</span>
+                <span>Recargo {PAYMENT_LABELS[paymentType]}</span>
+                <span className="tabular-nums">+ {formatCurrency(surcharge)}</span>
               </div>
               <div className="flex justify-between items-center pt-1 border-t border-border">
-                <span className="font-semibold">Total</span>
+                <span className="font-semibold">Total a cobrar</span>
                 <span className="text-2xl font-serif font-bold text-primary tabular-nums">
-                  {formatCurrency(totalWithBold)}
+                  {formatCurrency(chargedTotal)}
                 </span>
               </div>
             </div>
@@ -487,7 +479,7 @@ export default function Pos() {
           >
             {createSale.isPending
               ? "Procesando..."
-              : useBoldLink
+              : paymentType === "link"
                 ? <span className="flex items-center gap-2"><CreditCard className="h-4 w-4" /> Cobrar + link Bold</span>
                 : "Cobrar"
             }
@@ -663,11 +655,7 @@ export default function Pos() {
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-                {boldFeeAmount > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Incluye {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(boldFeeAmount)} de comisión Bold (5%)
-                  </p>
-                )}
+
                 {boldLinkUrl && (
                   <a
                     href={`https://wa.me/?text=${encodeURIComponent(`Aquí está tu link de pago: ${boldLinkUrl}`)}`}

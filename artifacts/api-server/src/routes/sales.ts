@@ -92,16 +92,17 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/sales", requireAuth, async (req, res): Promise<void> => {
-  const { customerId, paymentType, notes, items, advanceAmount, withBoldLink } = req.body as {
+  const { customerId, paymentType, notes, items, advanceAmount, chargedAmount } = req.body as {
     customerId?: number;
-    paymentType: "contado" | "credito";
+    paymentType: "efectivo" | "transferencia" | "credito" | "datafono" | "link";
     notes?: string;
     items: { productId: number; qty: number; unitPrice: number }[];
     advanceAmount?: number;
-    withBoldLink?: boolean;
+    chargedAmount?: number;
   };
 
-  if (!paymentType || !items?.length) {
+  const validPaymentTypes = ["efectivo", "transferencia", "credito", "datafono", "link"];
+  if (!paymentType || !validPaymentTypes.includes(paymentType) || !items?.length) {
     res.status(400).json({ error: "Tipo de pago e items son requeridos" });
     return;
   }
@@ -191,11 +192,11 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
   let result = await buildSaleResponse(saleId);
   let boldError: string | null = null;
 
-  // Generate Bold payment link if requested
-  if (withBoldLink && result) {
+  // Generate Bold payment link for 'link' payment type
+  if (paymentType === "link" && result) {
     try {
       const boldResult = await createBoldPaymentLink({
-        amountCOP: total,
+        amountCOP: chargedAmount ?? total,
         description: `Factura #${saleId}`,
         reference: `sale-${saleId}`,
         customer: {

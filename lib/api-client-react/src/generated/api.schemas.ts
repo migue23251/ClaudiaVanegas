@@ -409,8 +409,11 @@ export type SalePaymentType = typeof SalePaymentType[keyof typeof SalePaymentTyp
 
 
 export const SalePaymentType = {
-  contado: 'contado',
+  efectivo: 'efectivo',
+  transferencia: 'transferencia',
   credito: 'credito',
+  datafono: 'datafono',
+  link: 'link',
 } as const;
 
 /**
@@ -478,8 +481,11 @@ export type SaleInputPaymentType = typeof SaleInputPaymentType[keyof typeof Sale
 
 
 export const SaleInputPaymentType = {
-  contado: 'contado',
+  efectivo: 'efectivo',
+  transferencia: 'transferencia',
   credito: 'credito',
+  datafono: 'datafono',
+  link: 'link',
 } as const;
 
 export interface SaleInput {
@@ -487,8 +493,8 @@ export interface SaleInput {
   paymentType: SaleInputPaymentType;
   notes?: string;
   advanceAmount?: number;
-  /** When true, generates a Bold payment link and attaches it to the sale */
-  withBoldLink?: boolean;
+  /** Gross amount charged to the customer after surcharges (used for Bold link generation on 'link' payment type) */
+  chargedAmount?: number;
   items: SaleItemInput[];
 }
 
@@ -541,8 +547,6 @@ export interface BillingVsCollectionPoint {
 export interface TopProduct {
   productId: number;
   productName: string;
-  /** @nullable */
-  description?: string | null;
   category: string;
   totalQty: number;
   totalRevenue: number;
@@ -588,8 +592,6 @@ export interface NetProfitTrendPoint {
 export interface SlowMovingProduct {
   id: number;
   name: string;
-  /** @nullable */
-  description?: string | null;
   code: string;
   category: string;
   stock: number;

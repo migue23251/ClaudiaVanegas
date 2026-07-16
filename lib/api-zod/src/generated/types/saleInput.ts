@@ -13,7 +13,7 @@ export interface SaleInput {
   paymentType: SaleInputPaymentType;
   notes?: string;
   advanceAmount?: number;
-  /** When true, generates a Bold payment link and attaches it to the sale */
-  withBoldLink?: boolean;
+  /** Gross amount charged to the customer after surcharges (used for Bold link generation on 'link' payment type) */
+  chargedAmount?: number;
   items: SaleItemInput[];
 }

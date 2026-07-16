@@ -1754,7 +1754,7 @@ components:
           type: ["string", "null"]
         paymentType:
           type: string
-          enum: [contado, credito]
+          enum: [efectivo, transferencia, credito, datafono, link]
         total:
           type: number
         notes:
@@ -1799,14 +1799,14 @@ components:
           type: integer
         paymentType:
           type: string
-          enum: [contado, credito]
+          enum: [efectivo, transferencia, credito, datafono, link]
         notes:
           type: string
         advanceAmount:
           type: number
-        withBoldLink:
-          type: boolean
-          description: When true, generates a Bold payment link and attaches it to the sale
+        chargedAmount:
+          type: number
+          description: Gross amount charged to the customer after surcharges (used for Bold link generation on 'link' payment type)
         items:
           type: array
           items:
