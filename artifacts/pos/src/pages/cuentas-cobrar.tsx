@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, AlertCircle, History } from "lucide-react";
+import { DollarSign, AlertCircle, History, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -32,6 +32,7 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 
 export default function CuentasCobrar() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [search, setSearch] = useState("");
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedAr, setSelectedAr] = useState<any>(null);
@@ -47,9 +48,13 @@ export default function CuentasCobrar() {
   const { data: fetchedArs, isLoading } = useListAccountsReceivable(queryParams, {
     query: { queryKey: getListAccountsReceivableQueryKey(queryParams) }
   });
-  const ars = statusFilter === "pending"
+  const ars = (statusFilter === "pending"
     ? fetchedArs?.filter(ar => ar.status === "pending" || ar.status === "partial")
-    : fetchedArs;
+    : fetchedArs
+  )?.filter(ar =>
+    !search.trim() ||
+    ar.customerName?.toLowerCase().includes(search.trim().toLowerCase())
+  );
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
@@ -91,6 +96,7 @@ export default function CuentasCobrar() {
   };
 
   const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
+  const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
   const paginated = (ars ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
@@ -112,6 +118,15 @@ export default function CuentasCobrar() {
               <SelectItem value="paid">Pagadas</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por cliente..."
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            className="pl-9"
+          />
         </div>
       </div>
 
