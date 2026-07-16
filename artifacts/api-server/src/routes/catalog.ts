@@ -65,6 +65,7 @@ router.get("/catalog", async (req, res): Promise<void> => {
       salePrice: productsTable.salePrice,
       category: productsTable.category,
       images: productsTable.images,
+      stock: productsTable.stock,
     })
     .from(productsTable);
 
@@ -90,6 +91,7 @@ router.get("/catalog", async (req, res): Promise<void> => {
     products: products.map((p) => ({
       ...p,
       salePrice: parseFloat(p.salePrice),
+      stock: parseInt(p.stock as unknown as string, 10),
     })),
   });
 });
