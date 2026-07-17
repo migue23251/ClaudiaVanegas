@@ -1894,6 +1894,8 @@ components:
           type: integer
         productName:
           type: string
+        description:
+          type: ["string", "null"]
         category:
           type: string
         totalQty:
@@ -1978,6 +1980,8 @@ components:
           type: integer
         name:
           type: string
+        description:
+          type: ["string", "null"]
         code:
           type: string
         category:

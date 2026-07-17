@@ -545,6 +545,8 @@ export interface BillingVsCollectionPoint {
 export interface TopProduct {
   productId: number;
   productName: string;
+  /** @nullable */
+  description?: string | null;
   category: string;
   totalQty: number;
   totalRevenue: number;
@@ -590,6 +592,8 @@ export interface NetProfitTrendPoint {
 export interface SlowMovingProduct {
   id: number;
   name: string;
+  /** @nullable */
+  description?: string | null;
   code: string;
   category: string;
   stock: number;

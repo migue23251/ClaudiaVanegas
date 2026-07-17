@@ -234,7 +234,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
     sendInvoiceEmail({
       saleId: result.id,
       createdAt: result.createdAt,
-      paymentType: result.paymentType as "contado" | "credito",
+      paymentType: result.paymentType as "efectivo" | "credito" | "datafono" | "link",
       customerName: result.customerName ?? result.customerEmail,
       customerEmail: result.customerEmail,
       customerCedula: result.customerCedula,

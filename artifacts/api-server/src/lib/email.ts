@@ -12,7 +12,7 @@ interface SaleItem {
 interface InvoiceData {
   saleId: number;
   createdAt: string | Date;
-  paymentType: "contado" | "credito";
+  paymentType: "efectivo" | "credito" | "datafono" | "link";
   customerName: string;
   customerEmail: string;
   customerCedula?: string | null;
@@ -59,7 +59,11 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
     </tr>
   `).join("");
 
-  const paymentLabel = invoice.paymentType === "credito" ? "Crédito" : "Contado";
+  const paymentLabel =
+    invoice.paymentType === "credito" ? "Crédito" :
+    invoice.paymentType === "datafono" ? "Datáfono" :
+    invoice.paymentType === "link" ? "Link de pago" :
+    "Efectivo";
 
   return `<!DOCTYPE html>
 <html lang="es">

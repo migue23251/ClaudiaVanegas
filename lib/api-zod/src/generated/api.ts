@@ -1156,6 +1156,7 @@ export const GetDashboardTopProductsQueryParams = zod.object({
 export const GetDashboardTopProductsResponseItem = zod.object({
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
   "category": zod.string(),
   "totalQty": zod.number(),
   "totalRevenue": zod.number()
@@ -1186,6 +1187,7 @@ export const GetDashboardNetProfitTrendResponse = zod.array(GetDashboardNetProfi
 export const GetDashboardSlowMovingProductsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
+  "description": zod.string().nullish(),
   "code": zod.string(),
   "category": zod.string(),
   "stock": zod.number(),
@@ -1244,6 +1246,7 @@ export const GetReportTopProductsQueryParams = zod.object({
 export const GetReportTopProductsResponseItem = zod.object({
   "productId": zod.number(),
   "productName": zod.string(),
+  "description": zod.string().nullish(),
   "category": zod.string(),
   "totalQty": zod.number(),
   "totalRevenue": zod.number()

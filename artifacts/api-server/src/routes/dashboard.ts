@@ -77,7 +77,7 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
     total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
   }).from(salesTable).where(and(
     eq(salesTable.voided, false),
-    eq(salesTable.paymentType, "contado"),
+    eq(salesTable.paymentType, "efectivo"),
     gte(salesTable.createdAt, startOfMonth),
     lte(salesTable.createdAt, endOfMonth),
   ));
@@ -186,7 +186,7 @@ router.get("/dashboard/billing-vs-collection", requireAuth, async (req, res): Pr
     }).from(salesTable)
       .where(and(
         eq(salesTable.voided, false),
-        eq(salesTable.paymentType, "contado"),
+        eq(salesTable.paymentType, "efectivo"),
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
       ))
@@ -350,7 +350,7 @@ router.get("/dashboard/expenses-vs-income", requireAuth, async (req, res): Promi
     }).from(salesTable)
       .where(and(
         eq(salesTable.voided, false),
-        eq(salesTable.paymentType, "contado"),
+        eq(salesTable.paymentType, "efectivo"),
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
       ))
@@ -405,7 +405,7 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
     }).from(salesTable)
       .where(and(
         eq(salesTable.voided, false),
-        eq(salesTable.paymentType, "contado"),
+        eq(salesTable.paymentType, "efectivo"),
         gte(salesTable.createdAt, rangeStart),
         lte(salesTable.createdAt, rangeEnd),
       ))

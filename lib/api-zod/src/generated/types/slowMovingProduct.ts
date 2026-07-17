@@ -9,6 +9,8 @@
 export interface SlowMovingProduct {
   id: number;
   name: string;
+  /** @nullable */
+  description?: string | null;
   code: string;
   category: string;
   stock: number;

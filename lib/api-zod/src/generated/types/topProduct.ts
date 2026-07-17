@@ -9,6 +9,8 @@
 export interface TopProduct {
   productId: number;
   productName: string;
+  /** @nullable */
+  description?: string | null;
   category: string;
   totalQty: number;
   totalRevenue: number;
