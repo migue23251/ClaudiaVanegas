@@ -11,13 +11,12 @@
  */
 
 const BOLD_BASE_URL = "https://integrations.api.bold.co";
-const BOLD_FEE_RATE = 0.05; // 5 % charged by Bold
 
 export interface BoldLinkParams {
-  /** Net amount in COP. The function will add the Bold 5% fee on top. */
+  /** Base sale amount in COP (used only to compute the surcharge for record-keeping). */
   amountCOP: number;
-  /** Gross amount already calculated by the caller (e.g. via a custom formula).
-   *  When provided, this value is sent to Bold AS-IS — no fee is added. */
+  /** Final amount to charge the customer, already computed by the caller's formula.
+   *  This value is sent to Bold AS-IS — no fee is added. */
   grossAmountCOP?: number;
   description: string;
   customer?: {
@@ -55,14 +54,12 @@ export async function createBoldPaymentLink(
   const apiKey = process.env.BOLD_API_KEY;
   if (!apiKey) throw new Error("BOLD_API_KEY no está configurado");
 
-  // If the caller already computed the gross amount (e.g. via a custom formula),
-  // use it directly; otherwise derive it by adding the 5% Bold fee.
-  const fee = params.grossAmountCOP != null
-    ? Math.round(params.grossAmountCOP - params.amountCOP)
-    : Math.round(params.amountCOP * BOLD_FEE_RATE);
+  // Use the pre-calculated gross amount from the caller's formula.
+  // If not provided, fall back to amountCOP (no extra fee is added).
   const totalWithFee = params.grossAmountCOP != null
     ? Math.round(params.grossAmountCOP)
-    : Math.round(params.amountCOP + fee);
+    : Math.round(params.amountCOP);
+  const fee = totalWithFee - Math.round(params.amountCOP);
 
   // Expiration date in nanoseconds from Unix epoch
   const expiresInMs = params.expiresInMs ?? 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -128,4 +125,3 @@ export async function createBoldPaymentLink(
   return { url, linkId, reference: body.reference as string, totalWithFee, fee };
 }
 
-export { BOLD_FEE_RATE };
