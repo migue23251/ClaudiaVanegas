@@ -18,6 +18,14 @@ import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 15;
 
+type PaymentType = "efectivo" | "credito" | "datafono" | "link";
+
+const calcChargedTotal = (base: number, method: string): number => {
+  if (method === "datafono") return Math.floor((base + 300) / 0.9451);
+  if (method === "link") return Math.floor((base + 900) / 0.9421);
+  return base;
+};
+
 function Pagination({ total, page, onChange }: { total: number; page: number; onChange: (p: number) => void }) {
   const pages = Math.ceil(total / PAGE_SIZE);
   if (pages <= 1) return null;
@@ -332,10 +340,27 @@ export default function Ventas() {
                 </div>
               </div>
 
-              <div className="border-t pt-4 flex justify-between items-center bg-primary/5 p-4 rounded-lg">
-                <span className="font-semibold text-lg">Total</span>
-                <span className="font-serif text-2xl font-bold text-primary">{formatCurrency(saleDetail.total)}</span>
-              </div>
+              {(saleDetail.paymentType === 'datafono' || saleDetail.paymentType === 'link') ? (
+                <div className="border-t pt-4 bg-primary/5 p-4 rounded-lg space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">{formatCurrency(saleDetail.total)}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-600 font-medium">
+                    <span>Recargo {saleDetail.paymentType === 'datafono' ? 'Datáfono' : 'Link de pago'}</span>
+                    <span className="tabular-nums">+ {formatCurrency(calcChargedTotal(saleDetail.total, saleDetail.paymentType) - saleDetail.total)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="font-semibold text-lg">Total cobrado</span>
+                    <span className="font-serif text-2xl font-bold text-primary tabular-nums">{formatCurrency(calcChargedTotal(saleDetail.total, saleDetail.paymentType))}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t pt-4 flex justify-between items-center bg-primary/5 p-4 rounded-lg">
+                  <span className="font-semibold text-lg">Total</span>
+                  <span className="font-serif text-2xl font-bold text-primary">{formatCurrency(saleDetail.total)}</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="py-12 text-center text-muted-foreground">Cargando detalle...</div>
