@@ -52,6 +52,7 @@ export default function Pos() {
   // Bold link state
   const [boldLinkOpen, setBoldLinkOpen] = useState(false);
   const [boldLinkUrl, setBoldLinkUrl] = useState<string | null>(null);
+  const [boldLinkFee, setBoldLinkFee] = useState(0);
   const [boldLinkError, setBoldLinkError] = useState<string | null>(null);
 
   const { toast } = useToast();
@@ -157,6 +158,7 @@ export default function Pos() {
         const hasBoldError = !!(result?.boldError);
         if (hasLink) {
           setBoldLinkUrl(result.paymentLink);
+          setBoldLinkFee(result.boldFee ? parseFloat(String(result.boldFee)) : 0);
           setBoldLinkError(null);
           setBoldLinkOpen(true);
           toast({ title: "Venta registrada y link de pago generado", className: "bg-emerald-500 text-white border-none" });
@@ -653,6 +655,11 @@ export default function Pos() {
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
+                {boldLinkFee > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Incluye {formatCurrency(boldLinkFee)} de recargo bold
+                  </p>
+                )}
 
                 {boldLinkUrl && (
                   <a
