@@ -196,7 +196,8 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
   if (paymentType === "link" && result) {
     try {
       const boldResult = await createBoldPaymentLink({
-        amountCOP: chargedAmount ?? total,
+        amountCOP: total,
+        grossAmountCOP: chargedAmount,
         description: `Factura #${saleId}`,
         reference: `sale-${saleId}`,
         customer: {

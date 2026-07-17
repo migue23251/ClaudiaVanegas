@@ -329,7 +329,8 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
   if (paymentType === "link") {
     try {
       const boldResult = await createBoldPaymentLink({
-        amountCOP: chargedAmount ?? total,
+        amountCOP: total,
+        grossAmountCOP: chargedAmount,
         description: `Factura #${saleId} · ${order.customerName}`,
         customer: {
           fullName: order.customerName,
