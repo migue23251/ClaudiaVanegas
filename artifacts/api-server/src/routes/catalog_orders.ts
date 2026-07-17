@@ -229,14 +229,14 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
     customerId,
     advanceAmount,
     notes,
-    withBoldLink,
+    chargedAmount,
   } = req.body as {
     items: { productId: number; qty: number; unitPrice: number }[];
-    paymentType: "contado" | "credito";
+    paymentType: "efectivo" | "credito" | "datafono" | "link";
     customerId?: number;
     advanceAmount?: number;
     notes?: string;
-    withBoldLink?: boolean;
+    chargedAmount?: number;
   };
 
   if (!paymentType || !items?.length) {
@@ -326,10 +326,10 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
   let paymentLink: string | null = null;
   let boldFee: number | null = null;
 
-  if (withBoldLink) {
+  if (paymentType === "link") {
     try {
       const boldResult = await createBoldPaymentLink({
-        amountCOP: total,
+        amountCOP: chargedAmount ?? total,
         description: `Factura #${saleId} · ${order.customerName}`,
         customer: {
           fullName: order.customerName,

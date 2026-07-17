@@ -12,6 +12,7 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -61,7 +62,20 @@ const fmtDate = (d: string) =>
     hour: "2-digit", minute: "2-digit",
   });
 
-const BOLD_FEE_RATE = 0.05;
+type PaymentType = "efectivo" | "credito" | "datafono" | "link";
+
+const calcChargedTotal = (base: number, method: PaymentType): number => {
+  if (method === "datafono") return Math.floor((base + 300) / 0.9451);
+  if (method === "link") return Math.floor((base + 900) / 0.9421);
+  return base;
+};
+
+const PAYMENT_LABELS: Record<PaymentType, string> = {
+  efectivo: "Efectivo / Transferencia",
+  credito: "Crédito",
+  datafono: "Datáfono",
+  link: "Link de pago",
+};
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
@@ -90,8 +104,7 @@ export default function Pedidos() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [invoiceOrder, setInvoiceOrder] = useState<CatalogOrder | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<EditableItem[]>([]);
-  const [paymentType, setPaymentType] = useState<"contado" | "credito">("contado");
-  const [useBoldLink, setUseBoldLink] = useState(false);
+  const [paymentType, setPaymentType] = useState<PaymentType>("efectivo");
   const [isInvoicing, setIsInvoicing] = useState(false);
   const [cancelOrderId, setCancelOrderId] = useState<number | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -150,18 +163,17 @@ export default function Pedidos() {
 
   // ── Invoice calculations ───────────────────────────────────────────────────
 
-  const invoiceSubtotal = invoiceItems.reduce((s, i) => s + i.editQty * i.editPrice, 0);
-  const invoiceBoldFee  = useBoldLink ? Math.round(invoiceSubtotal * BOLD_FEE_RATE) : 0;
-  const invoiceTotal    = invoiceSubtotal + invoiceBoldFee;
+  const invoiceSubtotal    = invoiceItems.reduce((s, i) => s + i.editQty * i.editPrice, 0);
+  const invoiceChargedTotal = calcChargedTotal(invoiceSubtotal, paymentType);
+  const invoiceSurcharge    = invoiceChargedTotal - invoiceSubtotal;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const openInvoice = (order: CatalogOrder) => {
     setInvoiceOrder(order);
     setInvoiceItems(order.items.map(i => ({ ...i, editQty: i.qty, editPrice: i.unitPrice })));
-    setPaymentType("contado");
+    setPaymentType("efectivo");
     setAdvanceAmount(0);
-    setUseBoldLink(false);
     setSelectedCustomer(null);
     setCustomerSearch("");
     setIsCreatingCustomer(false);
@@ -233,7 +245,7 @@ export default function Pedidos() {
         body: JSON.stringify({
           items: invoiceItems.map(i => ({ productId: i.productId, qty: i.editQty, unitPrice: i.editPrice })),
           paymentType,
-          withBoldLink: useBoldLink,
+          chargedAmount: invoiceSurcharge > 0 ? invoiceChargedTotal : undefined,
           customerId: selectedCustomer?.id,
           advanceAmount: paymentType === "credito" && advanceAmount > 0 ? advanceAmount : undefined,
         }),
@@ -736,22 +748,18 @@ export default function Pedidos() {
 
             {/* Payment type */}
             <div>
-              <p className="text-sm font-semibold mb-2">Tipo de pago</p>
-              <div className="flex gap-2">
-                {(["contado", "credito"] as const).map(pt => (
-                  <button
-                    key={pt}
-                    onClick={() => { setPaymentType(pt); setAdvanceAmount(0); if (pt === "credito") setUseBoldLink(false); }}
-                    className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
-                      paymentType === pt
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40"
-                    }`}
-                  >
-                    {pt === "contado" ? "Contado" : "Crédito (15 días)"}
-                  </button>
-                ))}
-              </div>
+              <p className="text-sm font-semibold mb-2">Método de pago</p>
+              <Select value={paymentType} onValueChange={(v: PaymentType) => { setPaymentType(v); setAdvanceAmount(0); }}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Método de pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="efectivo">Efectivo / Transferencia</SelectItem>
+                  <SelectItem value="credito">Crédito (15 días)</SelectItem>
+                  <SelectItem value="datafono">Datáfono</SelectItem>
+                  <SelectItem value="link">Link de pago</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Advance amount — only for credit payments */}
@@ -776,36 +784,6 @@ export default function Pedidos() {
               </div>
             )}
 
-            {/* Bold link toggle — only for cash (contado) payments */}
-            {paymentType === "contado" && (
-              <div
-                className={`flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer ${
-                  useBoldLink ? "border-primary bg-primary/5" : "border-border"
-                }`}
-                onClick={() => setUseBoldLink(!useBoldLink)}
-              >
-                <div>
-                  <p className="text-sm font-semibold flex items-center gap-2">
-                    <CreditCard className="h-4 w-4 text-primary" />
-                    Generar link de pago Bold
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Se añade el 5% de comisión Bold al total
-                  </p>
-                </div>
-                <div
-                  className={`relative h-6 w-11 rounded-full transition-colors shrink-0 ${
-                    useBoldLink ? "bg-primary" : "bg-muted"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      useBoldLink ? "translate-x-5" : ""
-                    }`}
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Total breakdown */}
             <div className="rounded-xl border border-border bg-card p-3.5 space-y-2 text-sm">
@@ -813,15 +791,15 @@ export default function Pedidos() {
                 <span>Subtotal</span>
                 <span className="tabular-nums">{fmt(invoiceSubtotal)}</span>
               </div>
-              {useBoldLink && (
+              {invoiceSurcharge > 0 && (
                 <div className="flex justify-between text-amber-600 font-medium">
-                  <span>Comisión Bold (5%)</span>
-                  <span className="tabular-nums">+ {fmt(invoiceBoldFee)}</span>
+                  <span>Recargo {PAYMENT_LABELS[paymentType]}</span>
+                  <span className="tabular-nums">+ {fmt(invoiceSurcharge)}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
                 <span>Total a cobrar</span>
-                <span className="text-primary tabular-nums">{fmt(invoiceTotal)}</span>
+                <span className="text-primary tabular-nums">{fmt(invoiceChargedTotal)}</span>
               </div>
               {paymentType === "credito" && advanceAmount > 0 && (
                 <>
@@ -855,7 +833,7 @@ export default function Pedidos() {
             >
               {isInvoicing
                 ? "Procesando..."
-                : useBoldLink
+                : paymentType === "link"
                   ? <><CreditCard className="h-4 w-4" /> Facturar + link Bold</>
                   : <><Receipt className="h-4 w-4" /> Facturar</>
               }
