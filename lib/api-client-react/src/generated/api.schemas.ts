@@ -410,7 +410,6 @@ export type SalePaymentType = typeof SalePaymentType[keyof typeof SalePaymentTyp
 
 export const SalePaymentType = {
   efectivo: 'efectivo',
-  transferencia: 'transferencia',
   credito: 'credito',
   datafono: 'datafono',
   link: 'link',
@@ -482,7 +481,6 @@ export type SaleInputPaymentType = typeof SaleInputPaymentType[keyof typeof Sale
 
 export const SaleInputPaymentType = {
   efectivo: 'efectivo',
-  transferencia: 'transferencia',
   credito: 'credito',
   datafono: 'datafono',
   link: 'link',

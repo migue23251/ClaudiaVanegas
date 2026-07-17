@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
-type PaymentType = "efectivo" | "transferencia" | "credito" | "datafono" | "link";
+type PaymentType = "efectivo" | "credito" | "datafono" | "link";
 
 const calcChargedTotal = (base: number, method: PaymentType): number => {
   if (method === "datafono") return Math.floor((base + 300) / 0.9451);
@@ -27,8 +27,7 @@ const calcChargedTotal = (base: number, method: PaymentType): number => {
 };
 
 const PAYMENT_LABELS: Record<PaymentType, string> = {
-  efectivo: "Efectivo",
-  transferencia: "Transferencia",
+  efectivo: "Efectivo / Transferencia",
   credito: "Crédito",
   datafono: "Datáfono",
   link: "Link de pago",
@@ -416,8 +415,7 @@ export default function Pos() {
               <SelectValue placeholder="Método de pago" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="efectivo">Efectivo</SelectItem>
-              <SelectItem value="transferencia">Transferencia</SelectItem>
+              <SelectItem value="efectivo">Efectivo / Transferencia</SelectItem>
               <SelectItem value="credito">Crédito</SelectItem>
               <SelectItem value="datafono">Datáfono</SelectItem>
               <SelectItem value="link">Link de pago</SelectItem>

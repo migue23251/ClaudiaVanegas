@@ -1754,7 +1754,7 @@ components:
           type: ["string", "null"]
         paymentType:
           type: string
-          enum: [efectivo, transferencia, credito, datafono, link]
+          enum: [efectivo, credito, datafono, link]
         total:
           type: number
         notes:
@@ -1799,7 +1799,7 @@ components:
           type: integer
         paymentType:
           type: string
-          enum: [efectivo, transferencia, credito, datafono, link]
+          enum: [efectivo, credito, datafono, link]
         notes:
           type: string
         advanceAmount:

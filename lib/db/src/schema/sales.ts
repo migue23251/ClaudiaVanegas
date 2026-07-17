@@ -8,7 +8,7 @@ export const salesTable = pgTable("sales", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   customerId: integer("customer_id").references(() => customersTable.id),
-  paymentType: text("payment_type", { enum: ["efectivo", "transferencia", "credito", "datafono", "link"] }).notNull(),
+  paymentType: text("payment_type", { enum: ["efectivo", "credito", "datafono", "link"] }).notNull(),
   total: numeric("total", { precision: 12, scale: 2 }).notNull(),
   notes: text("notes"),
   voided: boolean("voided").notNull().default(false),

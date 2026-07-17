@@ -154,8 +154,10 @@ export default function Ventas() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="contado">Contado</SelectItem>
+              <SelectItem value="efectivo">Efectivo / Transferencia</SelectItem>
               <SelectItem value="credito">Crédito</SelectItem>
+              <SelectItem value="datafono">Datáfono</SelectItem>
+              <SelectItem value="link">Link de pago</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -189,8 +191,11 @@ export default function Ventas() {
                   <TableCell className="font-mono text-xs text-muted-foreground">{(sale as any).customerCedula || "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{sale.userName}</TableCell>
                   <TableCell className="space-y-1">
-                    <Badge variant={sale.paymentType === 'contado' ? "outline" : "secondary"}>
-                      {sale.paymentType === 'contado' ? 'Contado' : 'Crédito'}
+                    <Badge variant={sale.paymentType === 'credito' ? "secondary" : "outline"}>
+                      {sale.paymentType === 'efectivo' ? 'Efectivo / Transf.' :
+                       sale.paymentType === 'credito' ? 'Crédito' :
+                       sale.paymentType === 'datafono' ? 'Datáfono' :
+                       sale.paymentType === 'link' ? 'Link de pago' : sale.paymentType}
                     </Badge>
                     {(sale as any).paymentLink && (
                       <div className="flex items-center gap-1">
@@ -263,8 +268,11 @@ export default function Ventas() {
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-1">Pago</p>
-                  <Badge variant={saleDetail.paymentType === 'contado' ? "outline" : "secondary"}>
-                    {saleDetail.paymentType === 'contado' ? 'Contado' : 'Crédito'}
+                  <Badge variant={saleDetail.paymentType === 'credito' ? "secondary" : "outline"}>
+                    {saleDetail.paymentType === 'efectivo' ? 'Efectivo / Transferencia' :
+                     saleDetail.paymentType === 'credito' ? 'Crédito' :
+                     saleDetail.paymentType === 'datafono' ? 'Datáfono' :
+                     saleDetail.paymentType === 'link' ? 'Link de pago' : saleDetail.paymentType}
                   </Badge>
                 </div>
               </div>

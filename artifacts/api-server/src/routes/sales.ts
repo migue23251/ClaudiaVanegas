@@ -64,7 +64,7 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
     conditions.push(eq(salesTable.userId, parseInt(userId, 10)));
   }
   if (paymentType && typeof paymentType === "string") {
-    conditions.push(eq(salesTable.paymentType, paymentType as "contado" | "credito"));
+    conditions.push(eq(salesTable.paymentType, paymentType as "efectivo" | "credito" | "datafono" | "link"));
   }
   if (from && typeof from === "string") {
     conditions.push(gte(salesTable.createdAt, new Date(from)));
@@ -94,14 +94,14 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
 router.post("/sales", requireAuth, async (req, res): Promise<void> => {
   const { customerId, paymentType, notes, items, advanceAmount, chargedAmount } = req.body as {
     customerId?: number;
-    paymentType: "efectivo" | "transferencia" | "credito" | "datafono" | "link";
+    paymentType: "efectivo" | "credito" | "datafono" | "link";
     notes?: string;
     items: { productId: number; qty: number; unitPrice: number }[];
     advanceAmount?: number;
     chargedAmount?: number;
   };
 
-  const validPaymentTypes = ["efectivo", "transferencia", "credito", "datafono", "link"];
+  const validPaymentTypes = ["efectivo", "credito", "datafono", "link"];
   if (!paymentType || !validPaymentTypes.includes(paymentType) || !items?.length) {
     res.status(400).json({ error: "Tipo de pago e items son requeridos" });
     return;

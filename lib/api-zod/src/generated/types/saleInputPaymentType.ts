@@ -11,7 +11,6 @@ export type SaleInputPaymentType = typeof SaleInputPaymentType[keyof typeof Sale
 
 export const SaleInputPaymentType = {
   efectivo: 'efectivo',
-  transferencia: 'transferencia',
   credito: 'credito',
   datafono: 'datafono',
   link: 'link',
