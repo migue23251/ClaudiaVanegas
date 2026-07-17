@@ -930,7 +930,7 @@ export default function Pedidos() {
             </div>
             {!!boldResult?.fee && (
               <p className="text-xs text-muted-foreground">
-                Incluye {fmt(boldResult.fee)} de recargo
+                Incluye {fmt(boldResult.fee)} de recargo bold
               </p>
             )}
             <a
