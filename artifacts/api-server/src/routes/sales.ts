@@ -272,6 +272,32 @@ router.get("/sales/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(result);
 });
 
+router.patch("/sales/:id/payment-type", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const { paymentType } = req.body as { paymentType?: string };
+
+  const allowed = ["efectivo", "datafono", "link"] as const;
+  if (!paymentType || !(allowed as readonly string[]).includes(paymentType)) {
+    res.status(400).json({ error: "Método de pago inválido. Opciones: efectivo, datafono, link" });
+    return;
+  }
+
+  const [sale] = await db.select().from(salesTable).where(eq(salesTable.id, id));
+  if (!sale) { res.status(404).json({ error: "Venta no encontrada" }); return; }
+  if (sale.voided) { res.status(400).json({ error: "No se puede cambiar el método de pago de una venta anulada" }); return; }
+  if (sale.paymentType === "link" && sale.boldPaymentStatus === "paid") {
+    res.status(400).json({ error: "No se puede cambiar el método de pago de un link Bold ya pagado" });
+    return;
+  }
+
+  await db.update(salesTable)
+    .set({ paymentType: paymentType as "efectivo" | "datafono" | "link" })
+    .where(eq(salesTable.id, id));
+
+  const result = await buildSaleResponse(id);
+  res.json(result);
+});
+
 router.post("/sales/:id/void", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { reason } = req.body as { reason?: string };

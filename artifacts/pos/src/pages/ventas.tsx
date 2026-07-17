@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  useListSales, getListSalesQueryKey, useGetSale, getGetSaleQueryKey, useVoidSale,
+  useListSales, getListSalesQueryKey, useGetSale, getGetSaleQueryKey, useVoidSale, useUpdateSalePaymentType,
 } from "@workspace/api-client-react";
 import type { Sale, SaleItem } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,11 +50,13 @@ export default function Ventas() {
   const [page, setPage] = useState(1);
   const [voidingSaleId, setVoidingSaleId] = useState<number | null>(null);
   const [voidReason, setVoidReason] = useState("");
+  const [changingPaymentType, setChangingPaymentType] = useState(false);
 
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const voidSale = useVoidSale();
+  const updatePaymentType = useUpdateSalePaymentType();
 
   const queryParams = {
     paymentType: paymentType !== "all" ? paymentType as any : undefined,
@@ -113,6 +115,28 @@ export default function Ventas() {
   const handleSearch = (v: string) => { setSearch(v); setPage(1); };
 
   const paginated = (sales ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handlePaymentTypeChange = (newType: string) => {
+    if (!selectedSaleId) return;
+    setChangingPaymentType(true);
+    updatePaymentType.mutate({ id: selectedSaleId, data: { paymentType: newType as "efectivo" | "datafono" | "link" } }, {
+      onSuccess: () => {
+        toast({ title: "Método de pago actualizado" });
+        queryClient.invalidateQueries({ queryKey: getListSalesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetSaleQueryKey(selectedSaleId) });
+        queryClient.invalidateQueries({
+          predicate: (q) => {
+            const key = q.queryKey[0];
+            return typeof key === "string" && key.startsWith("/api/dashboard");
+          },
+        });
+      },
+      onError: (err: any) => {
+        toast({ title: "No se pudo cambiar el método de pago", description: err?.response?.data?.error ?? "Intenta de nuevo", variant: "destructive" });
+      },
+      onSettled: () => setChangingPaymentType(false),
+    });
+  };
 
   const handleVoid = () => {
     if (!voidingSaleId || !voidReason.trim()) return;
@@ -276,12 +300,45 @@ export default function Ventas() {
                 </div>
                 <div>
                   <p className="text-muted-foreground mb-1">Pago</p>
-                  <Badge variant={saleDetail.paymentType === 'credito' ? "secondary" : "outline"}>
-                    {saleDetail.paymentType === 'efectivo' ? 'Efectivo / Transferencia' :
-                     saleDetail.paymentType === 'credito' ? 'Crédito' :
-                     saleDetail.paymentType === 'datafono' ? 'Datáfono' :
-                     saleDetail.paymentType === 'link' ? 'Link de pago' : saleDetail.paymentType}
-                  </Badge>
+                  {(() => {
+                    const isLocked =
+                      saleDetail.voided ||
+                      (saleDetail.paymentType === "link" && saleDetail.boldPaymentStatus === "paid") ||
+                      saleDetail.paymentType === "credito";
+                    const paymentLabel = (t: string) =>
+                      t === "efectivo" ? "Efectivo / Transf." :
+                      t === "credito"  ? "Crédito" :
+                      t === "datafono" ? "Datáfono" :
+                      t === "link"     ? "Link de pago" : t;
+                    if (!isLocked && user?.role === "admin") {
+                      return (
+                        <Select
+                          value={saleDetail.paymentType}
+                          onValueChange={handlePaymentTypeChange}
+                          disabled={changingPaymentType}
+                        >
+                          <SelectTrigger className="h-8 w-44 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="efectivo">Efectivo / Transf.</SelectItem>
+                            <SelectItem value="datafono">Datáfono</SelectItem>
+                            <SelectItem value="link">Link de pago</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      );
+                    }
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Badge variant={saleDetail.paymentType === "credito" ? "secondary" : "outline"}>
+                          {paymentLabel(saleDetail.paymentType)}
+                        </Badge>
+                        {isLocked && saleDetail.paymentType === "link" && saleDetail.boldPaymentStatus === "paid" && (
+                          <span className="text-[10px] text-muted-foreground">(bloqueado)</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

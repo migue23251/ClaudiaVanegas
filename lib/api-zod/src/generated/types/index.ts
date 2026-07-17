@@ -83,6 +83,8 @@ export * from './supplier';
 export * from './supplierInput';
 export * from './supplierUpdate';
 export * from './topProduct';
+export * from './updateSalePaymentTypeInput';
+export * from './updateSalePaymentTypeInputPaymentType';
 export * from './user';
 export * from './userInput';
 export * from './userInputRole';

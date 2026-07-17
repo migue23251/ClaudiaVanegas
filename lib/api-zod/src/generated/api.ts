@@ -927,6 +927,48 @@ export const GetSaleResponse = zod.object({
 
 
 /**
+ * @summary Change the payment method of a sale (admin only, not allowed when Bold link is paid or sale is voided)
+ */
+export const UpdateSalePaymentTypeParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSalePaymentTypeBody = zod.object({
+  "paymentType": zod.enum(['efectivo', 'datafono', 'link'])
+})
+
+export const UpdateSalePaymentTypeResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "userName": zod.string().nullish(),
+  "customerId": zod.number().nullish(),
+  "customerName": zod.string().nullish(),
+  "customerCedula": zod.string().nullish(),
+  "customerEmail": zod.string().nullish(),
+  "customerPhone": zod.string().nullish(),
+  "paymentType": zod.enum(['efectivo', 'credito', 'datafono', 'link']),
+  "total": zod.number(),
+  "notes": zod.string().nullish(),
+  "paymentLink": zod.string().nullish().describe('Bold payment link URL (only present when withBoldLink was requested)'),
+  "boldFee": zod.number().nullish().describe('Bold transaction fee in COP'),
+  "boldPaymentStatus": zod.enum(['pending', 'paid', 'failed', 'expired']).nullish().describe('Status of the Bold payment link (updated via webhook)'),
+  "voided": zod.boolean(),
+  "voidedAt": zod.coerce.date().nullish(),
+  "voidReason": zod.string().nullish(),
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "productName": zod.string(),
+  "description": zod.string().nullish(),
+  "qty": zod.number(),
+  "unitPrice": zod.number(),
+  "subtotal": zod.number()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Void/annul a sale, restoring stock and reversing any related debt
  */
 export const VoidSaleParams = zod.object({

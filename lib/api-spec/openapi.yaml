@@ -803,6 +803,35 @@ paths:
         "404":
           description: Not found
 
+  /sales/{id}/payment-type:
+    patch:
+      operationId: updateSalePaymentType
+      tags: [sales]
+      summary: Change the payment method of a sale (admin only, not allowed when Bold link is paid or sale is voided)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSalePaymentTypeInput"
+      responses:
+        "200":
+          description: Updated sale
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sale"
+        "400":
+          description: Cannot change payment type (voided or Bold link paid)
+        "404":
+          description: Not found
+
   /sales/{id}/void:
     post:
       operationId: voidSale
@@ -1783,6 +1812,14 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    UpdateSalePaymentTypeInput:
+      type: object
+      required: [paymentType]
+      properties:
+        paymentType:
+          type: string
+          enum: [efectivo, datafono, link]
 
     VoidSaleInput:
       type: object

@@ -472,6 +472,19 @@ export interface Sale {
   createdAt: string;
 }
 
+export type UpdateSalePaymentTypeInputPaymentType = typeof UpdateSalePaymentTypeInputPaymentType[keyof typeof UpdateSalePaymentTypeInputPaymentType];
+
+
+export const UpdateSalePaymentTypeInputPaymentType = {
+  efectivo: 'efectivo',
+  datafono: 'datafono',
+  link: 'link',
+} as const;
+
+export interface UpdateSalePaymentTypeInput {
+  paymentType: UpdateSalePaymentTypeInputPaymentType;
+}
+
 export interface VoidSaleInput {
   reason: string;
 }

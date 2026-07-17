@@ -70,6 +70,7 @@ import type {
   SupplierInput,
   SupplierUpdate,
   TopProduct,
+  UpdateSalePaymentTypeInput,
   User,
   UserInput,
   UserUpdate,
@@ -2925,6 +2926,77 @@ export function useGetSale<TData = Awaited<ReturnType<typeof getSale>>, TError =
 
 
 
+
+export const getUpdateSalePaymentTypeUrl = (id: number,) => {
+
+
+
+
+  return `/api/sales/${id}/payment-type`
+}
+
+/**
+ * @summary Change the payment method of a sale (admin only, not allowed when Bold link is paid or sale is voided)
+ */
+export const updateSalePaymentType = async (id: number,
+    updateSalePaymentTypeInput: UpdateSalePaymentTypeInput, options?: RequestInit): Promise<Sale> => {
+
+  return customFetch<Sale>(getUpdateSalePaymentTypeUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateSalePaymentTypeInput)
+  }
+);}
+
+
+
+
+export const getUpdateSalePaymentTypeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSalePaymentType>>, TError,{id: number;data: BodyType<UpdateSalePaymentTypeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSalePaymentType>>, TError,{id: number;data: BodyType<UpdateSalePaymentTypeInput>}, TContext> => {
+
+const mutationKey = ['updateSalePaymentType'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSalePaymentType>>, {id: number;data: BodyType<UpdateSalePaymentTypeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSalePaymentType(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSalePaymentTypeMutationResult = NonNullable<Awaited<ReturnType<typeof updateSalePaymentType>>>
+    export type UpdateSalePaymentTypeMutationBody = BodyType<UpdateSalePaymentTypeInput>
+    export type UpdateSalePaymentTypeMutationError = ErrorType<void>
+
+    /**
+ * @summary Change the payment method of a sale (admin only, not allowed when Bold link is paid or sale is voided)
+ */
+export const useUpdateSalePaymentType = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSalePaymentType>>, TError,{id: number;data: BodyType<UpdateSalePaymentTypeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSalePaymentType>>,
+        TError,
+        {id: number;data: BodyType<UpdateSalePaymentTypeInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSalePaymentTypeMutationOptions(options));
+    }
 
 export const getVoidSaleUrl = (id: number,) => {
 
