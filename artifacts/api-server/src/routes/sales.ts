@@ -311,8 +311,13 @@ router.patch("/sales/:id/payment-type", requireAuth, requireAdmin, async (req, r
   let result = await buildSaleResponse(id);
   let boldError: string | null = null;
 
-  // Changing TO link with no existing link → generate a new Bold link.
-  if (paymentType === "link" && !sale.paymentLink && result) {
+  // Changing TO link → reuse the existing link if it is still active (pending/paid).
+  // Only generate a new one if there is no link yet, or the previous one expired/failed.
+  const needsNewLink = !sale.paymentLink
+    || sale.boldPaymentStatus === "expired"
+    || sale.boldPaymentStatus === "failed";
+
+  if (paymentType === "link" && needsNewLink && result) {
     try {
       const total = parseFloat(sale.total);
       const grossAmountCOP = Math.floor((total + 900) / 0.9421);
