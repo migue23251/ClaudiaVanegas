@@ -290,12 +290,63 @@ router.patch("/sales/:id/payment-type", requireAuth, requireAdmin, async (req, r
     return;
   }
 
-  await db.update(salesTable)
-    .set({ paymentType: paymentType as "efectivo" | "datafono" | "link" })
-    .where(eq(salesTable.id, id));
+  // Build the update: always change the payment type.
+  // Changing FROM link → clear all Bold fields so the UI hides the link box.
+  const updateFields: Parameters<typeof db.update>[0] extends infer T
+    ? Record<string, unknown>
+    : never = { paymentType };
 
-  const result = await buildSaleResponse(id);
-  res.json(result);
+  if (sale.paymentType === "link" && paymentType !== "link") {
+    Object.assign(updateFields, {
+      paymentLink: null,
+      boldLinkId: null,
+      boldReference: null,
+      boldPaymentStatus: null,
+      boldFee: null,
+    });
+  }
+
+  await db.update(salesTable).set(updateFields as any).where(eq(salesTable.id, id));
+
+  let result = await buildSaleResponse(id);
+  let boldError: string | null = null;
+
+  // Changing TO link with no existing link → generate a new Bold link.
+  if (paymentType === "link" && !sale.paymentLink && result) {
+    try {
+      const total = parseFloat(sale.total);
+      const grossAmountCOP = Math.floor((total + 900) / 0.9421);
+      const boldResult = await createBoldPaymentLink({
+        amountCOP: total,
+        grossAmountCOP,
+        description: `Factura #${id}`,
+        reference: `sale-${id}`,
+        customer: {
+          fullName: result.customerName ?? undefined,
+          email: result.customerEmail ?? undefined,
+          phone: result.customerPhone ?? undefined,
+        },
+      });
+      await db.update(salesTable).set({
+        paymentLink: boldResult.url,
+        boldFee: String(boldResult.fee),
+        boldLinkId: boldResult.linkId ?? undefined,
+        boldReference: boldResult.reference,
+        boldPaymentStatus: "pending",
+      }).where(eq(salesTable.id, id));
+      result = {
+        ...result,
+        paymentLink: boldResult.url,
+        boldFee: boldResult.fee,
+        boldPaymentStatus: "pending",
+      } as typeof result;
+    } catch (err) {
+      boldError = (err as Error).message ?? "Error generando link de pago Bold";
+      console.error("[bold] Error generando link:", boldError);
+    }
+  }
+
+  res.json({ ...result, boldError });
 });
 
 router.post("/sales/:id/void", requireAuth, requireAdmin, async (req, res): Promise<void> => {
