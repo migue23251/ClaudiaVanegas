@@ -10,7 +10,7 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
    - `DATABASE_URL` is auto-provisioned by Replit; do not set it manually
 3. `pnpm --filter @workspace/db run push` — apply schema to the database
 4. `pnpm --filter @workspace/db run seed` — insert default admin + cajero accounts (idempotent; safe to run again)
-5. Start workflows via the Replit UI (or `pnpm --filter @workspace/api-server run dev` + `pnpm --filter @workspace/pos run dev`)
+5. Start workflows via the Replit UI — **"API Server"** and **"POS Frontend"** are already configured
 
 ## Run & Operate
 
