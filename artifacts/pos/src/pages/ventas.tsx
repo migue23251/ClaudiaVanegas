@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Eye, Receipt, Search, Ban, Link2, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Eye, Receipt, Search, Ban, Link2, Clock, CheckCircle2, XCircle, AlertTriangle, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -349,7 +349,21 @@ export default function Ventas() {
                       <Link2 className="h-4 w-4 text-primary" />
                       Link de Pago Bold
                     </p>
-                    <BoldStatusBadge status={(saleDetail as any).boldPaymentStatus} />
+                    <div className="flex items-center gap-2">
+                      <BoldStatusBadge status={(saleDetail as any).boldPaymentStatus} />
+                      {user?.role === "admin" && (saleDetail as any).boldPaymentStatus === "expired" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs gap-1"
+                          disabled={changingPaymentType}
+                          onClick={() => handlePaymentTypeChange("link")}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Renovar
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <a
                     href={(saleDetail as any).paymentLink}
