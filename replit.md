@@ -14,8 +14,8 @@ Sistema de Punto de Venta (POS) completo para la tienda de ropa, zapatos y acces
 
 ## Run & Operate
 
-- **API Server workflow**: `PORT=8080 pnpm --filter @workspace/api-server run dev` — proxied at `/api`
-- **POS Frontend workflow**: `PORT=24730 pnpm --filter @workspace/pos run dev` — proxied at `/`
+- **API Server workflow**: `artifacts/api-server: API Server` — proxied at `/api` (port 8080)
+- **POS Frontend workflow**: `artifacts/pos: web` — proxied at `/` (port 24730)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
