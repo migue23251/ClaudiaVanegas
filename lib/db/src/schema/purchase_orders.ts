@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, numeric, timestamp, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, numeric, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { suppliersTable } from "./suppliers";
@@ -18,6 +18,7 @@ export const purchaseOrderItemsTable = pgTable("purchase_order_items", {
   id: serial("id").primaryKey(),
   purchaseOrderId: integer("purchase_order_id").notNull().references(() => purchaseOrdersTable.id),
   productId: integer("product_id").notNull(),
+  variantId: integer("variant_id"),  // nullable — set when product has variants
   qtyOrdered: integer("qty_ordered").notNull(),
   qtyReceived: integer("qty_received").notNull().default(0),
   unitCost: numeric("unit_cost", { precision: 12, scale: 2 }).notNull(),

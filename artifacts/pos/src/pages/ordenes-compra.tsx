@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { 
-  useListPurchaseOrders, getListPurchaseOrdersQueryKey, 
+import { useState, useMemo } from "react";
+import {
+  useListPurchaseOrders, getListPurchaseOrdersQueryKey,
   useCreatePurchaseOrder,
   useUpdatePurchaseOrder,
   useListSuppliers, getListSuppliersQueryKey,
   useListProducts, getListProductsQueryKey,
   useReceivePurchaseOrder,
-  PurchaseOrderInput
+  PurchaseOrderInput, Product, ProductVariant,
 } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,13 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 const PAGE_SIZE = 15;
+
+const COLOR_HEX: Record<string, string> = {
+  blanco: "#FFFFFF", negro: "#111111", gris: "#9CA3AF", beige: "#D4B896", crema: "#FFF8E7",
+  rojo: "#EF4444", rosa: "#F9A8D4", fucsia: "#EC4899", naranja: "#F97316", amarillo: "#FACC15",
+  verde: "#22C55E", azul: "#3B82F6", morado: "#A855F7", vinotinto: "#7F1D1D", café: "#78350F",
+  multicolor: "#E879F9",
+};
 
 function Pagination({ total, page, onChange }: { total: number; page: number; onChange: (p: number) => void }) {
   const pages = Math.ceil(total / PAGE_SIZE);
@@ -40,6 +47,7 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 
 interface LineItem {
   productId: number;
+  variantId?: number;
   qty: number;
   unitCost: number;
 }
@@ -56,7 +64,6 @@ export default function OrdenesCompra() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [page, setPage] = useState(1);
 
-  // Multi-item form state
   const [lineItems, setLineItems] = useState<LineItem[]>([{ productId: 0, qty: 1, unitCost: 0 }]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
 
@@ -74,6 +81,12 @@ export default function OrdenesCompra() {
   const { data: suppliers } = useListSuppliers({ query: { queryKey: getListSuppliersQueryKey() } });
   const { data: products } = useListProducts(undefined, { query: { queryKey: getListProductsQueryKey() } });
 
+  const productMap = useMemo(() => {
+    const map = new Map<number, Product>();
+    products?.forEach(p => map.set(p.id, p));
+    return map;
+  }, [products]);
+
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
 
@@ -87,27 +100,23 @@ export default function OrdenesCompra() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Pendiente';
-      case 'partial': return 'Parcial';
-      case 'received': return 'Recibido';
-      case 'cancelled': return 'Cancelado';
-      default: return status;
-    }
-  };
-
   const createOrder = useCreatePurchaseOrder();
   const receiveOrder = useReceivePurchaseOrder();
   const updateOrder = useUpdatePurchaseOrder();
 
   const addLineItem = () => setLineItems(prev => [...prev, { productId: 0, qty: 1, unitCost: 0 }]);
   const removeLineItem = (idx: number) => setLineItems(prev => prev.filter((_, i) => i !== idx));
-  const updateLineItem = (idx: number, field: keyof LineItem, val: number) => {
+  const updateLineItem = (idx: number, field: keyof LineItem, val: number | undefined) => {
     setLineItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: val } : item));
   };
 
   const orderTotal = lineItems.reduce((sum, i) => sum + (i.qty * i.unitCost), 0);
+
+  // Variant options for a product line item
+  const getVariantOptions = (productId: number): ProductVariant[] => {
+    const product = productMap.get(productId);
+    return product?.variants ?? [];
+  };
 
   const handleCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -123,12 +132,27 @@ export default function OrdenesCompra() {
       return;
     }
 
+    // Validate variant selection for products that have variants
+    for (const item of validItems) {
+      const variants = getVariantOptions(item.productId);
+      if (variants.length > 0 && !item.variantId) {
+        const prod = productMap.get(item.productId);
+        toast({ title: `Seleccione variante para "${prod?.name}"`, variant: "destructive" });
+        return;
+      }
+    }
+
     const data: PurchaseOrderInput = {
       supplierId: Number(selectedSupplierId),
       guideNumber: (formData.get("guideNumber") as string) || undefined,
       paymentType: formData.get("paymentType") as "contado" | "credito",
       notes: formData.get("notes") as string || undefined,
-      items: validItems.map(i => ({ productId: i.productId, qtyOrdered: i.qty, unitCost: i.unitCost }))
+      items: validItems.map(i => ({
+        productId: i.productId,
+        variantId: i.variantId,
+        qtyOrdered: i.qty,
+        unitCost: i.unitCost,
+      })) as any,
     };
 
     createOrder.mutate({ data }, {
@@ -145,7 +169,12 @@ export default function OrdenesCompra() {
   const openEdit = (order: any) => {
     setEditingOrder(order);
     setSelectedSupplierId(order.supplierId.toString());
-    setLineItems(order.items.map((i: any) => ({ productId: i.productId, qty: i.qtyOrdered, unitCost: i.unitCost })));
+    setLineItems(order.items.map((i: any) => ({
+      productId: i.productId,
+      variantId: i.variantId ?? undefined,
+      qty: i.qtyOrdered,
+      unitCost: i.unitCost,
+    })));
     setIsEditOpen(true);
   };
 
@@ -170,7 +199,12 @@ export default function OrdenesCompra() {
         guideNumber: (formData.get("guideNumber") as string) || undefined,
         paymentType: formData.get("paymentType") as "contado" | "credito",
         notes: formData.get("notes") as string || undefined,
-        items: validItems.map(i => ({ productId: i.productId, qtyOrdered: i.qty, unitCost: i.unitCost })),
+        items: validItems.map(i => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          qtyOrdered: i.qty,
+          unitCost: i.unitCost,
+        })) as any,
       },
     }, {
       onSuccess: () => {
@@ -235,6 +269,100 @@ export default function OrdenesCompra() {
 
   const paginated = (orders ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // ── Line item row ─────────────────────────────────────────────────────────
+
+  const LineItemRow = ({ item, idx }: { item: LineItem; idx: number }) => {
+    const product = item.productId ? productMap.get(item.productId) : undefined;
+    const variants = product?.variants ?? [];
+    const selectedVariant = variants.find(v => v.id === item.variantId);
+
+    return (
+      <div className="space-y-2 p-3 bg-muted/30 rounded-lg">
+        <div className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Producto</label>
+            <Select
+              value={item.productId ? item.productId.toString() : ""}
+              onValueChange={(v) => {
+                const prod = products?.find(p => p.id === Number(v));
+                updateLineItem(idx, "productId", Number(v));
+                updateLineItem(idx, "variantId", undefined);
+                if (prod) updateLineItem(idx, "unitCost", prod.costPrice);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+              <SelectContent>
+                {products?.map(p => (
+                  <SelectItem key={p.id} value={p.id.toString()}>
+                    <span>{p.name}</span>
+                    {p.variants && p.variants.length > 0 && (
+                      <span className="text-muted-foreground ml-1 text-xs">({p.variants.length} variantes)</span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Cant.</label>
+            <Input
+              type="number" min="1"
+              value={item.qty}
+              onChange={(e) => updateLineItem(idx, "qty", Number(e.target.value))}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Costo Unit.</label>
+            <Input
+              type="number" min="0"
+              value={item.unitCost}
+              onChange={(e) => updateLineItem(idx, "unitCost", Number(e.target.value))}
+              className="h-9"
+            />
+          </div>
+          <Button
+            type="button" variant="ghost" size="icon"
+            className="h-9 w-8 text-destructive hover:bg-destructive/10"
+            disabled={lineItems.length === 1}
+            onClick={() => removeLineItem(idx)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Variant selector — shown when product has variants */}
+        {item.productId > 0 && variants.length > 0 && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Variante (Color / Talla)</label>
+            <Select
+              value={item.variantId ? item.variantId.toString() : ""}
+              onValueChange={(v) => updateLineItem(idx, "variantId", Number(v))}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Seleccionar variante..." />
+              </SelectTrigger>
+              <SelectContent>
+                {variants.map(v => (
+                  <SelectItem key={v.id} value={v.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} />
+                      <span className="capitalize">{v.color} / {v.size}</span>
+                      <span className="text-muted-foreground text-xs">— SKU: {v.sku} (×{v.stock})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedVariant && (
+              <p className="text-xs text-muted-foreground pl-0.5">Stock actual: {selectedVariant.stock} unidades</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -298,7 +426,6 @@ export default function OrdenesCompra() {
                   <TableCell className="text-right font-serif font-bold">{formatCurrency(order.total)}</TableCell>
                   <TableCell>{getStatusBadge(order.status)}</TableCell>
                   <TableCell className="text-right space-x-1 whitespace-nowrap">
-                    {/* View button — always visible */}
                     <Button variant="ghost" size="icon" className="h-8 w-8" title="Ver detalle" onClick={() => { setViewingOrder(order); setIsViewOpen(true); }}>
                       <Eye className="h-3.5 w-3.5" />
                     </Button>
@@ -386,8 +513,17 @@ export default function OrdenesCompra() {
                       <TableRow key={item.id}>
                         <TableCell>
                           <p className="font-medium text-sm">{item.productName}</p>
-                          {item.description && (
+                          {item.variantColor && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="w-2.5 h-2.5 rounded-full border" style={{ background: COLOR_HEX[item.variantColor] ?? "#ccc" }} />
+                              <span className="text-xs text-muted-foreground capitalize">{item.variantColor} / {item.variantSize}</span>
+                            </div>
+                          )}
+                          {item.description && !item.variantColor && (
                             <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                          )}
+                          {item.variantSku && (
+                            <p className="text-xs text-muted-foreground font-mono">{item.variantSku}</p>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">{formatCurrency(item.unitCost)}</TableCell>
@@ -412,7 +548,7 @@ export default function OrdenesCompra() {
 
       {/* Create Order Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva Orden de Compra</DialogTitle>
           </DialogHeader>
@@ -447,7 +583,6 @@ export default function OrdenesCompra() {
               </Select>
             </div>
 
-            {/* Line items */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Productos a comprar</label>
@@ -456,55 +591,7 @@ export default function OrdenesCompra() {
                 </Button>
               </div>
               {lineItems.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end p-3 bg-muted/30 rounded-lg">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Producto</label>
-                    <Select
-                      value={item.productId ? item.productId.toString() : ""}
-                      onValueChange={(v) => {
-                        const prod = products?.find(p => p.id === Number(v));
-                        updateLineItem(idx, "productId", Number(v));
-                        if (prod) updateLineItem(idx, "unitCost", prod.costPrice);
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                      <SelectContent>
-                        {products?.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
-                            <span>{p.name}</span>
-                            {p.description && <span className="text-muted-foreground ml-1 text-xs">— {p.description}</span>}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Cant.</label>
-                    <Input
-                      type="number" min="1"
-                      value={item.qty}
-                      onChange={(e) => updateLineItem(idx, "qty", Number(e.target.value))}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium">Costo Unit.</label>
-                    <Input
-                      type="number" min="0"
-                      value={item.unitCost}
-                      onChange={(e) => updateLineItem(idx, "unitCost", Number(e.target.value))}
-                      className="h-9"
-                    />
-                  </div>
-                  <Button
-                    type="button" variant="ghost" size="icon"
-                    className="h-9 w-8 text-destructive hover:bg-destructive/10"
-                    disabled={lineItems.length === 1}
-                    onClick={() => removeLineItem(idx)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                <LineItemRow key={idx} item={item} idx={idx} />
               ))}
               <div className="flex justify-end text-sm font-semibold text-foreground">
                 Total: <span className="ml-2 font-serif text-primary">{formatCurrency(orderTotal)}</span>
@@ -526,7 +613,7 @@ export default function OrdenesCompra() {
 
       {/* Edit Order Dialog */}
       <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEditingOrder(null); setLineItems([{ productId: 0, qty: 1, unitCost: 0 }]); setSelectedSupplierId(""); } }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Orden de Compra</DialogTitle>
           </DialogHeader>
@@ -570,57 +657,9 @@ export default function OrdenesCompra() {
                   </Button>
                 </div>
                 {lineItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end p-3 bg-muted/30 rounded-lg">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium">Producto</label>
-                      <Select
-                        value={item.productId ? item.productId.toString() : ""}
-                        onValueChange={(v) => {
-                          const prod = products?.find(p => p.id === Number(v));
-                          updateLineItem(idx, "productId", Number(v));
-                          if (prod) updateLineItem(idx, "unitCost", prod.costPrice);
-                        }}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                        <SelectContent>
-                          {products?.map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              <span>{p.name}</span>
-                              {p.description && <span className="text-muted-foreground ml-1 text-xs">— {p.description}</span>}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium">Cant.</label>
-                      <Input
-                        type="number" min="1"
-                        value={item.qty}
-                        onChange={(e) => updateLineItem(idx, "qty", Number(e.target.value))}
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium">Costo Unit.</label>
-                      <Input
-                        type="number" min="0"
-                        value={item.unitCost}
-                        onChange={(e) => updateLineItem(idx, "unitCost", Number(e.target.value))}
-                        className="h-9"
-                      />
-                    </div>
-                    <Button
-                      type="button" variant="ghost" size="icon"
-                      className="h-9 w-8 text-destructive hover:bg-destructive/10"
-                      disabled={lineItems.length === 1}
-                      onClick={() => removeLineItem(idx)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <LineItemRow key={idx} item={item} idx={idx} />
                 ))}
-                <div className="flex justify-end text-sm font-semibold text-foreground">
+                <div className="flex justify-end text-sm font-semibold">
                   Total: <span className="ml-2 font-serif text-primary">{formatCurrency(orderTotal)}</span>
                 </div>
               </div>
@@ -632,72 +671,85 @@ export default function OrdenesCompra() {
 
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={updateOrder.isPending}>Guardar Cambios</Button>
+                <Button type="submit" disabled={updateOrder.isPending}>Guardar cambios</Button>
               </DialogFooter>
             </form>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Receive Dialog */}
+      {/* Receive Order Dialog */}
       <Dialog open={isReceiveOpen} onOpenChange={setIsReceiveOpen}>
-        <DialogContent className="sm:max-w-[680px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Recibir Mercancía — {selectedOrder?.guideNumber ?? `Orden #${selectedOrder?.id}`}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <PackageCheck className="h-5 w-5 text-primary" />
+              Recibir Mercancía
+            </DialogTitle>
           </DialogHeader>
           {selectedOrder && (
-            <form onSubmit={handleReceiveSubmit} className="space-y-4 py-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Producto</TableHead>
-                    <TableHead className="text-right">Pedido</TableHead>
-                    <TableHead className="text-right">Ya Recibido</TableHead>
-                    <TableHead className="text-right w-24">A Recibir</TableHead>
-                    <TableHead className="text-right w-32">Precio Venta</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedOrder.items.map((item: any) => {
-                    const remaining = item.qtyOrdered - item.qtyReceived;
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell>
+            <form onSubmit={handleReceiveSubmit} className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Registra las unidades físicamente recibidas. Si vas a actualizar el precio de venta, ingrésalo en el campo correspondiente.
+              </p>
+              <div className="space-y-3">
+                {selectedOrder.items.map((item: any) => {
+                  const remaining = item.qtyOrdered - item.qtyReceived;
+                  return (
+                    <div key={item.id} className="p-3 border rounded-lg space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
                           <p className="font-medium text-sm">{item.productName}</p>
-                          {item.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                          {item.variantColor && (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="w-2.5 h-2.5 rounded-full border" style={{ background: COLOR_HEX[item.variantColor] ?? "#ccc" }} />
+                              <span className="text-xs text-muted-foreground capitalize">{item.variantColor} / {item.variantSize}</span>
+                            </div>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right">{item.qtyOrdered}</TableCell>
-                        <TableCell className="text-right">{item.qtyReceived}</TableCell>
-                        <TableCell className="text-right">
+                          {item.variantSku && (
+                            <p className="text-xs text-muted-foreground font-mono">{item.variantSku}</p>
+                          )}
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground shrink-0 ml-2">
+                          <p>Pedido: {item.qtyOrdered}</p>
+                          <p>Ya recibido: {item.qtyReceived}</p>
+                          <p className="font-medium text-foreground">Pendiente: {remaining}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">Unidades a recibir ahora</label>
                           <Input
-                            name={`qty_${item.id}`}
                             type="number" min="0" max={remaining}
-                            defaultValue={remaining > 0 ? remaining : 0}
-                            disabled={remaining === 0}
-                            className="w-20 ml-auto h-8 text-right"
+                            name={`qty_${item.id}`}
+                            defaultValue={remaining}
+                            className="h-8 text-sm"
                           />
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium">
+                            Precio venta
+                            <span className="text-muted-foreground ml-1">(opcional)</span>
+                          </label>
                           <Input
+                            type="number" min="0"
                             name={`salePrice_${item.id}`}
-                            type="number" min="0" step="100"
                             defaultValue={item.salePrice ?? ""}
-                            placeholder={item.salePrice ? String(item.salePrice) : "Sin cambio"}
-                            disabled={remaining === 0}
-                            className="w-28 ml-auto h-8 text-right"
+                            placeholder={item.salePrice ? `Actual: $${item.salePrice.toLocaleString("es-CO")}` : "Sin cambios"}
+                            className="h-8 text-sm"
                           />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              <p className="text-xs text-muted-foreground">💡 El precio de venta se actualizará en el inventario si lo modificas aquí.</p>
-              <DialogFooter className="pt-4">
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsReceiveOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={receiveOrder.isPending}>Confirmar Recepción</Button>
+                <Button type="submit" disabled={receiveOrder.isPending}>
+                  <PackageCheck className="h-4 w-4 mr-1.5" />
+                  {receiveOrder.isPending ? "Registrando..." : "Confirmar recepción"}
+                </Button>
               </DialogFooter>
             </form>
           )}

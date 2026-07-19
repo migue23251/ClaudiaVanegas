@@ -9,9 +9,17 @@
 export interface SaleItem {
   id: number;
   productId: number;
+  /** @nullable */
+  variantId?: number | null;
   productName: string;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  variantColor?: string | null;
+  /** @nullable */
+  variantSize?: string | null;
+  /** @nullable */
+  variantSku?: string | null;
   qty: number;
   unitPrice: number;
   subtotal: number;

@@ -3,3 +3,4 @@
 - [POS environment setup](pos-environment-setup.md) — JWT_SECRET/seed-user handling when (re)provisioning this project after import.
 - [POS schema extension pattern](pos-schema-extension.md) — how to safely add optional columns and update the full stack (DB → spec → codegen → frontend).
 - [Bold webhook shape](bold-webhook-shape.md) — real signature algorithm (base64-then-HMAC) and CloudEvents payload; sales matched by `bold_reference`, not link ID.
+- [POS Variants System](pos-variants-system.md) — full-stack color/size variants: DB table, stock sync, API routes, cartKey pattern, and per-page UI summary.

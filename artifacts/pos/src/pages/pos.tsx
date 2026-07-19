@@ -3,7 +3,7 @@ import {
   useListProducts, getListProductsQueryKey,
   useListCustomers, getListCustomersQueryKey,
   useCreateSale, useUpdateCustomer, useCreateCustomer,
-  Product, Customer, CustomerInput
+  Product, ProductVariant, Customer, CustomerInput
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +33,38 @@ const PAYMENT_LABELS: Record<PaymentType, string> = {
   link: "Link de pago",
 };
 
-interface CartItem extends Product {
+const COLOR_HEX: Record<string, string> = {
+  blanco: "#FFFFFF", negro: "#111111", gris: "#9CA3AF", beige: "#D4B896", crema: "#FFF8E7",
+  rojo: "#EF4444", rosa: "#F9A8D4", fucsia: "#EC4899", naranja: "#F97316", amarillo: "#FACC15",
+  verde: "#22C55E", azul: "#3B82F6", morado: "#A855F7", vinotinto: "#7F1D1D", café: "#78350F",
+  multicolor: "#E879F9",
+};
+
+// Cart item keyed by productId + variantId so same product with different variants can coexist
+interface CartItem {
+  cartKey: string;          // `${productId}-${variantId ?? "none"}`
+  productId: number;
+  variantId?: number;
+  variantColor?: string;
+  variantSize?: string;
+  variantSku?: string;
+  variantStock?: number;    // max available for this variant
+  name: string;
+  code: string;
+  description?: string | null;
+  images?: string[];
+  stock: number;            // total product stock (for simple products)
+  salePrice: number;
   cartQty: number;
   cartPrice: number;
+}
+
+function makeCartKey(productId: number, variantId?: number) {
+  return `${productId}-${variantId ?? "none"}`;
+}
+
+function maxStock(item: CartItem) {
+  return item.variantId !== undefined ? (item.variantStock ?? 0) : item.stock;
 }
 
 export default function Pos() {
@@ -48,6 +77,11 @@ export default function Pos() {
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [mobileTab, setMobileTab] = useState<"products" | "cart">("products");
+
+  // Variant picker
+  const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
+  const [pickerColor, setPickerColor] = useState<string | null>(null);
+  const [pickerSize, setPickerSize] = useState<string | null>(null);
 
   // Bold link state
   const [boldLinkOpen, setBoldLinkOpen] = useState(false);
@@ -75,32 +109,95 @@ export default function Pos() {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
 
+  // ── Variant picker helpers ──────────────────────────────────────────────────
+
+  const availableColors = useMemo(() => {
+    if (!variantPickerProduct?.variants) return [];
+    return [...new Set(variantPickerProduct.variants.map(v => v.color))];
+  }, [variantPickerProduct]);
+
+  const availableSizes = useMemo(() => {
+    if (!variantPickerProduct?.variants || !pickerColor) return [];
+    return variantPickerProduct.variants
+      .filter(v => v.color === pickerColor)
+      .map(v => v.size);
+  }, [variantPickerProduct, pickerColor]);
+
+  const selectedVariant = useMemo((): ProductVariant | null => {
+    if (!variantPickerProduct?.variants || !pickerColor || !pickerSize) return null;
+    return variantPickerProduct.variants.find(v => v.color === pickerColor && v.size === pickerSize) ?? null;
+  }, [variantPickerProduct, pickerColor, pickerSize]);
+
+  const openVariantPicker = (product: Product) => {
+    setVariantPickerProduct(product);
+    setPickerColor(null);
+    setPickerSize(null);
+  };
+
+  const confirmVariantAdd = () => {
+    if (!variantPickerProduct || !selectedVariant) return;
+    if (selectedVariant.stock <= 0) {
+      toast({ title: "Esta variante no tiene stock disponible", variant: "destructive" });
+      return;
+    }
+    addToCartDirectly(variantPickerProduct, selectedVariant);
+    setVariantPickerProduct(null);
+  };
+
   // ── Cart operations ────────────────────────────────────────────────────────
 
   const addToCart = (product: Product) => {
+    if (product.variants && product.variants.length > 0) {
+      openVariantPicker(product);
+      return;
+    }
+    addToCartDirectly(product, undefined);
+  };
+
+  const addToCartDirectly = (product: Product, variant?: ProductVariant) => {
+    const cartKey = makeCartKey(product.id, variant?.id);
+    const stockAvailable = variant ? variant.stock : product.stock;
+
     setCart(prev => {
-      const existing = prev.find(p => p.id === product.id);
+      const existing = prev.find(p => p.cartKey === cartKey);
       if (existing) {
-        if (existing.cartQty >= product.stock) {
+        if (existing.cartQty >= stockAvailable) {
           toast({ title: "Stock insuficiente", variant: "destructive" });
           return prev;
         }
-        return prev.map(p => p.id === product.id ? { ...p, cartQty: p.cartQty + 1 } : p);
+        return prev.map(p => p.cartKey === cartKey ? { ...p, cartQty: p.cartQty + 1 } : p);
       }
-      if (product.stock <= 0) {
+      if (stockAvailable <= 0) {
         toast({ title: "Producto sin stock", variant: "destructive" });
         return prev;
       }
-      return [...prev, { ...product, cartQty: 1, cartPrice: product.salePrice }];
+      const newItem: CartItem = {
+        cartKey,
+        productId: product.id,
+        variantId: variant?.id,
+        variantColor: variant?.color,
+        variantSize: variant?.size,
+        variantSku: variant?.sku,
+        variantStock: variant?.stock,
+        name: product.name,
+        code: product.code,
+        description: product.description,
+        images: product.images,
+        stock: product.stock,
+        salePrice: product.salePrice,
+        cartQty: 1,
+        cartPrice: product.salePrice,
+      };
+      return [...prev, newItem];
     });
   };
 
-  const updateCartQty = (id: number, delta: number) => {
+  const updateCartQty = (cartKey: string, delta: number) => {
     setCart(prev => prev.map(p => {
-      if (p.id !== id) return p;
+      if (p.cartKey !== cartKey) return p;
       const newQty = p.cartQty + delta;
       if (newQty < 1) return p;
-      if (newQty > p.stock) {
+      if (newQty > maxStock(p)) {
         toast({ title: "Stock máximo alcanzado", variant: "destructive" });
         return p;
       }
@@ -108,12 +205,12 @@ export default function Pos() {
     }));
   };
 
-  const updateCartPrice = (id: number, price: number) => {
-    setCart(prev => prev.map(p => p.id === id ? { ...p, cartPrice: price } : p));
+  const updateCartPrice = (cartKey: string, price: number) => {
+    setCart(prev => prev.map(p => p.cartKey === cartKey ? { ...p, cartPrice: price } : p));
   };
 
-  const removeFromCart = (id: number) => {
-    setCart(prev => prev.filter(p => p.id !== id));
+  const removeFromCart = (cartKey: string) => {
+    setCart(prev => prev.filter(p => p.cartKey !== cartKey));
   };
 
   const total = useMemo(() => cart.reduce((acc, item) => acc + (item.cartQty * item.cartPrice), 0), [cart]);
@@ -147,9 +244,10 @@ export default function Pos() {
         advanceAmount: advance > 0 ? advance : undefined,
         chargedAmount: surcharge > 0 ? chargedTotal : undefined,
         items: cart.map(item => ({
-          productId: item.id,
+          productId: item.productId,
+          variantId: item.variantId,
           qty: item.cartQty,
-          unitPrice: item.cartPrice
+          unitPrice: item.cartPrice,
         }))
       } as any
     }, {
@@ -174,7 +272,7 @@ export default function Pos() {
         queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
       },
       onError: (err: any) => {
-        toast({ title: "Error registrando la venta", description: err.message, variant: "destructive" });
+        toast({ title: "Error registrando la venta", description: err?.response?.data?.error ?? err.message, variant: "destructive" });
       }
     });
   };
@@ -269,12 +367,23 @@ export default function Pos() {
             <CardContent className="p-2.5">
               <div className="text-[10px] text-muted-foreground mb-0.5 font-mono leading-none">{product.code}</div>
               <h3 className="font-semibold text-xs line-clamp-2 leading-tight mb-0.5 min-h-[2rem]">{product.name}</h3>
-              {product.description && <p className="text-[10px] text-muted-foreground line-clamp-1 mb-1 leading-tight">{product.description}</p>}
+              {/* Color swatches for variants */}
+              {product.variants && product.variants.length > 0 && (
+                <div className="flex gap-0.5 mb-1 flex-wrap">
+                  {[...new Set(product.variants.map(v => v.color))].slice(0, 6).map(color => (
+                    <span key={color} className="w-2.5 h-2.5 rounded-full border border-border" style={{ background: COLOR_HEX[color] ?? "#ccc" }} title={color} />
+                  ))}
+                </div>
+              )}
               <div className="flex justify-between items-end gap-1">
                 <span className="font-serif font-bold text-primary text-sm leading-none">{formatCurrency(product.salePrice)}</span>
-                <span className={`text-[10px] shrink-0 ${product.stock > 0 ? "text-muted-foreground" : "text-destructive font-semibold"}`}>
-                  ×{product.stock}
-                </span>
+                {product.variants && product.variants.length > 0 ? (
+                  <Badge variant="secondary" className="text-[9px] h-4 px-1">Variantes</Badge>
+                ) : (
+                  <span className={`text-[10px] shrink-0 ${product.stock > 0 ? "text-muted-foreground" : "text-destructive font-semibold"}`}>
+                    ×{product.stock}
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -372,31 +481,39 @@ export default function Pos() {
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0">
           {cart.map(item => (
-            <div key={item.id} className="flex flex-col gap-2 p-3 border rounded-lg bg-background">
+            <div key={item.cartKey} className="flex flex-col gap-2 p-3 border rounded-lg bg-background">
               <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                   <p className="font-medium text-sm leading-tight truncate">{item.name}</p>
-                  {item.description && <p className="text-xs text-muted-foreground line-clamp-1 leading-tight">{item.description}</p>}
-                  <p className="text-xs text-muted-foreground font-mono">{item.code}</p>
+                  {item.variantColor && (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="w-2.5 h-2.5 rounded-full border" style={{ background: COLOR_HEX[item.variantColor] ?? "#ccc" }} />
+                      <span className="text-xs text-muted-foreground capitalize">{item.variantColor} / {item.variantSize}</span>
+                    </div>
+                  )}
+                  {!item.variantColor && item.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-1 leading-tight">{item.description}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground font-mono">{item.variantSku ?? item.code}</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFromCart(item.id)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeFromCart(item.cartKey)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-1.5 border rounded-md p-0.5">
-                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm" onClick={() => updateCartQty(item.id, -1)}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm" onClick={() => updateCartQty(item.cartKey, -1)}>
                     <Minus className="h-3 w-3" />
                   </Button>
                   <span className="text-sm font-semibold w-5 text-center tabular-nums">{item.cartQty}</span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm" onClick={() => updateCartQty(item.id, 1)}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm" onClick={() => updateCartQty(item.cartKey, 1)}>
                     <Plus className="h-3 w-3" />
                   </Button>
                 </div>
                 <Input
                   type="number"
                   value={item.cartPrice}
-                  onChange={(e) => updateCartPrice(item.id, Number(e.target.value))}
+                  onChange={(e) => updateCartPrice(item.cartKey, Number(e.target.value))}
                   className="w-28 h-8 text-right font-serif text-sm"
                 />
               </div>
@@ -447,7 +564,6 @@ export default function Pos() {
             </div>
           )}
 
-          {/* Totals */}
           {surcharge > 0 ? (
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground">
@@ -541,6 +657,84 @@ export default function Pos() {
         </button>
       )}
 
+      {/* Variant Picker Dialog */}
+      <Dialog open={!!variantPickerProduct} onOpenChange={(open) => { if (!open) setVariantPickerProduct(null); }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle className="leading-tight">{variantPickerProduct?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-2">
+            {/* Color selection */}
+            <div className="space-y-2.5">
+              <label className="text-sm font-semibold">Color</label>
+              <div className="flex flex-wrap gap-2">
+                {availableColors.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => { setPickerColor(color); setPickerSize(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                      pickerColor === color
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <span className="w-3 h-3 rounded-full border border-white/50" style={{ background: COLOR_HEX[color] ?? "#ccc" }} />
+                    <span className="capitalize">{color}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Size selection (shown after color) */}
+            {pickerColor && (
+              <div className="space-y-2.5">
+                <label className="text-sm font-semibold">Talla</label>
+                <div className="flex flex-wrap gap-2">
+                  {availableSizes.map(size => {
+                    const v = variantPickerProduct?.variants?.find(v => v.color === pickerColor && v.size === size);
+                    const outOfStock = !v || v.stock <= 0;
+                    return (
+                      <button
+                        key={size}
+                        onClick={() => !outOfStock && setPickerSize(size)}
+                        disabled={outOfStock}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                          pickerSize === size
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : outOfStock
+                              ? "border-border text-muted-foreground opacity-40 cursor-not-allowed line-through"
+                              : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        {size}
+                        {!outOfStock && v && <span className="ml-1 text-muted-foreground">({v.stock})</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Selected variant info */}
+            {selectedVariant && (
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg text-sm">
+                <span className="w-4 h-4 rounded-full border" style={{ background: COLOR_HEX[selectedVariant.color] ?? "#ccc" }} />
+                <div>
+                  <span className="font-medium capitalize">{selectedVariant.color} / {selectedVariant.size}</span>
+                  <span className="text-muted-foreground ml-2">— {selectedVariant.stock} disponibles</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVariantPickerProduct(null)}>Cancelar</Button>
+            <Button onClick={confirmVariantAdd} disabled={!selectedVariant}>
+              <Plus className="h-4 w-4 mr-1.5" /> Agregar al carrito
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Customer Dialog */}
       <Dialog open={isEditingCustomer} onOpenChange={setIsEditingCustomer}>
         <DialogContent>
@@ -626,15 +820,9 @@ export default function Pos() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {boldLinkError ? (
-                <>
-                  <span className="h-5 w-5 text-destructive">⚠️</span>
-                  Error al generar link Bold
-                </>
+                <><span className="h-5 w-5 text-destructive">⚠️</span>Error al generar link Bold</>
               ) : (
-                <>
-                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  Link de pago Bold generado
-                </>
+                <><CheckCircle2 className="h-5 w-5 text-emerald-500" />Link de pago Bold generado</>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -646,9 +834,7 @@ export default function Pos() {
               </div>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground">
-                  Comparte este link con el cliente para que realice el pago en línea.
-                </p>
+                <p className="text-sm text-muted-foreground">Comparte este link con el cliente para que realice el pago en línea.</p>
                 <div className="flex gap-2">
                   <Input value={boldLinkUrl ?? ""} readOnly className="text-xs font-mono bg-muted" />
                   <Button variant="outline" size="icon" onClick={copyBoldLink} title="Copiar link">
@@ -656,11 +842,8 @@ export default function Pos() {
                   </Button>
                 </div>
                 {boldLinkFee > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Incluye {formatCurrency(boldLinkFee)} de recargo bold
-                  </p>
+                  <p className="text-xs text-muted-foreground">Incluye {formatCurrency(boldLinkFee)} de recargo bold</p>
                 )}
-
                 {boldLinkUrl && (
                   <a
                     href={`https://wa.me/?text=${encodeURIComponent(`Aquí está tu link de pago: ${boldLinkUrl}`)}`}

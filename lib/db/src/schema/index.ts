@@ -1,5 +1,6 @@
 export * from "./users";
 export * from "./products";
+export * from "./product_variants";
 export * from "./customers";
 export * from "./suppliers";
 export * from "./purchase_orders";

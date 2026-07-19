@@ -149,7 +149,17 @@ export const ListProductsResponseItem = zod.object({
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
+  "createdAt": zod.coerce.date(),
+  "variants": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
+}))
 })
 export const ListProductsResponse = zod.array(ListProductsResponseItem)
 
@@ -179,7 +189,17 @@ export const CreateProductResponse = zod.object({
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
+  "createdAt": zod.coerce.date(),
+  "variants": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
+}))
 })
 
 
@@ -246,7 +266,17 @@ export const GetProductResponse = zod.object({
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
+  "createdAt": zod.coerce.date(),
+  "variants": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
+}))
 })
 
 
@@ -279,7 +309,17 @@ export const UpdateProductResponse = zod.object({
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
+  "createdAt": zod.coerce.date(),
+  "variants": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
+}))
 })
 
 
@@ -315,8 +355,84 @@ export const SetProductVisibilityResponse = zod.object({
   "category": zod.enum(['blusas', 'jeans', 'vestidos', 'conjuntos', 'faldas', 'chaquetas', 'zapatos', 'bolsos', 'accesorios']),
   "images": zod.array(zod.string()),
   "isVisible": zod.boolean().describe('Whether the product is shown in the public catalog'),
+  "createdAt": zod.coerce.date(),
+  "variants": zod.array(zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
+  "createdAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Add a new color/size variant to a product
+ */
+export const CreateProductVariantParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CreateProductVariantBody = zod.object({
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string().optional().describe('Auto-generated if not provided (CODE-COLOR-SIZE)'),
+  "stock": zod.number().optional(),
+  "images": zod.array(zod.string()).optional()
+})
+
+export const CreateProductVariantResponse = zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Update a product variant (stock, images, color, size)
+ */
+export const UpdateProductVariantParams = zod.object({
+  "id": zod.coerce.number(),
+  "variantId": zod.coerce.number()
+})
+
+export const UpdateProductVariantBody = zod.object({
+  "color": zod.string().optional(),
+  "size": zod.string().optional(),
+  "sku": zod.string().optional(),
+  "stock": zod.number().optional(),
+  "images": zod.array(zod.string()).optional()
+})
+
+export const UpdateProductVariantResponse = zod.object({
+  "id": zod.number(),
+  "productId": zod.number(),
+  "color": zod.string(),
+  "size": zod.string(),
+  "sku": zod.string(),
+  "stock": zod.number(),
+  "images": zod.array(zod.string()),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a product variant
+ */
+export const DeleteProductVariantParams = zod.object({
+  "id": zod.coerce.number(),
+  "variantId": zod.coerce.number()
+})
+
+export const DeleteProductVariantResponse = zod.void()
 
 
 /**
@@ -517,9 +633,13 @@ export const ListPurchaseOrdersResponseItem = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
   "salePrice": zod.number().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -539,6 +659,7 @@ export const CreatePurchaseOrderBody = zod.object({
   "notes": zod.string().optional(),
   "items": zod.array(zod.object({
   "productId": zod.number(),
+  "variantId": zod.number().optional().describe('Required when the product has variants'),
   "qtyOrdered": zod.number(),
   "unitCost": zod.number()
 }))
@@ -556,9 +677,13 @@ export const CreatePurchaseOrderResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
   "salePrice": zod.number().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -586,9 +711,13 @@ export const GetPurchaseOrderResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
   "salePrice": zod.number().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -612,6 +741,7 @@ export const UpdatePurchaseOrderBody = zod.object({
   "notes": zod.string().optional(),
   "items": zod.array(zod.object({
   "productId": zod.number(),
+  "variantId": zod.number().optional().describe('Required when the product has variants'),
   "qtyOrdered": zod.number(),
   "unitCost": zod.number()
 })).optional()
@@ -629,9 +759,13 @@ export const UpdatePurchaseOrderResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
   "salePrice": zod.number().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -667,9 +801,13 @@ export const ReceivePurchaseOrderResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
   "salePrice": zod.number().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qtyOrdered": zod.number(),
   "qtyReceived": zod.number(),
   "unitCost": zod.number()
@@ -830,8 +968,12 @@ export const ListSalesResponseItem = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -852,6 +994,7 @@ export const CreateSaleBody = zod.object({
   "chargedAmount": zod.number().optional().describe('Gross amount charged to the customer after surcharges (used for Bold link generation on \'link\' payment type)'),
   "items": zod.array(zod.object({
   "productId": zod.number(),
+  "variantId": zod.number().optional().describe('Required when the product has variants'),
   "qty": zod.number(),
   "unitPrice": zod.number()
 }))
@@ -878,8 +1021,12 @@ export const CreateSaleResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -916,8 +1063,12 @@ export const GetSaleResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -958,8 +1109,12 @@ export const UpdateSalePaymentTypeResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()
@@ -1000,8 +1155,12 @@ export const VoidSaleResponse = zod.object({
   "items": zod.array(zod.object({
   "id": zod.number(),
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
   "description": zod.string().nullish(),
+  "variantColor": zod.string().nullish(),
+  "variantSize": zod.string().nullish(),
+  "variantSku": zod.string().nullish(),
   "qty": zod.number(),
   "unitPrice": zod.number(),
   "subtotal": zod.number()

@@ -1,10 +1,13 @@
 import { Router, type IRouter } from "express";
-import { eq, and, gte, lte, or, ilike, desc, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, desc, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { db, salesTable, saleItemsTable, productsTable, customersTable, usersTable, accountsReceivableTable, arPaymentsTable } from "@workspace/db";
+import {
+  db, salesTable, saleItemsTable, productsTable, customersTable, usersTable,
+  accountsReceivableTable, arPaymentsTable, productVariantsTable,
+} from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { sendInvoiceEmail, sendPaymentLinkEmail } from "../lib/email";
-import { bogotaNow, bogotaToday } from "../lib/tz";
+import { bogotaNow } from "../lib/tz";
 import { createBoldPaymentLink } from "../lib/bold";
 
 const router: IRouter = Router();
@@ -19,13 +22,18 @@ async function buildSaleResponse(saleId: number) {
   const items = await db.select({
     id: saleItemsTable.id,
     productId: saleItemsTable.productId,
+    variantId: saleItemsTable.variantId,
     qty: saleItemsTable.qty,
     unitPrice: saleItemsTable.unitPrice,
     subtotal: saleItemsTable.subtotal,
     productName: productsTable.name,
     description: productsTable.description,
+    variantColor: productVariantsTable.color,
+    variantSize: productVariantsTable.size,
+    variantSku: productVariantsTable.sku,
   }).from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
+    .leftJoin(productVariantsTable, eq(saleItemsTable.variantId, productVariantsTable.id))
     .where(eq(saleItemsTable.saleId, saleId));
 
   return {
@@ -47,6 +55,9 @@ async function buildSaleResponse(saleId: number) {
       ...i,
       productName: i.productName ?? "Desconocido",
       description: i.description ?? null,
+      variantColor: i.variantColor ?? null,
+      variantSize: i.variantSize ?? null,
+      variantSku: i.variantSku ?? null,
       unitPrice: parseFloat(i.unitPrice),
       subtotal: parseFloat(i.subtotal),
     })),
@@ -57,7 +68,6 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
   const { userId, paymentType, from, to, search } = req.query;
   const conditions: SQL[] = [];
 
-  // Cajero only sees their own sales
   if (req.user!.role === "cajero") {
     conditions.push(eq(salesTable.userId, req.user!.userId));
   } else if (userId && typeof userId === "string") {
@@ -79,7 +89,6 @@ router.get("/sales", requireAuth, async (req, res): Promise<void> => {
 
   let results = (await Promise.all(sales.map(s => buildSaleResponse(s.id)))).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof buildSaleResponse>>>[];
 
-  // Client-side filter by customer name or cedula (after joining)
   if (search && typeof search === "string") {
     const q = search.toLowerCase();
     results = results.filter(r =>
@@ -96,7 +105,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
     customerId?: number;
     paymentType: "efectivo" | "credito" | "datafono" | "link";
     notes?: string;
-    items: { productId: number; qty: number; unitPrice: number }[];
+    items: { productId: number; variantId?: number; qty: number; unitPrice: number }[];
     advanceAmount?: number;
     chargedAmount?: number;
   };
@@ -107,7 +116,7 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  // Validate all products exist and have enough stock before writing anything
+  // Validate all products/variants exist and have enough stock
   for (const item of items) {
     if (item.qty <= 0 || item.unitPrice < 0) {
       res.status(400).json({ error: `Cantidad o precio inválido para el producto ${item.productId}` });
@@ -118,16 +127,31 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
       res.status(400).json({ error: `Producto con ID ${item.productId} no existe` });
       return;
     }
-    if (product.stock < item.qty) {
-      res.status(400).json({ error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` });
-      return;
+
+    if (item.variantId) {
+      const [variant] = await db
+        .select()
+        .from(productVariantsTable)
+        .where(and(eq(productVariantsTable.id, item.variantId), eq(productVariantsTable.productId, item.productId)));
+      if (!variant) {
+        res.status(400).json({ error: `Variante ${item.variantId} no es válida para el producto "${product.name}"` });
+        return;
+      }
+      if (variant.stock < item.qty) {
+        res.status(400).json({ error: `Stock insuficiente para "${product.name}" (${variant.color} / ${variant.size}). Disponible: ${variant.stock}` });
+        return;
+      }
+    } else {
+      if (product.stock < item.qty) {
+        res.status(400).json({ error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` });
+        return;
+      }
     }
   }
 
   const total = items.reduce((sum, i) => sum + i.qty * i.unitPrice, 0);
   const advance = Math.max(0, Math.min(advanceAmount ?? 0, total));
 
-  // Wrap all writes in a transaction for atomicity
   const saleId = await db.transaction(async (tx) => {
     const [sale] = await tx.insert(salesTable).values({
       userId: req.user!.userId,
@@ -141,22 +165,32 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
       items.map(i => ({
         saleId: sale.id,
         productId: i.productId,
+        variantId: i.variantId ?? null,
         qty: i.qty,
         unitPrice: String(i.unitPrice),
         subtotal: String(i.qty * i.unitPrice),
       }))
     );
 
-    // Reduce stock for each product
+    // Deduct stock
     for (const item of items) {
-      await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} - ${item.qty}` })
-        .where(eq(productsTable.id, item.productId));
+      if (item.variantId) {
+        await tx.update(productVariantsTable)
+          .set({ stock: sql`${productVariantsTable.stock} - ${item.qty}` })
+          .where(eq(productVariantsTable.id, item.variantId));
+        // Sync product total stock
+        await tx.update(productsTable)
+          .set({ stock: sql`(SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${item.productId})` })
+          .where(eq(productsTable.id, item.productId));
+      } else {
+        await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} - ${item.qty}` })
+          .where(eq(productsTable.id, item.productId));
+      }
     }
 
-    // For credit sales, create an accounts receivable entry
+    // For credit sales, create accounts receivable entry
     if (paymentType === "credito") {
-      // dueDate = 15 days after today in Bogotá timezone
       const { y: dy, m: dm, d: dd } = bogotaNow();
       const base = new Date(Date.UTC(dy, dm, dd + 15));
       const dueDateStr = `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}`;
@@ -174,9 +208,6 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
         status,
       }).returning();
 
-      // Record the advance as an actual ar_payments row so it's counted in
-      // collection/recaudo reporting (dashboard sums ar_payments, not the
-      // accounts_receivable.paidAmount field directly).
       if (advance > 0) {
         await tx.insert(arPaymentsTable).values({
           accountReceivableId: ar.id,
@@ -192,7 +223,6 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
   let result = await buildSaleResponse(saleId);
   let boldError: string | null = null;
 
-  // Generate Bold payment link for 'link' payment type
   if (paymentType === "link" && result) {
     try {
       const boldResult = await createBoldPaymentLink({
@@ -229,7 +259,6 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
 
   res.status(201).json({ ...result, boldError });
 
-  // Fire-and-forget invoice email — does not block or affect the sale response
   if (result?.customerEmail) {
     sendInvoiceEmail({
       saleId: result.id,
@@ -246,7 +275,6 @@ router.post("/sales", requireAuth, async (req, res): Promise<void> => {
       console.error("[email] Error enviando factura:", err?.message ?? err);
     });
 
-    // Fire-and-forget payment link email — only when a Bold link was generated
     if (result.paymentLink) {
       sendPaymentLinkEmail({
         saleId: result.id,
@@ -265,7 +293,6 @@ router.get("/sales/:id", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const result = await buildSaleResponse(id);
   if (!result) { res.status(404).json({ error: "Venta no encontrada" }); return; }
-  // Cajero can only see own sales
   if (req.user!.role === "cajero" && result.userId !== req.user!.userId) {
     res.status(403).json({ error: "Acceso denegado" }); return;
   }
@@ -290,19 +317,11 @@ router.patch("/sales/:id/payment-type", requireAuth, requireAdmin, async (req, r
     return;
   }
 
-  // Build the update: always change the payment type.
-  // Changing FROM link → clear all Bold fields so the UI hides the link box.
-  const updateFields: Parameters<typeof db.update>[0] extends infer T
-    ? Record<string, unknown>
-    : never = { paymentType };
+  const updateFields: Record<string, unknown> = { paymentType };
 
   if (sale.paymentType === "link" && paymentType !== "link") {
     Object.assign(updateFields, {
-      paymentLink: null,
-      boldLinkId: null,
-      boldReference: null,
-      boldPaymentStatus: null,
-      boldFee: null,
+      paymentLink: null, boldLinkId: null, boldReference: null, boldPaymentStatus: null, boldFee: null,
     });
   }
 
@@ -311,8 +330,6 @@ router.patch("/sales/:id/payment-type", requireAuth, requireAdmin, async (req, r
   let result = await buildSaleResponse(id);
   let boldError: string | null = null;
 
-  // Changing TO link → reuse the existing link if it is still active (pending/paid).
-  // Only generate a new one if there is no link yet, or the previous one expired/failed.
   const needsNewLink = !sale.paymentLink
     || sale.boldPaymentStatus === "expired"
     || sale.boldPaymentStatus === "failed";
@@ -369,9 +386,6 @@ router.post("/sales/:id/void", requireAuth, requireAdmin, async (req, res): Prom
   let alreadyVoided = false;
 
   await db.transaction(async (tx) => {
-    // Atomic guarded update: only proceed if this request is the one that actually
-    // transitions the sale from non-voided to voided. Prevents double stock-restore
-    // / double AR-cleanup from concurrent void requests on the same sale.
     const updated = await tx.update(salesTable).set({
       voided: true,
       voidedAt: new Date(),
@@ -387,12 +401,21 @@ router.post("/sales/:id/void", requireAuth, requireAdmin, async (req, res): Prom
 
     // Return items to stock
     for (const item of items) {
-      await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} + ${item.qty}` })
-        .where(eq(productsTable.id, item.productId));
+      if (item.variantId) {
+        await tx.update(productVariantsTable)
+          .set({ stock: sql`${productVariantsTable.stock} + ${item.qty}` })
+          .where(eq(productVariantsTable.id, item.variantId));
+        // Sync product total stock
+        await tx.update(productsTable)
+          .set({ stock: sql`(SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${item.productId})` })
+          .where(eq(productsTable.id, item.productId));
+      } else {
+        await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} + ${item.qty}` })
+          .where(eq(productsTable.id, item.productId));
+      }
     }
 
-    // If it was a credit sale, remove the outstanding debt (accounts receivable)
     const [ar] = await tx.select().from(accountsReceivableTable).where(eq(accountsReceivableTable.saleId, id));
     if (ar) {
       await tx.delete(arPaymentsTable).where(eq(arPaymentsTable.accountReceivableId, ar.id));

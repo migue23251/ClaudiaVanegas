@@ -3,7 +3,8 @@ import {
   useListProducts, getListProductsQueryKey, useCreateProduct, useUpdateProduct, useDeleteProduct,
   useSetProductVisibility,
   useGetProductMovements, getGetProductMovementsQueryKey,
-  ProductInput, Product,
+  useCreateProductVariant, useUpdateProductVariant, useDeleteProductVariant,
+  ProductInput, Product, ProductVariant,
 } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, History, Eye, EyeOff } from "lucide-react";
+import { Plus, Search, Edit, Trash2, History, Eye, EyeOff, Layers, Pencil } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -28,8 +29,26 @@ const CATEGORIES = [
   { value: "chaquetas", label: "Chaquetas" },
   { value: "zapatos",   label: "Zapatos" },
   { value: "bolsos",    label: "Bolsos" },
-  { value: "accesorios",label: "Accesorios" },
+  { value: "accesorios","label": "Accesorios" },
 ] as const;
+
+const VARIANT_COLORS = [
+  "blanco","negro","gris","beige","crema","rojo","rosa","fucsia","naranja",
+  "amarillo","verde","azul","morado","vinotinto","café","multicolor",
+] as const;
+
+const VARIANT_SIZES = [
+  "XS","S","M","L","XL","XXL",
+  "34","35","36","37","38","39","40","41","42",
+  "6","8","10","12","14","16","Único",
+] as const;
+
+const COLOR_HEX: Record<string, string> = {
+  blanco: "#FFFFFF", negro: "#111111", gris: "#9CA3AF", beige: "#D4B896", crema: "#FFF8E7",
+  rojo: "#EF4444", rosa: "#F9A8D4", fucsia: "#EC4899", naranja: "#F97316", amarillo: "#FACC15",
+  verde: "#22C55E", azul: "#3B82F6", morado: "#A855F7", vinotinto: "#7F1D1D", café: "#78350F",
+  multicolor: "#E879F9",
+};
 
 type CategoryValue = typeof CATEGORIES[number]["value"];
 
@@ -49,6 +68,152 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
     </div>
   );
 }
+
+// ── Variant row component ─────────────────────────────────────────────────────
+
+interface VariantRowProps {
+  variant: ProductVariant;
+  productId: number;
+  onUpdated: () => void;
+}
+
+function VariantRow({ variant, productId, onUpdated }: VariantRowProps) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [editStock, setEditStock] = useState(String(variant.stock));
+  const [editColor, setEditColor] = useState(variant.color);
+  const [editSize, setEditSize] = useState(variant.size);
+
+  const updateVariant = useUpdateProductVariant();
+  const deleteVariant = useDeleteProductVariant();
+
+  const handleSave = () => {
+    updateVariant.mutate({
+      id: productId,
+      variantId: variant.id,
+      data: { stock: parseInt(editStock, 10), color: editColor, size: editSize },
+    }, {
+      onSuccess: () => { setEditing(false); onUpdated(); },
+      onError: () => toast({ title: "Error actualizando variante", variant: "destructive" }),
+    });
+  };
+
+  const handleDelete = () => {
+    if (!confirm("¿Eliminar esta variante?")) return;
+    deleteVariant.mutate({ id: productId, variantId: variant.id }, {
+      onSuccess: () => onUpdated(),
+      onError: () => toast({ title: "Error eliminando variante", variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-2 p-2.5 border rounded-lg bg-background text-sm">
+      <span className="w-4 h-4 rounded-full border shrink-0" style={{ background: COLOR_HEX[variant.color] ?? "#ccc" }} />
+      {editing ? (
+        <>
+          <Select value={editColor} onValueChange={setEditColor}>
+            <SelectTrigger className="h-7 text-xs w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {VARIANT_COLORS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={editSize} onValueChange={setEditSize}>
+            <SelectTrigger className="h-7 text-xs w-20"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input
+            type="number" min="0"
+            value={editStock}
+            onChange={e => setEditStock(e.target.value)}
+            className="h-7 w-16 text-xs"
+          />
+          <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={updateVariant.isPending}>Guardar</Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(false)}>Cancelar</Button>
+        </>
+      ) : (
+        <>
+          <span className="capitalize font-medium w-20">{variant.color}</span>
+          <span className="text-muted-foreground w-12">{variant.size}</span>
+          <span className="font-mono text-xs text-muted-foreground flex-1">{variant.sku}</span>
+          <Badge variant={variant.stock <= 5 ? "destructive" : "outline"} className="text-xs">
+            ×{variant.stock}
+          </Badge>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditing(true)}>
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={handleDelete}>
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Add Variant Form ──────────────────────────────────────────────────────────
+
+function AddVariantForm({ productId, onAdded }: { productId: number; onAdded: () => void }) {
+  const { toast } = useToast();
+  const [color, setColor] = useState<string>("");
+  const [size, setSize] = useState<string>("");
+  const [stock, setStock] = useState("0");
+  const createVariant = useCreateProductVariant();
+
+  const handleAdd = () => {
+    if (!color || !size) {
+      toast({ title: "Selecciona color y talla", variant: "destructive" });
+      return;
+    }
+    createVariant.mutate({
+      id: productId,
+      data: { color, size, stock: parseInt(stock, 10) },
+    }, {
+      onSuccess: () => { setColor(""); setSize(""); setStock("0"); onAdded(); },
+      onError: (err: any) => toast({ title: "Error agregando variante", description: err?.response?.data?.error, variant: "destructive" }),
+    });
+  };
+
+  return (
+    <div className="flex items-end gap-2 p-3 bg-muted/30 rounded-lg border border-dashed">
+      <div className="space-y-1 flex-1">
+        <label className="text-xs font-medium">Color</label>
+        <Select value={color} onValueChange={setColor}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Color..." /></SelectTrigger>
+          <SelectContent>
+            {VARIANT_COLORS.map(c => (
+              <SelectItem key={c} value={c}>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full border" style={{ background: COLOR_HEX[c] ?? "#ccc" }} />
+                  <span className="capitalize">{c}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1 w-24">
+        <label className="text-xs font-medium">Talla</label>
+        <Select value={size} onValueChange={setSize}>
+          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Talla..." /></SelectTrigger>
+          <SelectContent>
+            {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1 w-16">
+        <label className="text-xs font-medium">Stock</label>
+        <Input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} className="h-8 text-xs" />
+      </div>
+      <Button size="sm" className="h-8 gap-1 shrink-0" onClick={handleAdd} disabled={createVariant.isPending}>
+        <Plus className="h-3.5 w-3.5" /> Agregar
+      </Button>
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Inventario() {
   const [search, setSearch] = useState("");
@@ -89,23 +254,23 @@ export default function Inventario() {
   const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const hasVariants = (editingProduct?.variants?.length ?? 0) > 0;
     const data: ProductInput = {
-      // Code is always auto-generated on creation and cannot be changed on edit.
       name: formData.get("name") as string,
       description: formData.get("description") as string || undefined,
       category: formData.get("category") as CategoryValue,
       costPrice: Number(formData.get("costPrice")),
       salePrice: Number(formData.get("salePrice")),
-      stock: Number(formData.get("stock")),
+      stock: hasVariants ? editingProduct!.stock : Number(formData.get("stock")),
       images: (formData.get("images") as string).split(",").map(s => s.trim()).filter(Boolean)
     };
 
     if (editingProduct) {
       updateProd.mutate({ id: editingProduct.id, data }, {
-        onSuccess: () => {
+        onSuccess: (updated) => {
           toast({ title: "Producto actualizado" });
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
-          setIsDialogOpen(false);
+          setEditingProduct(updated);
         }
       });
     } else {
@@ -140,6 +305,11 @@ export default function Inventario() {
         queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
       }
     });
+  };
+
+  const refreshProduct = () => {
+    queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+    // Also refresh the editing product's variants by re-fetching product list
   };
 
   const paginated = (products ?? []).slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -192,15 +362,16 @@ export default function Inventario() {
               <TableHead className="text-right">Costo</TableHead>
               <TableHead className="text-right">Venta</TableHead>
               <TableHead className="text-right">Stock</TableHead>
+              <TableHead className="text-center">Variantes</TableHead>
               <TableHead className="text-center">Catálogo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Cargando...</TableCell></TableRow>
             ) : paginated.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No se encontraron productos</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No se encontraron productos</TableCell></TableRow>
             ) : (
               paginated.map((product) => (
                 <TableRow key={product.id} className={!product.isVisible ? "opacity-60" : undefined}>
@@ -211,6 +382,18 @@ export default function Inventario() {
                   <TableCell className="text-right font-serif font-bold">{formatCurrency(product.salePrice)}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant={product.stock <= 5 ? "destructive" : "outline"}>{product.stock}</Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {product.variants && product.variants.length > 0 ? (
+                      <div className="flex items-center justify-center gap-0.5">
+                        {product.variants.slice(0, 5).map(v => (
+                          <span key={v.id} className="w-3 h-3 rounded-full border border-border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} title={`${v.color} / ${v.size}: ×${v.stock}`} />
+                        ))}
+                        {product.variants.length > 5 && <span className="text-xs text-muted-foreground ml-0.5">+{product.variants.length - 5}</span>}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     <Button
@@ -250,75 +433,156 @@ export default function Inventario() {
         )}
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+      {/* Product dialog — create / edit */}
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) setEditingProduct(null); }}>
+        <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSave} className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              {editingProduct && (
+
+          <Tabs defaultValue="info" className="pt-1">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="info">Información</TabsTrigger>
+              <TabsTrigger value="variants" disabled={!editingProduct}>
+                <Layers className="h-3.5 w-3.5 mr-1.5" />
+                Variantes {editingProduct && editingProduct.variants && editingProduct.variants.length > 0 ? `(${editingProduct.variants.length})` : ""}
+              </TabsTrigger>
+            </TabsList>
+
+            {/* ── Info tab ──────────────────────────────────────────────────── */}
+            <TabsContent value="info">
+              <form onSubmit={handleSave} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {editingProduct && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Código
+                        <span className="text-xs text-muted-foreground ml-1">(no se puede modificar)</span>
+                      </label>
+                      <Input value={editingProduct.code} disabled readOnly />
+                    </div>
+                  )}
+                  <div className="space-y-2 col-span-2 sm:col-span-1">
+                    <label className="text-sm font-medium">Nombre</label>
+                    <Input name="name" defaultValue={editingProduct?.name} required />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Código
-                    <span className="text-xs text-muted-foreground ml-1">(no se puede modificar)</span>
-                  </label>
-                  <Input value={editingProduct.code} disabled readOnly />
+                  <label className="text-sm font-medium">Descripción</label>
+                  <Input name="description" defaultValue={editingProduct?.description || ""} />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Categoría</label>
+                    <Select name="category" defaultValue={editingProduct?.category || "blusas"}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(c => (
+                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Stock
+                      {editingProduct && editingProduct.variants && editingProduct.variants.length > 0 && (
+                        <span className="text-xs text-muted-foreground ml-1">(calculado de variantes)</span>
+                      )}
+                    </label>
+                    <Input
+                      name="stock"
+                      type="number"
+                      min="0"
+                      defaultValue={editingProduct?.stock || 0}
+                      readOnly={!!(editingProduct && editingProduct.variants && editingProduct.variants.length > 0)}
+                      className={editingProduct && editingProduct.variants && editingProduct.variants.length > 0 ? "bg-muted" : ""}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Precio de Costo</label>
+                    <Input name="costPrice" type="number" min="0" defaultValue={editingProduct?.costPrice} required />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Precio de Venta</label>
+                    <Input name="salePrice" type="number" min="0" defaultValue={editingProduct?.salePrice} required />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">URLs de Imágenes (separadas por coma)</label>
+                  <Input name="images" defaultValue={editingProduct?.images?.join(", ") || ""} placeholder="https://..." />
+                </div>
+
+                <DialogFooter className="pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+                  <Button type="submit" disabled={createProd.isPending || updateProd.isPending}>
+                    {editingProduct ? "Guardar cambios" : "Crear producto"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </TabsContent>
+
+            {/* ── Variants tab ───────────────────────────────────────────────── */}
+            <TabsContent value="variants">
+              {editingProduct && (
+                <div className="py-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Cada variante tiene su propio stock. El stock total del producto es la suma de todas las variantes.
+                  </p>
+
+                  {(!editingProduct.variants || editingProduct.variants.length === 0) && (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      Sin variantes. Agrega la primera variante abajo.
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {editingProduct.variants?.map(v => (
+                      <VariantRow
+                        key={v.id}
+                        variant={v}
+                        productId={editingProduct.id}
+                        onUpdated={() => {
+                          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+                          // Refresh editing product
+                          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
+                            const updated = queryClient.getQueryData<Product[]>(getListProductsQueryKey());
+                            const found = updated?.find(p => p.id === editingProduct.id);
+                            if (found) setEditingProduct(found);
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <AddVariantForm
+                    productId={editingProduct.id}
+                    onAdded={() => {
+                      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
+                        const updated = queryClient.getQueryData<Product[]>(getListProductsQueryKey());
+                        const found = updated?.find(p => p.id === editingProduct.id);
+                        if (found) setEditingProduct(found);
+                      });
+                    }}
+                  />
+
+                  <DialogFooter className="pt-2">
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cerrar</Button>
+                  </DialogFooter>
                 </div>
               )}
-              <div className="space-y-2 col-span-2 sm:col-span-1">
-                <label className="text-sm font-medium">Nombre</label>
-                <Input name="name" defaultValue={editingProduct?.name} required />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción</label>
-              <Input name="description" defaultValue={editingProduct?.description || ""} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Categoría</label>
-                <Select name="category" defaultValue={editingProduct?.category || "blusas"}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map(c => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Stock</label>
-                <Input name="stock" type="number" min="0" defaultValue={editingProduct?.stock || 0} required />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Precio de Costo</label>
-                <Input name="costPrice" type="number" min="0" defaultValue={editingProduct?.costPrice} required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Precio de Venta</label>
-                <Input name="salePrice" type="number" min="0" defaultValue={editingProduct?.salePrice} required />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">URLs de Imágenes (separadas por coma)</label>
-              <Input name="images" defaultValue={editingProduct?.images?.join(", ") || ""} placeholder="https://..." />
-            </div>
-
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={createProd.isPending || updateProd.isPending}>Guardar</Button>
-            </DialogFooter>
-          </form>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
+      {/* Movements dialog */}
       <Dialog open={!!movementsProduct} onOpenChange={(open) => !open && setMovementsProduct(null)}>
         <DialogContent className="sm:max-w-[650px]">
           <DialogHeader>

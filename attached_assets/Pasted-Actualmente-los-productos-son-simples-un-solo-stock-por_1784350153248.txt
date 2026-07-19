@@ -1,0 +1,44 @@
+Actualmente los productos son simples (un solo stock por producto). Necesito refactorizar todo el sistema para soportar **variantes de productos** por **color** y **talla**, con control de stock **independiente por combinación** (color + talla).
+
+### Requisitos específicos:
+
+1. **Modelo de datos (base de datos)**
+   - Crear tabla/modelo `ProductVariants` o similar.
+   - Cada variante debe tener: id, productId, color (string o código), size (string), sku (único, ej: TSHIRT-RED-M), stock (integer), price (opcional si varía), images (array si quieres imágenes por color).
+   - El producto padre (Products) tendrá campos generales: nombre, descripción, categoría, precio base, etc.
+   - Mantener compatibilidad con datos existentes (migración suave).
+
+2. **Inventario**
+   - Listar productos con sus variantes.
+   - Editar stock por variante (color + talla).
+   - Ver stock total del producto (suma de variantes).
+   - Alertas de stock bajo por variante.
+
+3. **Órdenes de Compra (Proveedores)**
+   - Al crear/Editar una orden de compra, poder seleccionar el producto + color + talla.
+   - Al recibir mercancía, incrementar stock de la variante específica.
+
+4. **Catálogo Público (Frontend)**
+   - En la página de producto mostrar selectores/swatches de colores y tallas.
+   - Actualizar stock disponible en tiempo real (deshabilitar opciones sin stock).
+   - Mostrar imágenes según color seleccionado (si es posible).
+   - Filtros en la lista de productos por color/talla.
+
+5. **Punto de Venta (POS)**
+   - Al agregar producto al carrito/venta, permitir selección de color y talla.
+   - Validar stock disponible de esa variante antes de agregar.
+   - Restar stock al confirmar la venta.
+
+6. **Otras mejoras**
+   - Generación automática de SKU (ej: [CÓDIGO_PRODUCTO]-[COLOR_ABR]-[TALLA]).
+   - Definir listas maestras de Colores y Tallas (para reutilizar y evitar errores de escritura).
+   - UI/UX amigable: usar chips o swatches para colores, botones para tallas.
+   - Validaciones fuertes (no permitir stock negativo).
+   - Actualizar todas las rutas API, componentes React y lógica existente.
+
+
+### Instrucciones para ti (Replit AI):
+- Primero analiza la estructura actual del proyecto (busca carpetas como src/, server/, models, routes, components, etc.).
+- Propón un plan paso a paso claro antes de hacer cambios masivos.
+- Usa buenas prácticas: separación de concerns, TypeScript si está configurado, validación con Zod/Joi, etc.
+- Implementa de forma incremental: primero backend (modelos y rutas), luego frontend.

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProductCategory } from './productCategory';
+import type { ProductVariant } from './productVariant';
 
 export interface Product {
   id: number;
@@ -21,4 +22,5 @@ export interface Product {
   /** Whether the product is shown in the public catalog */
   isVisible: boolean;
   createdAt: Date;
+  variants: ProductVariant[];
 }

@@ -8,6 +8,8 @@
 
 export interface PurchaseOrderItemInput {
   productId: number;
+  /** Required when the product has variants */
+  variantId?: number;
   qtyOrdered: number;
   unitCost: number;
 }

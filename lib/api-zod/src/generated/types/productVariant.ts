@@ -6,10 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface SaleItemInput {
+export interface ProductVariant {
+  id: number;
   productId: number;
-  /** Required when the product has variants */
-  variantId?: number;
-  qty: number;
-  unitPrice: number;
+  color: string;
+  size: string;
+  sku: string;
+  stock: number;
+  images: string[];
+  createdAt: Date;
 }

@@ -12,6 +12,7 @@ tags:
   - name: auth
   - name: users
   - name: products
+  - name: variants
   - name: customers
   - name: suppliers
   - name: purchaseOrders
@@ -337,6 +338,84 @@ paths:
                 $ref: "#/components/schemas/Product"
         "404":
           description: Not found
+
+  # ─── VARIANTS ────────────────────────────────────────────────────────────────
+  /products/{id}/variants:
+    post:
+      operationId: createProductVariant
+      tags: [variants]
+      summary: Add a new color/size variant to a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariantInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductVariant"
+        "404":
+          description: Not found
+
+  /products/{id}/variants/{variantId}:
+    put:
+      operationId: updateProductVariant
+      tags: [variants]
+      summary: Update a product variant (stock, images, color, size)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: variantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductVariantUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductVariant"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProductVariant
+      tags: [variants]
+      summary: Delete a product variant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: variantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 
   # ─── CUSTOMERS ───────────────────────────────────────────────────────────────
   /customers:
@@ -1313,10 +1392,69 @@ components:
         password:
           type: string
 
+    # ─── PRODUCT VARIANT ─────────────────────────────────────────────────────
+    ProductVariant:
+      type: object
+      required: [id, productId, color, size, sku, stock, images, createdAt]
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        color:
+          type: string
+        size:
+          type: string
+        sku:
+          type: string
+        stock:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ProductVariantInput:
+      type: object
+      required: [color, size]
+      properties:
+        color:
+          type: string
+        size:
+          type: string
+        sku:
+          type: string
+          description: Auto-generated if not provided (CODE-COLOR-SIZE)
+        stock:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+
+    ProductVariantUpdate:
+      type: object
+      properties:
+        color:
+          type: string
+        size:
+          type: string
+        sku:
+          type: string
+        stock:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+
     # ─── PRODUCT ─────────────────────────────────────────────────────────────
     Product:
       type: object
-      required: [id, code, name, costPrice, salePrice, stock, category, images, isVisible, createdAt]
+      required: [id, code, name, costPrice, salePrice, stock, category, images, isVisible, createdAt, variants]
       properties:
         id:
           type: integer
@@ -1345,6 +1483,10 @@ components:
         createdAt:
           type: string
           format: date-time
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductVariant"
 
     ProductInput:
       type: object
@@ -1556,12 +1698,20 @@ components:
           type: integer
         productId:
           type: integer
+        variantId:
+          type: ["integer", "null"]
         productName:
           type: string
         description:
           type: ["string", "null"]
         salePrice:
           type: ["number", "null"]
+        variantColor:
+          type: ["string", "null"]
+        variantSize:
+          type: ["string", "null"]
+        variantSku:
+          type: ["string", "null"]
         qtyOrdered:
           type: integer
         qtyReceived:
@@ -1575,6 +1725,9 @@ components:
       properties:
         productId:
           type: integer
+        variantId:
+          type: integer
+          description: Required when the product has variants
         qtyOrdered:
           type: integer
         unitCost:
@@ -1739,9 +1892,17 @@ components:
           type: integer
         productId:
           type: integer
+        variantId:
+          type: ["integer", "null"]
         productName:
           type: string
         description:
+          type: ["string", "null"]
+        variantColor:
+          type: ["string", "null"]
+        variantSize:
+          type: ["string", "null"]
+        variantSku:
           type: ["string", "null"]
         qty:
           type: integer
@@ -1756,6 +1917,9 @@ components:
       properties:
         productId:
           type: integer
+        variantId:
+          type: integer
+          description: Required when the product has variants
         qty:
           type: integer
         unitPrice:

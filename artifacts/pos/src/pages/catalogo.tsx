@@ -25,6 +25,14 @@ interface StoreInfo {
   tiktokUrl: string | null;
 }
 
+interface CatalogVariant {
+  id: number;
+  color: string;
+  size: string;
+  sku: string;
+  stock: number;
+}
+
 interface CatalogProduct {
   id: number;
   name: string;
@@ -33,6 +41,7 @@ interface CatalogProduct {
   category: string;
   images: string[];
   stock: number;
+  variants: CatalogVariant[];
 }
 
 interface CatalogData {
@@ -42,7 +51,11 @@ interface CatalogData {
 }
 
 interface CartItem {
+  cartKey: string;          // `${productId}-${variantId ?? "none"}`
   productId: number;
+  variantId?: number;
+  variantColor?: string;
+  variantSize?: string;
   productName: string;
   description: string | null;
   unitPrice: number;
@@ -56,6 +69,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   blusas: "Blusas", jeans: "Jeans", vestidos: "Vestidos",
   conjuntos: "Conjuntos", faldas: "Faldas", chaquetas: "Chaquetas",
   zapatos: "Zapatos", bolsos: "Bolsos", accesorios: "Accesorios",
+};
+
+const COLOR_HEX: Record<string, string> = {
+  blanco: "#FFFFFF", negro: "#111111", gris: "#9CA3AF", beige: "#D4B896", crema: "#FFF8E7",
+  rojo: "#EF4444", rosa: "#F9A8D4", fucsia: "#EC4899", naranja: "#F97316", amarillo: "#FACC15",
+  verde: "#22C55E", azul: "#3B82F6", morado: "#A855F7", vinotinto: "#7F1D1D", café: "#78350F",
+  multicolor: "#E879F9",
 };
 
 /** WhatsApp glyph — lucide-react has no brand icons, so it's inlined here. */
@@ -139,11 +159,24 @@ function ProductModal({
 }: {
   product: CatalogProduct;
   onClose: () => void;
-  onAddToCart: (product: CatalogProduct) => void;
+  onAddToCart: (product: CatalogProduct, variantId?: number, variantColor?: string, variantSize?: string) => void;
   cartQty: number;
 }) {
   const srcs = product.images.length > 0 ? product.images : [PLACEHOLDER];
   const [mainIdx, setMainIdx] = useState(0);
+  const [pickerColor, setPickerColor] = useState<string | null>(null);
+  const [pickerSize, setPickerSize] = useState<string | null>(null);
+
+  const hasVariants = product.variants && product.variants.length > 0;
+  const uniqueColors = hasVariants ? [...new Set(product.variants.map(v => v.color))] : [];
+  const availableSizes = pickerColor
+    ? product.variants.filter(v => v.color === pickerColor).map(v => v.size)
+    : [];
+  const selectedVariant = pickerColor && pickerSize
+    ? product.variants.find(v => v.color === pickerColor && v.size === pickerSize) ?? null
+    : null;
+
+  const canAdd = !hasVariants || !!selectedVariant;
 
   const prev = useCallback(() => setMainIdx(i => (i - 1 + srcs.length) % srcs.length), [srcs.length]);
   const next = useCallback(() => setMainIdx(i => (i + 1) % srcs.length), [srcs.length]);
@@ -240,12 +273,75 @@ function ProductModal({
                 {product.description}
               </p>
             )}
+
+            {/* Variant selector */}
+            {hasVariants && (
+              <div className="space-y-3">
+                {/* Color picker */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">Color{pickerColor && <span className="ml-2 font-normal capitalize text-muted-foreground">{pickerColor}</span>}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {uniqueColors.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => { setPickerColor(color); setPickerSize(null); }}
+                        title={color}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${
+                          pickerColor === color ? "border-primary scale-110 shadow-md" : "border-border hover:border-primary/50"
+                        }`}
+                        style={{ background: COLOR_HEX[color] ?? "#ccc" }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Size picker — shown after color is selected */}
+                {pickerColor && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Talla</p>
+                    <div className="flex flex-wrap gap-2">
+                      {availableSizes.map(size => {
+                        const v = product.variants.find(v => v.color === pickerColor && v.size === size);
+                        const outOfStock = !v || v.stock <= 0;
+                        return (
+                          <button
+                            key={size}
+                            onClick={() => !outOfStock && setPickerSize(size)}
+                            disabled={outOfStock}
+                            className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                              pickerSize === size
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : outOfStock
+                                  ? "border-border text-muted-foreground opacity-40 cursor-not-allowed line-through"
+                                  : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!pickerColor && (
+                  <p className="text-xs text-muted-foreground">Selecciona un color para ver las tallas disponibles</p>
+                )}
+              </div>
+            )}
+
             <Button
               className="mt-auto w-full gap-2"
-              onClick={() => { onAddToCart(product); onClose(); }}
+              disabled={!canAdd}
+              onClick={() => {
+                onAddToCart(product, selectedVariant?.id, selectedVariant?.color, selectedVariant?.size);
+                onClose();
+              }}
             >
               <ShoppingCart className="w-4 h-4" />
-              {cartQty > 0 ? `Añadir otro (${cartQty} en carrito)` : "Añadir al carrito"}
+              {hasVariants && !canAdd
+                ? "Selecciona color y talla"
+                : cartQty > 0 ? `Añadir otro (${cartQty} en carrito)` : "Añadir al carrito"}
             </Button>
           </div>
         </div>
@@ -267,6 +363,9 @@ function ProductCard({
   onAddToCart: (e: React.MouseEvent) => void;
   cartQty: number;
 }) {
+  const hasVariants = product.variants && product.variants.length > 0;
+  const uniqueColors = hasVariants ? [...new Set(product.variants.map(v => v.color))] : [];
+
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 flex flex-col group">
       {/* Image */}
@@ -285,11 +384,11 @@ function ProductCard({
             1/{product.images.length}
           </div>
         )}
-        {/* Quick add button */}
+        {/* Quick add / open */}
         <button
-          onClick={onAddToCart}
+          onClick={hasVariants ? (e) => { e.stopPropagation(); onOpen(); } : onAddToCart}
           className="absolute bottom-2 right-2 bg-primary text-primary-foreground rounded-full w-9 h-9 flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 active:scale-95"
-          title="Añadir al carrito"
+          title={hasVariants ? "Ver variantes" : "Añadir al carrito"}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -316,7 +415,23 @@ function ProductCard({
           <Tag className="w-3 h-3 mr-1" />
           {CATEGORY_LABELS[product.category] ?? product.category}
         </Badge>
-        {product.stock > 0 && (
+        {/* Color swatches for variant products */}
+        {hasVariants && uniqueColors.length > 0 && (
+          <div className="flex gap-1 flex-wrap">
+            {uniqueColors.slice(0, 8).map(color => (
+              <span
+                key={color}
+                className="w-3.5 h-3.5 rounded-full border border-border shrink-0"
+                style={{ background: COLOR_HEX[color] ?? "#ccc" }}
+                title={color}
+              />
+            ))}
+            {uniqueColors.length > 8 && (
+              <span className="text-xs text-muted-foreground">+{uniqueColors.length - 8}</span>
+            )}
+          </div>
+        )}
+        {!hasVariants && product.stock > 0 && (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 w-fit">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             Disponible para entrega inmediata
@@ -370,8 +485,8 @@ function CartDrawer({
   open: boolean;
   onClose: () => void;
   cart: CartItem[];
-  onUpdateQty: (productId: number, delta: number) => void;
-  onRemove: (productId: number) => void;
+  onUpdateQty: (cartKey: string, delta: number) => void;
+  onRemove: (cartKey: string) => void;
   onClearCart: () => void;
   store?: StoreInfo;
 }) {
@@ -456,7 +571,7 @@ function CartDrawer({
               <>
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {cart.map(item => (
-                    <div key={item.productId} className="flex gap-3 p-3 bg-card border border-border rounded-xl">
+                    <div key={item.cartKey} className="flex gap-3 p-3 bg-card border border-border rounded-xl">
                       <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted shrink-0">
                         {item.image ? (
                           <img src={item.image} alt={item.productName} className="w-full h-full object-cover"
@@ -467,19 +582,24 @@ function CartDrawer({
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm line-clamp-2 leading-snug">{item.productName}</p>
-                        {item.description && (
+                        {item.variantColor ? (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="w-2.5 h-2.5 rounded-full border border-border shrink-0" style={{ background: COLOR_HEX[item.variantColor] ?? "#ccc" }} />
+                            <span className="text-xs text-muted-foreground capitalize">{item.variantColor} / {item.variantSize}</span>
+                          </div>
+                        ) : item.description ? (
                           <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{item.description}</p>
-                        )}
+                        ) : null}
                         <p className="text-sm font-bold text-primary mt-1">${item.unitPrice.toLocaleString("es-CO")}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <button onClick={() => onUpdateQty(item.productId, -1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                          <button onClick={() => onUpdateQty(item.cartKey, -1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Minus className="w-3 h-3" />
                           </button>
                           <span className="w-6 text-center text-sm font-semibold tabular-nums">{item.qty}</span>
-                          <button onClick={() => onUpdateQty(item.productId, 1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                          <button onClick={() => onUpdateQty(item.cartKey, 1)} className="h-7 w-7 rounded-md border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Plus className="w-3 h-3" />
                           </button>
-                          <button onClick={() => onRemove(item.productId)} className="ml-auto text-muted-foreground hover:text-destructive transition-colors">
+                          <button onClick={() => onRemove(item.cartKey)} className="ml-auto text-muted-foreground hover:text-destructive transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -646,14 +766,24 @@ export default function Catalogo() {
 
   const cartCount = useMemo(() => cart.reduce((s, i) => s + i.qty, 0), [cart]);
 
-  const addToCart = useCallback((product: CatalogProduct) => {
+  const addToCart = useCallback((
+    product: CatalogProduct,
+    variantId?: number,
+    variantColor?: string,
+    variantSize?: string,
+  ) => {
+    const cartKey = `${product.id}-${variantId ?? "none"}`;
     setCart(prev => {
-      const existing = prev.find(i => i.productId === product.id);
+      const existing = prev.find(i => i.cartKey === cartKey);
       if (existing) {
-        return prev.map(i => i.productId === product.id ? { ...i, qty: i.qty + 1 } : i);
+        return prev.map(i => i.cartKey === cartKey ? { ...i, qty: i.qty + 1 } : i);
       }
       return [...prev, {
+        cartKey,
         productId: product.id,
+        variantId,
+        variantColor,
+        variantSize,
         productName: product.name,
         description: product.description,
         unitPrice: product.salePrice,
@@ -661,24 +791,26 @@ export default function Catalogo() {
         image: product.images[0] ?? null,
       }];
     });
-    toast({ title: `${product.name} añadido al carrito`, className: "bg-emerald-500 text-white border-none" });
+    const label = variantColor ? `${product.name} (${variantColor}/${variantSize})` : product.name;
+    toast({ title: `${label} añadido al carrito`, className: "bg-emerald-500 text-white border-none" });
   }, [toast]);
 
-  const updateQty = useCallback((productId: number, delta: number) => {
+  const updateQty = useCallback((cartKey: string, delta: number) => {
     setCart(prev => prev.map(i => {
-      if (i.productId !== productId) return i;
+      if (i.cartKey !== cartKey) return i;
       const newQty = i.qty + delta;
       return newQty < 1 ? i : { ...i, qty: newQty };
     }));
   }, []);
 
-  const removeFromCart = useCallback((productId: number) => {
-    setCart(prev => prev.filter(i => i.productId !== productId));
+  const removeFromCart = useCallback((cartKey: string) => {
+    setCart(prev => prev.filter(i => i.cartKey !== cartKey));
   }, []);
 
   const clearCart = useCallback(() => setCart([]), []);
 
-  const cartQtyFor = (productId: number) => cart.find(i => i.productId === productId)?.qty ?? 0;
+  const cartQtyFor = (productId: number) =>
+    cart.filter(i => i.productId === productId).reduce((s, i) => s + i.qty, 0);
 
   return (
     <div className="fixed inset-0 overflow-y-auto bg-background">
@@ -844,7 +976,9 @@ export default function Catalogo() {
         <ProductModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onAddToCart={p => { addToCart(p); }}
+          onAddToCart={(p, variantId, variantColor, variantSize) => {
+            addToCart(p, variantId, variantColor, variantSize);
+          }}
           cartQty={cartQtyFor(selectedProduct.id)}
         />
       )}

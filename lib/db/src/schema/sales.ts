@@ -27,6 +27,7 @@ export const saleItemsTable = pgTable("sale_items", {
   id: serial("id").primaryKey(),
   saleId: integer("sale_id").notNull().references(() => salesTable.id),
   productId: integer("product_id").notNull(),
+  variantId: integer("variant_id"),  // nullable — set when product has variants
   qty: integer("qty").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),

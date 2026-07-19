@@ -65,6 +65,34 @@ export interface UserUpdate {
   password?: string;
 }
 
+export interface ProductVariant {
+  id: number;
+  productId: number;
+  color: string;
+  size: string;
+  sku: string;
+  stock: number;
+  images: string[];
+  createdAt: string;
+}
+
+export interface ProductVariantInput {
+  color: string;
+  size: string;
+  /** Auto-generated if not provided (CODE-COLOR-SIZE) */
+  sku?: string;
+  stock?: number;
+  images?: string[];
+}
+
+export interface ProductVariantUpdate {
+  color?: string;
+  size?: string;
+  sku?: string;
+  stock?: number;
+  images?: string[];
+}
+
 export type ProductCategory = typeof ProductCategory[keyof typeof ProductCategory];
 
 
@@ -94,6 +122,7 @@ export interface Product {
   /** Whether the product is shown in the public catalog */
   isVisible: boolean;
   createdAt: string;
+  variants: ProductVariant[];
 }
 
 export type ProductInputCategory = typeof ProductInputCategory[keyof typeof ProductInputCategory];
@@ -235,11 +264,19 @@ export interface SupplierUpdate {
 export interface PurchaseOrderItem {
   id: number;
   productId: number;
+  /** @nullable */
+  variantId?: number | null;
   productName: string;
   /** @nullable */
   description?: string | null;
   /** @nullable */
   salePrice?: number | null;
+  /** @nullable */
+  variantColor?: string | null;
+  /** @nullable */
+  variantSize?: string | null;
+  /** @nullable */
+  variantSku?: string | null;
   qtyOrdered: number;
   qtyReceived: number;
   unitCost: number;
@@ -247,6 +284,8 @@ export interface PurchaseOrderItem {
 
 export interface PurchaseOrderItemInput {
   productId: number;
+  /** Required when the product has variants */
+  variantId?: number;
   qtyOrdered: number;
   unitCost: number;
 }
@@ -391,9 +430,17 @@ export interface FixedExpenseInput {
 export interface SaleItem {
   id: number;
   productId: number;
+  /** @nullable */
+  variantId?: number | null;
   productName: string;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  variantColor?: string | null;
+  /** @nullable */
+  variantSize?: string | null;
+  /** @nullable */
+  variantSku?: string | null;
   qty: number;
   unitPrice: number;
   subtotal: number;
@@ -401,6 +448,8 @@ export interface SaleItem {
 
 export interface SaleItemInput {
   productId: number;
+  /** Required when the product has variants */
+  variantId?: number;
   qty: number;
   unitPrice: number;
 }

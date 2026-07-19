@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, type SQL } from "drizzle-orm";
-import { db, productsTable, PRODUCT_CATEGORIES, settingsTable } from "@workspace/db";
+import { eq, and, inArray, type SQL } from "drizzle-orm";
+import { db, productsTable, PRODUCT_CATEGORIES, settingsTable, productVariantsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -19,7 +19,6 @@ async function getPublicSettings() {
 
   if (existing) return existing;
 
-  // First boot — create row with defaults and return it
   const [created] = await db
     .insert(settingsTable)
     .values({ storeName: "Claudia Vanegas" })
@@ -38,11 +37,11 @@ async function getPublicSettings() {
 /**
  * GET /api/catalog
  * Public endpoint — no auth required.
- * Returns store branding + categories + products (no costPrice, no stock).
- * Optional query param: ?category=blusas
+ * Returns store branding + categories + products with variants.
+ * Optional query params: ?category=blusas&color=rojo&size=M
  */
 router.get("/catalog", async (req, res): Promise<void> => {
-  const { category } = req.query;
+  const { category, color, size } = req.query;
   const conditions: SQL[] = [];
 
   if (
@@ -50,32 +49,64 @@ router.get("/catalog", async (req, res): Promise<void> => {
     typeof category === "string" &&
     (PRODUCT_CATEGORIES as readonly string[]).includes(category)
   ) {
-    conditions.push(
-      eq(productsTable.category, category as typeof PRODUCT_CATEGORIES[number])
-    );
+    conditions.push(eq(productsTable.category, category as typeof PRODUCT_CATEGORIES[number]));
   }
 
   conditions.push(eq(productsTable.isVisible, true));
 
-  const base = db
-    .select({
-      id: productsTable.id,
-      name: productsTable.name,
-      description: productsTable.description,
-      salePrice: productsTable.salePrice,
-      category: productsTable.category,
-      images: productsTable.images,
-      stock: productsTable.stock,
-    })
-    .from(productsTable);
-
   const [settingsResult, products] = await Promise.all([
     getPublicSettings(),
-    base.where(and(...conditions)).orderBy(
-      productsTable.category,
-      productsTable.name
-    ),
+    db
+      .select({
+        id: productsTable.id,
+        name: productsTable.name,
+        description: productsTable.description,
+        salePrice: productsTable.salePrice,
+        category: productsTable.category,
+        images: productsTable.images,
+        stock: productsTable.stock,
+      })
+      .from(productsTable)
+      .where(and(...conditions))
+      .orderBy(productsTable.category, productsTable.name),
   ]);
+
+  // Load variants for all visible products
+  const productIds = products.map(p => p.id);
+  const allVariants = productIds.length > 0
+    ? await db
+        .select({
+          id: productVariantsTable.id,
+          productId: productVariantsTable.productId,
+          color: productVariantsTable.color,
+          size: productVariantsTable.size,
+          sku: productVariantsTable.sku,
+          stock: productVariantsTable.stock,
+          images: productVariantsTable.images,
+        })
+        .from(productVariantsTable)
+        .where(inArray(productVariantsTable.productId, productIds))
+        .orderBy(productVariantsTable.color, productVariantsTable.size)
+    : [];
+
+  // Filter products by color/size if requested (via variant filtering)
+  let filteredProducts = products;
+  if ((color && typeof color === "string") || (size && typeof size === "string")) {
+    const matchingProductIds = new Set<number>();
+    for (const v of allVariants) {
+      const colorMatch = !color || v.color === color;
+      const sizeMatch = !size || v.size === size;
+      if (colorMatch && sizeMatch) {
+        matchingProductIds.add(v.productId);
+      }
+    }
+    filteredProducts = products.filter(p => {
+      // Include product if it has no variants (simple product) or has a matching variant
+      const productVariants = allVariants.filter(v => v.productId === p.id);
+      if (productVariants.length === 0) return true; // Simple product — always include
+      return matchingProductIds.has(p.id);
+    });
+  }
 
   res.json({
     store: {
@@ -88,10 +119,11 @@ router.get("/catalog", async (req, res): Promise<void> => {
       tiktokUrl: settingsResult.tiktokUrl ?? null,
     },
     categories: PRODUCT_CATEGORIES,
-    products: products.map((p) => ({
+    products: filteredProducts.map((p) => ({
       ...p,
       salePrice: parseFloat(p.salePrice),
       stock: parseInt(p.stock as unknown as string, 10),
+      variants: allVariants.filter(v => v.productId === p.id),
     })),
   });
 });

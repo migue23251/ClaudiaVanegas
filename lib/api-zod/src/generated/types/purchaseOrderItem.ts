@@ -9,11 +9,19 @@
 export interface PurchaseOrderItem {
   id: number;
   productId: number;
+  /** @nullable */
+  variantId?: number | null;
   productName: string;
   /** @nullable */
   description?: string | null;
   /** @nullable */
   salePrice?: number | null;
+  /** @nullable */
+  variantColor?: string | null;
+  /** @nullable */
+  variantSize?: string | null;
+  /** @nullable */
+  variantSku?: string | null;
   qtyOrdered: number;
   qtyReceived: number;
   unitCost: number;

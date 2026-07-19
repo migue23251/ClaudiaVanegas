@@ -1,7 +1,10 @@
 import { Router, type IRouter } from "express";
-import { eq, and, ilike, desc, type SQL } from "drizzle-orm";
+import { eq, and, desc, type SQL } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import { db, purchaseOrdersTable, purchaseOrderItemsTable, productsTable, suppliersTable, accountsPayableTable } from "@workspace/db";
+import {
+  db, purchaseOrdersTable, purchaseOrderItemsTable, productsTable, suppliersTable,
+  accountsPayableTable, productVariantsTable,
+} from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -13,14 +16,19 @@ async function buildPOResponse(poId: number) {
   const items = await db.select({
     id: purchaseOrderItemsTable.id,
     productId: purchaseOrderItemsTable.productId,
+    variantId: purchaseOrderItemsTable.variantId,
     qtyOrdered: purchaseOrderItemsTable.qtyOrdered,
     qtyReceived: purchaseOrderItemsTable.qtyReceived,
     unitCost: purchaseOrderItemsTable.unitCost,
     productName: productsTable.name,
     description: productsTable.description,
     salePrice: productsTable.salePrice,
+    variantColor: productVariantsTable.color,
+    variantSize: productVariantsTable.size,
+    variantSku: productVariantsTable.sku,
   }).from(purchaseOrderItemsTable)
     .leftJoin(productsTable, eq(purchaseOrderItemsTable.productId, productsTable.id))
+    .leftJoin(productVariantsTable, eq(purchaseOrderItemsTable.variantId, productVariantsTable.id))
     .where(eq(purchaseOrderItemsTable.purchaseOrderId, poId));
 
   return {
@@ -31,6 +39,9 @@ async function buildPOResponse(poId: number) {
       ...i,
       productName: i.productName ?? "Desconocido",
       description: i.description ?? null,
+      variantColor: i.variantColor ?? null,
+      variantSize: i.variantSize ?? null,
+      variantSku: i.variantSku ?? null,
       unitCost: parseFloat(i.unitCost),
       salePrice: i.salePrice != null ? parseFloat(i.salePrice) : null,
     })),
@@ -53,7 +64,6 @@ router.get("/purchase-orders", requireAuth, requireAdmin, async (req, res): Prom
 
   let results = (await Promise.all(orders.map(o => buildPOResponse(o.id)))).filter(Boolean) as NonNullable<Awaited<ReturnType<typeof buildPOResponse>>>[];
 
-  // Filter by supplier name (client-side after joining)
   if (supplierSearch && typeof supplierSearch === "string") {
     const q = supplierSearch.toLowerCase();
     results = results.filter(r => r.supplierName.toLowerCase().includes(q));
@@ -69,14 +79,12 @@ router.post("/purchase-orders", requireAuth, requireAdmin, async (req, res): Pro
     return;
   }
 
-  // Validate supplier exists
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, supplierId));
   if (!supplier) {
     res.status(400).json({ error: "Proveedor no encontrado" });
     return;
   }
 
-  // Validate all products exist
   for (const item of items) {
     const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
     if (!product) {
@@ -86,6 +94,16 @@ router.post("/purchase-orders", requireAuth, requireAdmin, async (req, res): Pro
     if (item.qtyOrdered <= 0 || item.unitCost < 0) {
       res.status(400).json({ error: `Cantidad o costo inválido para el producto ${item.productId}` });
       return;
+    }
+    if (item.variantId) {
+      const [variant] = await db
+        .select()
+        .from(productVariantsTable)
+        .where(and(eq(productVariantsTable.id, item.variantId), eq(productVariantsTable.productId, item.productId)));
+      if (!variant) {
+        res.status(400).json({ error: `Variante ${item.variantId} no es válida para el producto "${product.name}"` });
+        return;
+      }
     }
   }
 
@@ -98,9 +116,10 @@ router.post("/purchase-orders", requireAuth, requireAdmin, async (req, res): Pro
     }).returning();
 
     await tx.insert(purchaseOrderItemsTable).values(
-      items.map((i: { productId: number; qtyOrdered: number; unitCost: number }) => ({
+      items.map((i: { productId: number; variantId?: number; qtyOrdered: number; unitCost: number }) => ({
         purchaseOrderId: po.id,
         productId: i.productId,
+        variantId: i.variantId ?? null,
         qtyOrdered: i.qtyOrdered,
         unitCost: String(i.unitCost),
       }))
@@ -139,7 +158,6 @@ router.put("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): 
   const existingItems = await db.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
   const someReceived = existingItems.some(i => i.qtyReceived > 0);
 
-  // Voiding/cancelling: only allowed if nothing has been received yet
   if (status === "cancelled") {
     if (someReceived) {
       res.status(400).json({ error: "No se puede anular una orden con productos ya recibidos" });
@@ -159,7 +177,6 @@ router.put("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): 
     return;
   }
 
-  // Editing supplier/items only allowed while the order is not fully received
   if ((items || supplierId != null) && existing.status === "received") {
     res.status(400).json({ error: "No se puede modificar una orden ya recibida en su totalidad" });
     return;
@@ -178,9 +195,10 @@ router.put("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): 
       }
       await tx.delete(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
       await tx.insert(purchaseOrderItemsTable).values(
-        items.map((i: { productId: number; qtyOrdered: number; unitCost: number }) => ({
+        items.map((i: { productId: number; variantId?: number; qtyOrdered: number; unitCost: number }) => ({
           purchaseOrderId: id,
           productId: i.productId,
+          variantId: i.variantId ?? null,
           qtyOrdered: i.qtyOrdered,
           unitCost: String(i.unitCost),
         }))
@@ -208,7 +226,9 @@ router.put("/purchase-orders/:id", requireAuth, requireAdmin, async (req, res): 
 
 router.post("/purchase-orders/:id/receive", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-  const { items } = req.body as { items: { purchaseOrderItemId: number; qtyReceived: number; salePrice?: number }[] };
+  const { items } = req.body as {
+    items: { purchaseOrderItemId: number; qtyReceived: number; salePrice?: number }[];
+  };
 
   if (!items?.length) {
     res.status(400).json({ error: "Items requeridos" }); return;
@@ -226,22 +246,36 @@ router.post("/purchase-orders/:id/receive", requireAuth, requireAdmin, async (re
       await tx.update(purchaseOrderItemsTable)
         .set({ qtyReceived: newReceived })
         .where(eq(purchaseOrderItemsTable.id, purchaseOrderItemId));
-      const productUpdates: Record<string, unknown> = {
-        stock: sql`${productsTable.stock} + ${qtyReceived}`,
-      };
-      if (salePrice != null && salePrice > 0) {
-        productUpdates.salePrice = String(salePrice);
+
+      if (item.variantId) {
+        // Update variant stock
+        await tx.update(productVariantsTable)
+          .set({ stock: sql`${productVariantsTable.stock} + ${qtyReceived}` })
+          .where(eq(productVariantsTable.id, item.variantId));
+        // Sync product total stock from sum of variants
+        await tx.update(productsTable)
+          .set({ stock: sql`(SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${item.productId})` })
+          .where(eq(productsTable.id, item.productId));
+        if (salePrice != null && salePrice > 0) {
+          await tx.update(productsTable).set({ salePrice: String(salePrice) }).where(eq(productsTable.id, item.productId));
+        }
+      } else {
+        const productUpdates: Record<string, unknown> = {
+          stock: sql`${productsTable.stock} + ${qtyReceived}`,
+        };
+        if (salePrice != null && salePrice > 0) {
+          productUpdates.salePrice = String(salePrice);
+        }
+        await tx.update(productsTable)
+          .set(productUpdates)
+          .where(eq(productsTable.id, item.productId));
       }
-      await tx.update(productsTable)
-        .set(productUpdates)
-        .where(eq(productsTable.id, item.productId));
     }
 
-    // Recalculate status
     const allItems = await tx.select().from(purchaseOrderItemsTable).where(eq(purchaseOrderItemsTable.purchaseOrderId, id));
     const allReceived = allItems.every(i => i.qtyReceived >= i.qtyOrdered);
-    const someReceived = allItems.some(i => i.qtyReceived > 0);
-    const newStatus = allReceived ? "received" : someReceived ? "partial" : "pending";
+    const someRec = allItems.some(i => i.qtyReceived > 0);
+    const newStatus = allReceived ? "received" : someRec ? "partial" : "pending";
     await tx.update(purchaseOrdersTable).set({ status: newStatus }).where(eq(purchaseOrdersTable.id, id));
   });
 
