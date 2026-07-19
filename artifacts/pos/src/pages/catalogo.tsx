@@ -431,7 +431,7 @@ function ProductCard({
             )}
           </div>
         )}
-        {!hasVariants && product.stock > 0 && (
+        {product.stock > 0 && (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 w-fit">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             Disponible para entrega inmediata
