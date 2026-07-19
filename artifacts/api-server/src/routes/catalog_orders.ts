@@ -48,7 +48,7 @@ router.post("/catalog/order", async (req, res): Promise<void> => {
     customerEmail?: string;
     customerAddress?: string;
     notes?: string;
-    items: { productId: number; qty: number }[];
+    items: { productId: number; qty: number; variantId?: number; variantColor?: string; variantSize?: string }[];
   };
 
   if (!customerName?.trim() || !customerPhone?.trim()) {
@@ -90,6 +90,9 @@ router.post("/catalog/order", async (req, res): Promise<void> => {
       qty: item.qty,
       unitPrice,
       subtotal: unitPrice * item.qty,
+      variantId: item.variantId ?? null,
+      variantColor: item.variantColor ?? null,
+      variantSize: item.variantSize ?? null,
     };
   });
 

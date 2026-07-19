@@ -522,7 +522,13 @@ function CartDrawer({
           customerPhone: form.customerPhone.trim(),
           customerEmail: form.customerEmail.trim() || undefined,
           notes: form.notes.trim() || undefined,
-          items: cart.map(i => ({ productId: i.productId, qty: i.qty })),
+          items: cart.map(i => ({
+            productId: i.productId,
+            qty: i.qty,
+            ...(i.variantId   && { variantId:    i.variantId }),
+            ...(i.variantColor && { variantColor: i.variantColor }),
+            ...(i.variantSize  && { variantSize:  i.variantSize }),
+          })),
         }),
       });
       const data = await res.json();

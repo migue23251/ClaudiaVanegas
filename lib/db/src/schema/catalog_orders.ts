@@ -27,6 +27,9 @@ export const catalogOrderItemsTable = pgTable("catalog_order_items", {
   qty: integer("qty").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+  variantId: integer("variant_id"),
+  variantColor: text("variant_color"),
+  variantSize: text("variant_size"),
 });
 
 export type CatalogOrder = typeof catalogOrdersTable.$inferSelect;

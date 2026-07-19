@@ -20,6 +20,15 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const COLOR_HEX: Record<string, string> = {
+  blanco: "#FFFFFF", negro: "#111111", gris: "#9CA3AF", beige: "#D4B896",
+  crema: "#FFF8DC", rojo: "#EF4444", rosa: "#F9A8D4", fucsia: "#EC4899",
+  naranja: "#F97316", amarillo: "#EAB308", verde: "#22C55E", azul: "#3B82F6",
+  morado: "#A855F7", vinotinto: "#7F1D1D", café: "#92400E", multicolor: "linear-gradient(135deg,#f00,#0f0,#00f)",
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface OrderItem {
@@ -30,6 +39,9 @@ interface OrderItem {
   qty: number;
   unitPrice: number;
   subtotal: number;
+  variantId: number | null;
+  variantColor: string | null;
+  variantSize: string | null;
 }
 
 interface CatalogOrder {
@@ -471,7 +483,22 @@ export default function Pedidos() {
                       <tbody className="divide-y divide-border">
                         {order.items.map(item => (
                           <tr key={item.id}>
-                            <td className="px-3 py-2">{item.productName}</td>
+                            <td className="px-3 py-2">
+                              <span className="block">{item.productName}</span>
+                              {(item.variantColor || item.variantSize) && (
+                                <span className="flex items-center gap-1 mt-0.5">
+                                  {item.variantColor && (
+                                    <span
+                                      className="inline-block w-2.5 h-2.5 rounded-full border border-border shrink-0"
+                                      style={{ background: COLOR_HEX[item.variantColor] ?? "#ccc" }}
+                                    />
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {[item.variantColor, item.variantSize].filter(Boolean).join(" / ")}
+                                  </span>
+                                </span>
+                              )}
+                            </td>
                             <td className="px-3 py-2 text-center tabular-nums">{item.qty}</td>
                             <td className="px-3 py-2 text-right tabular-nums">{fmt(item.unitPrice)}</td>
                             <td className="px-3 py-2 text-right font-medium tabular-nums">{fmt(item.subtotal)}</td>
@@ -703,6 +730,9 @@ export default function Pedidos() {
                                   qty: 1,
                                   unitPrice: parseFloat((p as any).salePrice ?? "0"),
                                   subtotal: parseFloat((p as any).salePrice ?? "0"),
+                                  variantId: null,
+                                  variantColor: null,
+                                  variantSize: null,
                                   editQty: 1,
                                   editPrice: parseFloat((p as any).salePrice ?? "0"),
                                 }]);
