@@ -678,11 +678,21 @@ function CartDrawer({
                 <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Resumen del pedido</p>
                   {cart.map(i => (
-                    <div key={i.productId} className="flex justify-between gap-2 text-sm">
+                    <div key={i.cartKey} className="flex justify-between gap-2 text-sm">
                       <span className="text-muted-foreground min-w-0">
                         <span className="block">{i.productName} ×{i.qty}</span>
-                        {i.description && (
-                          <span className="block text-xs line-clamp-1 opacity-80">{i.description}</span>
+                        {(i.variantColor || i.variantSize) && (
+                          <span className="flex items-center gap-1 text-xs mt-0.5">
+                            {i.variantColor && (
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-full border border-border shrink-0"
+                                style={{ background: COLOR_HEX[i.variantColor] ?? "#ccc" }}
+                              />
+                            )}
+                            <span className="opacity-80">
+                              {[i.variantColor, i.variantSize].filter(Boolean).join(" / ")}
+                            </span>
+                          </span>
                         )}
                       </span>
                       <span className="font-medium shrink-0">${(i.unitPrice * i.qty).toLocaleString("es-CO")}</span>
