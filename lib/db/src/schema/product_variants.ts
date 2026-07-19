@@ -14,7 +14,7 @@ export const VARIANT_SIZES = [
   "XS", "S", "M", "L", "XL", "XXL",
   "34", "35", "36", "37", "38", "39", "40", "41", "42",
   "6", "8", "10", "12", "14", "16",
-  "Único",
+  "Única",
 ] as const;
 
 // Hex swatches for display in UI
