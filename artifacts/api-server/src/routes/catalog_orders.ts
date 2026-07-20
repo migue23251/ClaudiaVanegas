@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import {
   db, catalogOrdersTable, catalogOrderItemsTable, productsTable,
   salesTable, saleItemsTable, accountsReceivableTable, arPaymentsTable,
+  productVariantsTable,
 } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { createBoldPaymentLink } from "../lib/bold";
@@ -174,7 +175,7 @@ router.put("/catalog-orders/:id/cancel", requireAuth, requireAdmin, async (req, 
 router.put("/catalog-orders/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const orderId = parseInt(req.params.id as string, 10);
   const { items } = req.body as {
-    items: { productId: number; qty: number; unitPrice: number }[];
+    items: { productId: number; variantId?: number; qty: number; unitPrice: number }[];
   };
 
   if (!items?.length) {
@@ -201,17 +202,31 @@ router.put("/catalog-orders/:id", requireAuth, requireAdmin, async (req, res): P
     .from(productsTable).where(inArray(productsTable.id, productIds));
   const productMap = new Map(products.map(p => [p.id, p.name]));
 
+  // Fetch variant info for items that have variantId
+  const variantIds = items.map(i => i.variantId).filter((id): id is number => id != null);
+  const variants = variantIds.length > 0
+    ? await db.select({ id: productVariantsTable.id, color: productVariantsTable.color, size: productVariantsTable.size })
+        .from(productVariantsTable).where(inArray(productVariantsTable.id, variantIds))
+    : [];
+  const variantMap = new Map(variants.map(v => [v.id, v]));
+
   await db.transaction(async (tx) => {
     await tx.delete(catalogOrderItemsTable).where(eq(catalogOrderItemsTable.orderId, orderId));
     await tx.insert(catalogOrderItemsTable).values(
-      items.map(i => ({
-        orderId,
-        productId: i.productId,
-        productName: productMap.get(i.productId) ?? "Producto",
-        qty: i.qty,
-        unitPrice: String(i.unitPrice),
-        subtotal: String(i.qty * i.unitPrice),
-      }))
+      items.map(i => {
+        const v = i.variantId ? variantMap.get(i.variantId) : undefined;
+        return {
+          orderId,
+          productId: i.productId,
+          productName: productMap.get(i.productId) ?? "Producto",
+          qty: i.qty,
+          unitPrice: String(i.unitPrice),
+          subtotal: String(i.qty * i.unitPrice),
+          variantId: i.variantId ?? null,
+          variantColor: v?.color ?? null,
+          variantSize: v?.size ?? null,
+        };
+      })
     );
     await tx.update(catalogOrdersTable)
       .set({ total: String(total) })
@@ -234,7 +249,7 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
     notes,
     chargedAmount,
   } = req.body as {
-    items: { productId: number; qty: number; unitPrice: number }[];
+    items: { productId: number; variantId?: number; qty: number; unitPrice: number }[];
     paymentType: "efectivo" | "credito" | "datafono" | "link";
     customerId?: number;
     advanceAmount?: number;
@@ -252,17 +267,34 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
     res.status(400).json({ error: "El pedido ya fue facturado o cancelado" }); return;
   }
 
-  // Validate stock
+  // Validate stock (by variant when present, otherwise by product)
   for (const item of items) {
     if (item.qty <= 0 || item.unitPrice < 0) {
       res.status(400).json({ error: `Cantidad o precio inválido` }); return;
     }
     const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
     if (!product) { res.status(400).json({ error: `Producto ${item.productId} no existe` }); return; }
-    if (product.stock < item.qty) {
-      res.status(400).json({ error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }); return;
+    if (item.variantId) {
+      const [variant] = await db.select().from(productVariantsTable)
+        .where(and(eq(productVariantsTable.id, item.variantId), eq(productVariantsTable.productId, item.productId)));
+      if (!variant) { res.status(400).json({ error: `Variante inválida para "${product.name}"` }); return; }
+      if (variant.stock < item.qty) {
+        res.status(400).json({ error: `Stock insuficiente para "${product.name}" (${variant.color} / ${variant.size}). Disponible: ${variant.stock}` }); return;
+      }
+    } else {
+      if (product.stock < item.qty) {
+        res.status(400).json({ error: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}` }); return;
+      }
     }
   }
+
+  // Fetch variant info for display in saleItems
+  const invoiceVariantIds = items.map(i => i.variantId).filter((id): id is number => id != null);
+  const invoiceVariants = invoiceVariantIds.length > 0
+    ? await db.select({ id: productVariantsTable.id, color: productVariantsTable.color, size: productVariantsTable.size })
+        .from(productVariantsTable).where(inArray(productVariantsTable.id, invoiceVariantIds))
+    : [];
+  const invoiceVariantMap = new Map(invoiceVariants.map(v => [v.id, v]));
 
   const total = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
   const advance = paymentType === "credito" ? Math.max(0, Math.min(advanceAmount ?? 0, total)) : 0;
@@ -281,6 +313,7 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
       items.map(i => ({
         saleId: sale.id,
         productId: i.productId,
+        variantId: i.variantId ?? null,
         qty: i.qty,
         unitPrice: String(i.unitPrice),
         subtotal: String(i.qty * i.unitPrice),
@@ -288,9 +321,15 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
     );
 
     for (const item of items) {
-      await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} - ${item.qty}` })
-        .where(eq(productsTable.id, item.productId));
+      if (item.variantId) {
+        await tx.update(productVariantsTable)
+          .set({ stock: sql`${productVariantsTable.stock} - ${item.qty}` })
+          .where(eq(productVariantsTable.id, item.variantId));
+      } else {
+        await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} - ${item.qty}` })
+          .where(eq(productsTable.id, item.productId));
+      }
     }
 
     if (paymentType === "credito") {

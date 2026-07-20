@@ -211,7 +211,7 @@ export default function Pedidos() {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: invoiceItems.map(i => ({ productId: i.productId, qty: i.editQty, unitPrice: i.editPrice })),
+          items: invoiceItems.map(i => ({ productId: i.productId, variantId: i.variantId ?? undefined, qty: i.editQty, unitPrice: i.editPrice })),
         }),
       });
       const data = await res.json();
@@ -265,7 +265,7 @@ export default function Pedidos() {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: invoiceItems.map(i => ({ productId: i.productId, qty: i.editQty, unitPrice: i.editPrice })),
+          items: invoiceItems.map(i => ({ productId: i.productId, variantId: i.variantId ?? undefined, qty: i.editQty, unitPrice: i.editPrice })),
           paymentType,
           chargedAmount: invoiceSurcharge > 0 ? invoiceChargedTotal : undefined,
           customerId: selectedCustomer?.id,
