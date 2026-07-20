@@ -549,12 +549,12 @@ export default function Inventario() {
                         variant={v}
                         productId={editingProduct.id}
                         onUpdated={() => {
-                          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
-                          // Refresh editing product
                           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
-                            const updated = queryClient.getQueryData<Product[]>(getListProductsQueryKey());
-                            const found = updated?.find(p => p.id === editingProduct.id);
-                            if (found) setEditingProduct(found);
+                            const queries = queryClient.getQueriesData<Product[]>({ queryKey: getListProductsQueryKey() });
+                            for (const [, data] of queries) {
+                              const found = data?.find(p => p.id === editingProduct.id);
+                              if (found) { setEditingProduct(found); break; }
+                            }
                           });
                         }}
                       />
@@ -565,9 +565,11 @@ export default function Inventario() {
                     productId={editingProduct.id}
                     onAdded={() => {
                       queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
-                        const updated = queryClient.getQueryData<Product[]>(getListProductsQueryKey());
-                        const found = updated?.find(p => p.id === editingProduct.id);
-                        if (found) setEditingProduct(found);
+                        const queries = queryClient.getQueriesData<Product[]>({ queryKey: getListProductsQueryKey() });
+                        for (const [, data] of queries) {
+                          const found = data?.find(p => p.id === editingProduct.id);
+                          if (found) { setEditingProduct(found); break; }
+                        }
                       });
                     }}
                   />
