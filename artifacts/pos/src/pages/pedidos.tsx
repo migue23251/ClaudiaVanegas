@@ -134,6 +134,16 @@ export default function Pedidos() {
     () => new Map(allProducts.map(p => [p.id, p.stock])),
     [allProducts]
   );
+  const stockByVariantId = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const p of allProducts) {
+      for (const v of (p as any).variants ?? []) m.set(v.id, v.stock);
+    }
+    return m;
+  }, [allProducts]);
+
+  // ── Product picker expanded variant state ──────────────────────────────────
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
 
 
   // ── Customer selection (for invoicing) ────────────────────────────────────
@@ -624,11 +634,26 @@ export default function Pedidos() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {invoiceItems.map((item, idx) => {
-                      const stock = item.productId != null ? stockByProductId.get(item.productId) : undefined;
+                      const stock = item.variantId != null
+                        ? stockByVariantId.get(item.variantId)
+                        : item.productId != null ? stockByProductId.get(item.productId) : undefined;
                       return (
                       <tr key={item.id}>
                         <td className="px-3 py-2 align-top">
                           <div className="font-medium">{item.productName}</div>
+                          {(item.variantColor || item.variantSize) && (
+                            <span className="flex items-center gap-1 mt-0.5">
+                              {item.variantColor && (
+                                <span
+                                  className="inline-block w-2.5 h-2.5 rounded-full border border-border shrink-0"
+                                  style={{ background: COLOR_HEX[item.variantColor] ?? "#ccc" }}
+                                />
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {[item.variantColor, item.variantSize].filter(Boolean).join(" / ")}
+                              </span>
+                            </span>
+                          )}
                           {item.description && (
                             <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</div>
                           )}
@@ -712,53 +737,128 @@ export default function Pedidos() {
                     if (filtered.length === 0)
                       return <p className="text-xs text-muted-foreground text-center py-2">Sin resultados</p>;
                     return (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                      <div className="space-y-1 max-h-56 overflow-y-auto">
                         {filtered.map(p => {
-                          const alreadyAdded = invoiceItems.some(i => i.productId === p.id);
+                          const variants = (p as any).variants ?? [];
+                          const hasVariants = variants.length > 0;
+                          const isExpanded = expandedProductId === p.id;
+                          const allVariantsAdded = hasVariants && variants.every((v: any) => invoiceItems.some(i => i.variantId === v.id));
+                          const alreadyAdded = !hasVariants && invoiceItems.some(i => i.productId === p.id && i.variantId == null);
+                          const salePrice = parseFloat((p as any).salePrice ?? "0");
+
                           return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              disabled={alreadyAdded}
-                              onClick={() => {
-                                if (alreadyAdded) return;
-                                setInvoiceItems(prev => [...prev, {
-                                  id: -(Date.now()),
-                                  productId: p.id,
-                                  productName: p.name,
-                                  description: (p as any).description ?? null,
-                                  qty: 1,
-                                  unitPrice: parseFloat((p as any).salePrice ?? "0"),
-                                  subtotal: parseFloat((p as any).salePrice ?? "0"),
-                                  variantId: null,
-                                  variantColor: null,
-                                  variantSize: null,
-                                  editQty: 1,
-                                  editPrice: parseFloat((p as any).salePrice ?? "0"),
-                                }]);
-                                setAddProductSearch("");
-                                setShowAddProduct(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors text-left ${
-                                alreadyAdded
-                                  ? "opacity-40 cursor-not-allowed"
-                                  : "hover:bg-accent cursor-pointer"
-                              }`}
-                            >
-                              <div>
-                                <span className="font-medium">{p.name}</span>
-                                {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">ya agregado</span>}
-                                {(p as any).description && (
-                                  <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{(p as any).description}</div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 text-muted-foreground text-xs tabular-nums shrink-0">
-                                <span className="flex items-center gap-1">
-                                  <Package className="h-3 w-3" />{p.stock}
-                                </span>
-                                <span>{fmt(parseFloat((p as any).salePrice ?? "0"))}</span>
-                              </div>
-                            </button>
+                            <div key={p.id}>
+                              {/* Product row */}
+                              <button
+                                type="button"
+                                disabled={hasVariants ? allVariantsAdded : alreadyAdded}
+                                onClick={() => {
+                                  if (hasVariants) {
+                                    setExpandedProductId(isExpanded ? null : p.id);
+                                    return;
+                                  }
+                                  if (alreadyAdded) return;
+                                  setInvoiceItems(prev => [...prev, {
+                                    id: -(Date.now()),
+                                    productId: p.id,
+                                    productName: p.name,
+                                    description: (p as any).description ?? null,
+                                    qty: 1,
+                                    unitPrice: salePrice,
+                                    subtotal: salePrice,
+                                    variantId: null,
+                                    variantColor: null,
+                                    variantSize: null,
+                                    editQty: 1,
+                                    editPrice: salePrice,
+                                  }]);
+                                  setAddProductSearch("");
+                                  setShowAddProduct(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors text-left ${
+                                  (hasVariants ? allVariantsAdded : alreadyAdded)
+                                    ? "opacity-40 cursor-not-allowed"
+                                    : "hover:bg-accent cursor-pointer"
+                                } ${isExpanded ? "bg-accent/50" : ""}`}
+                              >
+                                <div>
+                                  <span className="font-medium">{p.name}</span>
+                                  {alreadyAdded && <span className="ml-2 text-xs text-muted-foreground">ya agregado</span>}
+                                  {(p as any).description && (
+                                    <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{(p as any).description}</div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-muted-foreground text-xs tabular-nums shrink-0">
+                                  {!hasVariants && (
+                                    <span className="flex items-center gap-1">
+                                      <Package className="h-3 w-3" />{p.stock}
+                                    </span>
+                                  )}
+                                  <span>{fmt(salePrice)}</span>
+                                  {hasVariants && (
+                                    <span className="text-xs text-muted-foreground ml-1">
+                                      {isExpanded ? "▲" : "▼"} {variants.length} variantes
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+
+                              {/* Variant rows */}
+                              {hasVariants && isExpanded && (
+                                <div className="ml-3 mt-0.5 space-y-0.5 border-l-2 border-border pl-2">
+                                  {variants.map((v: any) => {
+                                    const variantAdded = invoiceItems.some(i => i.variantId === v.id);
+                                    return (
+                                      <button
+                                        key={v.id}
+                                        type="button"
+                                        disabled={variantAdded}
+                                        onClick={() => {
+                                          if (variantAdded) return;
+                                          setInvoiceItems(prev => [...prev, {
+                                            id: -(Date.now()),
+                                            productId: p.id,
+                                            productName: p.name,
+                                            description: (p as any).description ?? null,
+                                            qty: 1,
+                                            unitPrice: salePrice,
+                                            subtotal: salePrice,
+                                            variantId: v.id,
+                                            variantColor: v.color,
+                                            variantSize: v.size,
+                                            editQty: 1,
+                                            editPrice: salePrice,
+                                          }]);
+                                          setAddProductSearch("");
+                                          setShowAddProduct(false);
+                                          setExpandedProductId(null);
+                                        }}
+                                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors text-left ${
+                                          variantAdded
+                                            ? "opacity-40 cursor-not-allowed"
+                                            : "hover:bg-accent cursor-pointer"
+                                        }`}
+                                      >
+                                        <span className="flex items-center gap-1.5">
+                                          <span
+                                            className="inline-block w-2.5 h-2.5 rounded-full border border-border shrink-0"
+                                            style={{ background: COLOR_HEX[v.color] ?? "#ccc" }}
+                                          />
+                                          <span className="capitalize">{v.color}</span>
+                                          {v.size && <span className="text-muted-foreground">/ {v.size}</span>}
+                                          {variantAdded && <span className="text-muted-foreground">ya agregado</span>}
+                                        </span>
+                                        <span className="flex items-center gap-2 text-muted-foreground shrink-0">
+                                          <span className={`flex items-center gap-1 ${v.stock <= 5 ? "text-red-600" : ""}`}>
+                                            <Package className="h-3 w-3" />{v.stock}
+                                          </span>
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
