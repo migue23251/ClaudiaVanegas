@@ -18,6 +18,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const PAGE_SIZE = 15;
 
+const COLOR_HEX: Record<string, string> = {
+  blanco: "#FFFFFF", negro: "#111111", gris: "#9CA3AF", beige: "#D4B896",
+  crema: "#FFF8DC", rojo: "#EF4444", rosa: "#F9A8D4", fucsia: "#EC4899",
+  naranja: "#F97316", amarillo: "#EAB308", verde: "#22C55E", azul: "#3B82F6",
+  morado: "#A855F7", vinotinto: "#7F1D1D", café: "#92400E", multicolor: "linear-gradient(135deg,#f00,#0f0,#00f)",
+};
+
 type PaymentType = "efectivo" | "credito" | "datafono" | "link";
 
 const calcChargedTotal = (base: number, method: string): number => {
@@ -400,6 +407,19 @@ export default function Ventas() {
                         <span className="font-medium shrink-0">{item.qty}x</span>
                         <div className="min-w-0">
                           <span className="text-foreground font-medium">{item.productName}</span>
+                          {((item as any).variantColor || (item as any).variantSize) && (
+                            <span className="flex items-center gap-1 mt-0.5">
+                              {(item as any).variantColor && (
+                                <span
+                                  className="inline-block w-2.5 h-2.5 rounded-full border border-border shrink-0"
+                                  style={{ background: COLOR_HEX[(item as any).variantColor] ?? "#ccc" }}
+                                />
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {[(item as any).variantColor, (item as any).variantSize].filter(Boolean).join(" / ")}
+                              </span>
+                            </span>
+                          )}
                           {item.description && (
                             <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.description}</p>
                           )}
