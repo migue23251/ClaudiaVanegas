@@ -117,6 +117,9 @@ router.post("/catalog/order", async (req, res): Promise<void> => {
         qty: i.qty,
         unitPrice: String(i.unitPrice),
         subtotal: String(i.subtotal),
+        variantId: i.variantId,
+        variantColor: i.variantColor,
+        variantSize: i.variantSize,
       }))
     );
     return order.id;
