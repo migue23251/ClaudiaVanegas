@@ -126,9 +126,9 @@ export default function Pedidos() {
   const [addProductSearch, setAddProductSearch] = useState("");
   const [showAddProduct, setShowAddProduct] = useState(false);
 
-  // ── Stock lookup (for the invoicing table) ─────────────────────────────────
+  // ── Stock lookup (for order detail view + invoicing table) ────────────────
   const { data: allProducts = [] } = useListProducts(undefined, {
-    query: { queryKey: ["catalog-order-invoice-products"], enabled: !!invoiceOrder },
+    query: { queryKey: ["catalog-order-invoice-products"], enabled: !!invoiceOrder || !!expandedId },
   });
   const stockByProductId = useMemo(
     () => new Map(allProducts.map(p => [p.id, p.stock])),
@@ -517,7 +517,7 @@ export default function Pedidos() {
                       </tbody>
                       <tfoot className="border-t-2 border-border bg-muted/30">
                         <tr>
-                          <td colSpan={3} className="px-3 py-2 text-right font-bold">Total pedido</td>
+                          <td colSpan={4} className="px-3 py-2 text-right font-bold">Total pedido</td>
                           <td className="px-3 py-2 text-right font-bold text-primary">{fmt(order.total)}</td>
                         </tr>
                       </tfoot>
