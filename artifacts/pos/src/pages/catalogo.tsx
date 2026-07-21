@@ -294,26 +294,19 @@ function ProductModal({
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">Talla</p>
                     <div className="flex flex-wrap gap-2">
-                      {availableSizes.map(size => {
-                        const v = product.variants.find(v => v.color === pickerColor && v.size === size);
-                        const outOfStock = !v || v.stock <= 0;
-                        return (
-                          <button
-                            key={size}
-                            onClick={() => !outOfStock && setPickerSize(size)}
-                            disabled={outOfStock}
-                            className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
-                              pickerSize === size
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : outOfStock
-                                  ? "border-border text-muted-foreground opacity-40 cursor-not-allowed line-through"
-                                  : "border-border hover:border-primary/50"
-                            }`}
-                          >
-                            {size}
-                          </button>
-                        );
-                      })}
+                      {availableSizes.map(size => (
+                        <button
+                          key={size}
+                          onClick={() => setPickerSize(size)}
+                          className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                            pickerSize === size
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
