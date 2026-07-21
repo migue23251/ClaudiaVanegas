@@ -772,7 +772,6 @@ export default function Dashboard() {
                           {variantLabel && (
                             <div className="text-muted-foreground font-normal capitalize">{variantLabel}</div>
                           )}
-                          <div className="text-muted-foreground font-mono">{p.sku ?? p.code}</div>
                         </td>
                         <td className="py-2 pr-4 text-muted-foreground capitalize">{CATEGORY_LABELS[p.category] ?? p.category}</td>
                         <td className="py-2 pr-4 text-right font-semibold">{p.stock}</td>
