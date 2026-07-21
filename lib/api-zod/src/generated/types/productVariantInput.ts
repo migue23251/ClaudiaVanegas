@@ -8,7 +8,8 @@
 
 export interface ProductVariantInput {
   color: string;
-  size: string;
+  /** Opcional. Dejar vacío para variantes sin talla (ej. accesorios). */
+  size?: string | null;
   /** Auto-generated if not provided (CODE-COLOR-SIZE) */
   sku?: string;
   stock?: number;

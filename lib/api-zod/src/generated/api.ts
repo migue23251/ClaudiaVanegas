@@ -378,7 +378,7 @@ export const CreateProductVariantParams = zod.object({
 
 export const CreateProductVariantBody = zod.object({
   "color": zod.string(),
-  "size": zod.string(),
+  "size": zod.string().nullish().describe('Opcional. Dejar vacío para variantes sin talla (ej. accesorios).'),
   "sku": zod.string().optional().describe('Auto-generated if not provided (CODE-COLOR-SIZE)'),
   "stock": zod.number().optional(),
   "images": zod.array(zod.string()).optional()
@@ -406,7 +406,7 @@ export const UpdateProductVariantParams = zod.object({
 
 export const UpdateProductVariantBody = zod.object({
   "color": zod.string().optional(),
-  "size": zod.string().optional(),
+  "size": zod.string().nullish().describe('Dejar null para quitar la talla.'),
   "sku": zod.string().optional(),
   "stock": zod.number().optional(),
   "images": zod.array(zod.string()).optional()

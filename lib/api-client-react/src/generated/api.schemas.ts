@@ -78,7 +78,8 @@ export interface ProductVariant {
 
 export interface ProductVariantInput {
   color: string;
-  size: string;
+  /** Opcional. Dejar vacío para variantes sin talla (ej. accesorios). */
+  size?: string | null;
   /** Auto-generated if not provided (CODE-COLOR-SIZE) */
   sku?: string;
   stock?: number;
@@ -87,7 +88,8 @@ export interface ProductVariantInput {
 
 export interface ProductVariantUpdate {
   color?: string;
-  size?: string;
+  /** Dejar null para quitar la talla. */
+  size?: string | null;
   sku?: string;
   stock?: number;
   images?: string[];

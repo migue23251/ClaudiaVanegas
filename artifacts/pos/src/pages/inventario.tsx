@@ -71,7 +71,10 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 
 // ── Variant row component ─────────────────────────────────────────────────────
 
-const NO_SIZE_CATEGORIES = ["bolsos", "accesorios"] as const;
+/** Categorías donde la talla se oculta completamente */
+const HIDE_SIZE_CATEGORIES = ["bolsos"] as const;
+/** Categorías donde la talla se muestra pero es opcional */
+const OPTIONAL_SIZE_CATEGORIES = ["accesorios"] as const;
 
 interface VariantRowProps {
   variant: ProductVariant;
@@ -82,7 +85,8 @@ interface VariantRowProps {
 
 function VariantRow({ variant, productId, category, onUpdated }: VariantRowProps) {
   const { toast } = useToast();
-  const showSize = !NO_SIZE_CATEGORIES.includes(category as any);
+  const showSize = !HIDE_SIZE_CATEGORIES.includes(category as any);
+  const sizeOptional = OPTIONAL_SIZE_CATEGORIES.includes(category as any);
   const [editing, setEditing] = useState(false);
   const [editStock, setEditStock] = useState(String(variant.stock));
   const [editColor, setEditColor] = useState(variant.color);
@@ -95,7 +99,7 @@ function VariantRow({ variant, productId, category, onUpdated }: VariantRowProps
     updateVariant.mutate({
       id: productId,
       variantId: variant.id,
-      data: { stock: parseInt(editStock, 10), color: editColor, size: showSize ? editSize : null },
+      data: { stock: parseInt(editStock, 10), color: editColor, size: showSize ? (editSize || null) : null },
     }, {
       onSuccess: () => { setEditing(false); onUpdated(); },
       onError: () => toast({ title: "Error actualizando variante", variant: "destructive" }),
@@ -123,8 +127,9 @@ function VariantRow({ variant, productId, category, onUpdated }: VariantRowProps
           </Select>
           {showSize && (
             <Select value={editSize} onValueChange={setEditSize}>
-              <SelectTrigger className="h-7 text-xs w-20"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-7 text-xs w-20"><SelectValue placeholder="Talla..." /></SelectTrigger>
               <SelectContent>
+                {sizeOptional && <SelectItem value="">Sin talla</SelectItem>}
                 {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -141,7 +146,7 @@ function VariantRow({ variant, productId, category, onUpdated }: VariantRowProps
       ) : (
         <>
           <span className="capitalize font-medium w-20">{variant.color}</span>
-          {showSize && <span className="text-muted-foreground w-12">{variant.size ?? "—"}</span>}
+          {showSize && <span className="text-muted-foreground w-12">{variant.size || "—"}</span>}
           <span className="font-mono text-xs text-muted-foreground flex-1">{variant.sku}</span>
           <Badge variant={variant.stock <= 5 ? "destructive" : "outline"} className="text-xs">
             ×{variant.stock}
@@ -162,20 +167,22 @@ function VariantRow({ variant, productId, category, onUpdated }: VariantRowProps
 
 function AddVariantForm({ productId, category, onAdded }: { productId: number; category: string; onAdded: () => void }) {
   const { toast } = useToast();
-  const showSize = !NO_SIZE_CATEGORIES.includes(category as any);
+  const showSize = !HIDE_SIZE_CATEGORIES.includes(category as any);
+  const sizeOptional = OPTIONAL_SIZE_CATEGORIES.includes(category as any);
+  const sizeRequired = showSize && !sizeOptional;
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
   const [stock, setStock] = useState("0");
   const createVariant = useCreateProductVariant();
 
   const handleAdd = () => {
-    if (!color || (showSize && !size)) {
-      toast({ title: showSize ? "Selecciona color y talla" : "Selecciona un color", variant: "destructive" });
+    if (!color || (sizeRequired && !size)) {
+      toast({ title: sizeRequired ? "Selecciona color y talla" : "Selecciona un color", variant: "destructive" });
       return;
     }
     createVariant.mutate({
       id: productId,
-      data: { color, size: showSize ? size : undefined, stock: parseInt(stock, 10) },
+      data: { color, size: showSize ? (size || null) : undefined, stock: parseInt(stock, 10) },
     }, {
       onSuccess: () => { setColor(""); setSize(""); setStock("0"); onAdded(); },
       onError: (err: any) => toast({ title: "Error agregando variante", description: err?.response?.data?.error, variant: "destructive" }),
@@ -202,10 +209,11 @@ function AddVariantForm({ productId, category, onAdded }: { productId: number; c
       </div>
       {showSize && (
         <div className="space-y-1 w-24">
-          <label className="text-xs font-medium">Talla</label>
+          <label className="text-xs font-medium">Talla{sizeOptional && <span className="text-muted-foreground"> (opcional)</span>}</label>
           <Select value={size} onValueChange={setSize}>
             <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Talla..." /></SelectTrigger>
             <SelectContent>
+              {sizeOptional && <SelectItem value="">Sin talla</SelectItem>}
               {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
             </SelectContent>
           </Select>

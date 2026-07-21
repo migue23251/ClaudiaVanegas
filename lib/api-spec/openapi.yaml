@@ -1419,12 +1419,14 @@ components:
 
     ProductVariantInput:
       type: object
-      required: [color, size]
+      required: [color]
       properties:
         color:
           type: string
         size:
           type: string
+          nullable: true
+          description: Opcional. Dejar vacío para variantes sin talla (ej. accesorios).
         sku:
           type: string
           description: Auto-generated if not provided (CODE-COLOR-SIZE)
@@ -1442,6 +1444,8 @@ components:
           type: string
         size:
           type: string
+          nullable: true
+          description: Dejar null para quitar la talla.
         sku:
           type: string
         stock:

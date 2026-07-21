@@ -8,7 +8,8 @@
 
 export interface ProductVariantUpdate {
   color?: string;
-  size?: string;
+  /** Dejar null para quitar la talla. */
+  size?: string | null;
   sku?: string;
   stock?: number;
   images?: string[];
