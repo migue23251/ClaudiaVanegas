@@ -4,6 +4,7 @@ import {
   useSetProductVisibility,
   useGetProductMovements, getGetProductMovementsQueryKey,
   useCreateProductVariant, useUpdateProductVariant, useDeleteProductVariant,
+  getProduct,
   ProductInput, Product, ProductVariant,
 } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -566,14 +567,10 @@ export default function Inventario() {
                         variant={v}
                         productId={editingProduct.id}
                         category={editingProduct.category}
-                        onUpdated={() => {
-                          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
-                            const queries = queryClient.getQueriesData<Product[]>({ queryKey: getListProductsQueryKey() });
-                            for (const [, data] of queries) {
-                              const found = data?.find(p => p.id === editingProduct.id);
-                              if (found) { setEditingProduct(found); break; }
-                            }
-                          });
+                        onUpdated={async () => {
+                          queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+                          const fresh = await getProduct(editingProduct.id);
+                          setEditingProduct(fresh);
                         }}
                       />
                     ))}
@@ -582,14 +579,10 @@ export default function Inventario() {
                   <AddVariantForm
                     productId={editingProduct.id}
                     category={editingProduct.category}
-                    onAdded={() => {
-                      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
-                        const queries = queryClient.getQueriesData<Product[]>({ queryKey: getListProductsQueryKey() });
-                        for (const [, data] of queries) {
-                          const found = data?.find(p => p.id === editingProduct.id);
-                          if (found) { setEditingProduct(found); break; }
-                        }
-                      });
+                    onAdded={async () => {
+                      queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+                      const fresh = await getProduct(editingProduct.id);
+                      setEditingProduct(fresh);
                     }}
                   />
 
