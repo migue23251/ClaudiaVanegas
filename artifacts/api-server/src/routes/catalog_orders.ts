@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import {
   db, catalogOrdersTable, catalogOrderItemsTable, productsTable,
   salesTable, saleItemsTable, accountsReceivableTable, arPaymentsTable,
-  productVariantsTable,
+  productVariantsTable, customersTable,
 } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 import { createBoldPaymentLink } from "../lib/bold";
@@ -133,13 +133,39 @@ router.post("/catalog/order", async (req, res): Promise<void> => {
 router.get("/catalog-orders", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const orders = await db.select().from(catalogOrdersTable).orderBy(desc(catalogOrdersTable.createdAt));
 
+  // Fetch sale customer info for invoiced orders in a single query
+  const invoicedSaleIds = orders.map(o => o.invoicedSaleId).filter((id): id is number => id != null);
+  const saleCustomers = invoicedSaleIds.length > 0
+    ? await db.select({
+        saleId: salesTable.id,
+        customerId: salesTable.customerId,
+        customerName: customersTable.firstName,
+        customerLastName: customersTable.lastName,
+        customerPhone: customersTable.phone,
+        customerEmail: customersTable.email,
+      })
+      .from(salesTable)
+      .leftJoin(customersTable, eq(salesTable.customerId, customersTable.id))
+      .where(inArray(salesTable.id, invoicedSaleIds))
+    : [];
+  const saleCustomerMap = new Map(saleCustomers.map(s => [s.saleId, s]));
+
   const withItems = await Promise.all(orders.map(async (order) => {
     const items = await db.select().from(catalogOrderItemsTable)
       .where(eq(catalogOrderItemsTable.orderId, order.id));
     const itemsWithDesc = await attachDescriptions(items);
+    const sc = order.invoicedSaleId ? saleCustomerMap.get(order.invoicedSaleId) : undefined;
+    const invoicedCustomer = sc?.customerId
+      ? {
+          name: `${sc.customerName} ${sc.customerLastName}`.trim(),
+          phone: sc.customerPhone ?? null,
+          email: sc.customerEmail ?? null,
+        }
+      : null;
     return {
       ...order,
       total: parseFloat(order.total),
+      invoicedCustomer,
       items: itemsWithDesc.map(i => ({
         ...i,
         unitPrice: parseFloat(i.unitPrice),

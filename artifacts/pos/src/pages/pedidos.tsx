@@ -54,6 +54,7 @@ interface CatalogOrder {
   notes: string | null;
   total: number;
   invoicedSaleId: number | null;
+  invoicedCustomer: { name: string; phone: string | null; email: string | null } | null;
   createdAt: string;
   items: OrderItem[];
 }
@@ -393,25 +394,49 @@ export default function Pedidos() {
                 <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                      <span className="font-semibold text-base">{order.customerName}</span>
+                      <span className="font-semibold text-base">
+                        {order.status === "invoiced" && order.invoicedCustomer
+                          ? order.invoicedCustomer.name
+                          : order.customerName}
+                      </span>
                       <StatusBadge status={order.status} />
                       <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">
                         #{order.id}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5" />{order.customerPhone}
-                      </span>
-                      {order.customerEmail && (
-                        <span className="flex items-center gap-1.5">
-                          <Mail className="h-3.5 w-3.5" />{order.customerEmail}
-                        </span>
+                      {order.status === "invoiced" && order.invoicedCustomer ? (
+                        <>
+                          {order.invoicedCustomer.phone && (
+                            <span className="flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5" />{order.invoicedCustomer.phone}
+                            </span>
+                          )}
+                          {order.invoicedCustomer.email && (
+                            <span className="flex items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5" />{order.invoicedCustomer.email}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="h-3.5 w-3.5" />{order.customerPhone}
+                          </span>
+                          {order.customerEmail && (
+                            <span className="flex items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5" />{order.customerEmail}
+                            </span>
+                          )}
+                        </>
                       )}
                       <span className="flex items-center gap-1.5">
                         <Calendar className="h-3.5 w-3.5" />{fmtDate(order.createdAt)}
                       </span>
                     </div>
+                    {order.status === "invoiced" && !order.invoicedCustomer && (
+                      <p className="text-xs text-muted-foreground mt-1">Sin cliente registrado · Pedido original: {order.customerName}</p>
+                    )}
                   </div>
 
                   {/* Right: total + actions */}
