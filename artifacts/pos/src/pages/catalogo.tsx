@@ -317,6 +317,13 @@ function ProductModal({
               </div>
             )}
 
+            {selectedVariant && selectedVariant.stock > 0 && (
+              <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 w-fit">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                Disponible para entrega inmediata
+              </span>
+            )}
+
             <Button
               className="mt-auto w-full gap-2"
               disabled={!canAdd}
