@@ -35,6 +35,7 @@ import type {
   GetDashboardNetProfitTrendParams,
   GetDashboardPaymentTypeBreakdownParams,
   GetDashboardSalesByCategoryParams,
+  GetDashboardSlowMovingProductsParams,
   GetDashboardTopProductsParams,
   GetReportSalesByMonthParams,
   GetReportTopProductsParams,
@@ -4026,7 +4027,7 @@ export const getGetDashboardTopProductsUrl = (params?: GetDashboardTopProductsPa
 }
 
 /**
- * @summary Top selling products
+ * @summary Top selling products (by variant when applicable)
  */
 export const getDashboardTopProducts = async (params?: GetDashboardTopProductsParams, options?: RequestInit): Promise<TopProduct[]> => {
 
@@ -4073,7 +4074,7 @@ export type GetDashboardTopProductsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Top selling products
+ * @summary Top selling products (by variant when applicable)
  */
 
 export function useGetDashboardTopProducts<TData = Awaited<ReturnType<typeof getDashboardTopProducts>>, TError = ErrorType<unknown>>(
@@ -4178,20 +4179,27 @@ export function useGetDashboardNetProfitTrend<TData = Awaited<ReturnType<typeof 
 
 
 
-export const getGetDashboardSlowMovingProductsUrl = () => {
+export const getGetDashboardSlowMovingProductsUrl = (params?: GetDashboardSlowMovingProductsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/dashboard/slow-moving-products`
+  return stringifiedParams.length > 0 ? `/api/dashboard/slow-moving-products?${stringifiedParams}` : `/api/dashboard/slow-moving-products`
 }
 
 /**
- * @summary Products with low turnover (slow-moving inventory)
+ * @summary Products/variants with low turnover (slow-moving inventory)
  */
-export const getDashboardSlowMovingProducts = async ( options?: RequestInit): Promise<SlowMovingProduct[]> => {
+export const getDashboardSlowMovingProducts = async (params?: GetDashboardSlowMovingProductsParams, options?: RequestInit): Promise<SlowMovingProduct[]> => {
 
-  return customFetch<SlowMovingProduct[]>(getGetDashboardSlowMovingProductsUrl(),
+  return customFetch<SlowMovingProduct[]>(getGetDashboardSlowMovingProductsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -4204,23 +4212,23 @@ export const getDashboardSlowMovingProducts = async ( options?: RequestInit): Pr
 
 
 
-export const getGetDashboardSlowMovingProductsQueryKey = () => {
+export const getGetDashboardSlowMovingProductsQueryKey = (params?: GetDashboardSlowMovingProductsParams,) => {
     return [
-    `/api/dashboard/slow-moving-products`
+    `/api/dashboard/slow-moving-products`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardSlowMovingProductsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardSlowMovingProductsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError = ErrorType<unknown>>(params?: GetDashboardSlowMovingProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSlowMovingProductsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSlowMovingProductsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>> = ({ signal }) => getDashboardSlowMovingProducts({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>> = ({ signal }) => getDashboardSlowMovingProducts(params, { signal, ...requestOptions });
 
 
 
@@ -4234,15 +4242,15 @@ export type GetDashboardSlowMovingProductsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Products with low turnover (slow-moving inventory)
+ * @summary Products/variants with low turnover (slow-moving inventory)
  */
 
 export function useGetDashboardSlowMovingProducts<TData = Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetDashboardSlowMovingProductsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSlowMovingProducts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardSlowMovingProductsQueryOptions(options)
+  const queryOptions = getGetDashboardSlowMovingProductsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

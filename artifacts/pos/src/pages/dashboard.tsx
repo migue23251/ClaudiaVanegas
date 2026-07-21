@@ -211,6 +211,35 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={`animate-pulse rounded-lg bg-muted ${className ?? ""}`} />;
 }
 
+// ── Category filter select ────────────────────────────────────────────────────
+
+const CATEGORY_OPTIONS = [
+  { value: "blusas",    label: "Blusas" },
+  { value: "jeans",     label: "Jeans" },
+  { value: "vestidos",  label: "Vestidos" },
+  { value: "conjuntos", label: "Conjuntos" },
+  { value: "faldas",    label: "Faldas" },
+  { value: "chaquetas", label: "Chaquetas" },
+  { value: "zapatos",   label: "Zapatos" },
+  { value: "bolsos",    label: "Bolsos" },
+  { value: "accesorios",label: "Accesorios" },
+] as const;
+
+function CategorySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="h-7 rounded-lg border border-border bg-card px-2 text-xs text-foreground focus:border-primary focus:outline-none cursor-pointer"
+    >
+      <option value="">Todas las categorías</option>
+      {CATEGORY_OPTIONS.map(o => (
+        <option key={o.value} value={o.value}>{o.label}</option>
+      ))}
+    </select>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -244,6 +273,10 @@ export default function Dashboard() {
     }
   }, []);
 
+  // ── Category filters for top-products and slow-moving ─────────────────────
+  const [topCat, setTopCat] = useState("");
+  const [slowCat, setSlowCat] = useState("");
+
   // ── Chart date range (category, payment, top-products, expenses) ──────────
   const [chartPreset, setChartPreset] = useState<Preset>("1m");
   const chartInit = getPresetDates("1m");
@@ -271,9 +304,10 @@ export default function Dashboard() {
   );
 
   const chartParams = { from: chartFrom, to: chartTo };
+  const topProductsParams = { from: chartFrom, to: chartTo, ...(topCat ? { category: topCat } : {}) };
   const { data: topProducts, isLoading: lp } = useGetDashboardTopProducts(
-    chartParams,
-    { query: { queryKey: [...getGetDashboardTopProductsQueryKey(), chartFrom, chartTo] } },
+    topProductsParams,
+    { query: { queryKey: [...getGetDashboardTopProductsQueryKey(), chartFrom, chartTo, topCat] } },
   );
   const { data: salesByCategory, isLoading: lsc } = useGetDashboardSalesByCategory(
     chartParams,
@@ -290,9 +324,11 @@ export default function Dashboard() {
     chartParams,
     { query: { queryKey: [...getGetDashboardExpensesVsIncomeQueryKey(), chartFrom, chartTo] } },
   );
-  const { data: slowMoving, isLoading: lsm } = useGetDashboardSlowMovingProducts({
-    query: { queryKey: getGetDashboardSlowMovingProductsQueryKey() },
-  });
+  const slowMovingParams = slowCat ? { category: slowCat } : {};
+  const { data: slowMoving, isLoading: lsm } = useGetDashboardSlowMovingProducts(
+    slowMovingParams,
+    { query: { queryKey: [...getGetDashboardSlowMovingProductsQueryKey(), slowCat] } },
+  );
 
   const profitParams = { from: profitFrom, to: profitTo };
   const { data: netProfitTrend, isLoading: lnp } = useGetDashboardNetProfitTrend(
@@ -649,7 +685,16 @@ export default function Dashboard() {
       </div>
 
       {/* ── Productos más vendidos ── */}
-      <ChartCard title="Productos más vendidos" sub={`${chartFrom} → ${chartTo}`} action={chartFilterAction}>
+      <ChartCard
+        title="Productos más vendidos"
+        sub={`Top 10 · ${chartFrom} → ${chartTo}`}
+        action={
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <CategorySelect value={topCat} onChange={setTopCat} />
+            {chartFilterAction}
+          </div>
+        }
+      >
         {lp ? <Skeleton className="h-48" /> : (
           (!topProducts || topProducts.length === 0) ? (
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Sin datos para el período seleccionado</div>
@@ -657,16 +702,19 @@ export default function Dashboard() {
             <div className="space-y-3">
               {topProducts.map((product, idx) => {
                 const pct = Math.round((product.totalRevenue / maxRevenue) * 100);
+                const variantLabel = product.color
+                  ? [product.color, product.size].filter(Boolean).join(" / ")
+                  : null;
                 return (
-                  <div key={product.productId}>
+                  <div key={`${product.productId}-${product.variantId ?? "no-var"}`}>
                     <div className="flex items-center gap-3 mb-1.5">
                       <span className="text-xs font-bold text-muted-foreground w-4 shrink-0 text-right tabular-nums">{idx + 1}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate leading-none">{product.productName}</p>
-                        {product.description && (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{product.description}</p>
+                        {variantLabel && (
+                          <p className="text-xs text-muted-foreground capitalize mt-0.5">{variantLabel}</p>
                         )}
-                        <p className="text-xs text-muted-foreground mt-0.5 capitalize">{product.category} · {product.totalQty} unid.</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 capitalize">{CATEGORY_LABELS[product.category] ?? product.category} · {product.totalQty} unid.</p>
                       </div>
                       <span className="text-xs font-semibold text-foreground tabular-nums shrink-0">{formatShort(product.totalRevenue)}</span>
                     </div>
@@ -684,11 +732,14 @@ export default function Dashboard() {
       {/* ── Inventario sin movimiento ── */}
       <ChartCard
         title="Inventario sin movimiento"
-        sub="Productos con baja rotación (sin ventas recientes)"
+        sub="Top 10 variantes con baja rotación"
         action={
-          <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {lsm ? "..." : `${slowMoving?.length ?? 0} productos`}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <CategorySelect value={slowCat} onChange={setSlowCat} />
+            <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+              <AlertTriangle className="h-3.5 w-3.5" />
+              {lsm ? "..." : `${slowMoving?.length ?? 0} items`}
+            </div>
           </div>
         }
       >
@@ -702,7 +753,7 @@ export default function Dashboard() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border text-muted-foreground">
-                    <th className="text-left py-2 pr-4 font-semibold">Producto</th>
+                    <th className="text-left py-2 pr-4 font-semibold">Producto / Variante</th>
                     <th className="text-left py-2 pr-4 font-semibold">Categoría</th>
                     <th className="text-right py-2 pr-4 font-semibold">Stock</th>
                     <th className="text-right py-2 pr-4 font-semibold">Días en bodega</th>
@@ -710,29 +761,34 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {slowMoving.slice(0, 10).map(p => (
-                    <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
-                      <td className="py-2 pr-4 font-medium">
-                        <div>{p.name}</div>
-                        {p.description && (
-                          <div className="text-muted-foreground font-normal truncate max-w-[160px]">{p.description}</div>
-                        )}
-                        <div className="text-muted-foreground font-mono">{p.code}</div>
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground capitalize">{CATEGORY_LABELS[p.category] ?? p.category}</td>
-                      <td className="py-2 pr-4 text-right font-semibold">{p.stock}</td>
-                      <td className="py-2 pr-4 text-right text-muted-foreground">{Math.round(p.daysInStock)}</td>
-                      <td className="py-2 text-right">
-                        {p.daysSinceLastSale != null ? (
-                          <span className={`font-semibold ${p.daysSinceLastSale > 30 ? "text-destructive" : "text-amber-600"}`}>
-                            {Math.round(p.daysSinceLastSale)} días
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground italic">Sin ventas</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {slowMoving.map(p => {
+                    const variantLabel = p.color
+                      ? [p.color, p.size].filter(Boolean).join(" / ")
+                      : null;
+                    return (
+                      <tr key={`${p.id}-${p.variantId ?? "no-var"}`} className="border-b border-border/50 hover:bg-muted/30">
+                        <td className="py-2 pr-4 font-medium">
+                          <div>{p.name}</div>
+                          {variantLabel && (
+                            <div className="text-muted-foreground font-normal capitalize">{variantLabel}</div>
+                          )}
+                          <div className="text-muted-foreground font-mono">{p.sku ?? p.code}</div>
+                        </td>
+                        <td className="py-2 pr-4 text-muted-foreground capitalize">{CATEGORY_LABELS[p.category] ?? p.category}</td>
+                        <td className="py-2 pr-4 text-right font-semibold">{p.stock}</td>
+                        <td className="py-2 pr-4 text-right text-muted-foreground">{Math.round(p.daysInStock)}</td>
+                        <td className="py-2 text-right">
+                          {p.daysSinceLastSale != null ? (
+                            <span className={`font-semibold ${p.daysSinceLastSale > 30 ? "text-destructive" : "text-amber-600"}`}>
+                              {Math.round(p.daysSinceLastSale)} días
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground italic">Sin ventas</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

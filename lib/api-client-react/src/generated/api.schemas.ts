@@ -608,10 +608,16 @@ export interface BillingVsCollectionPoint {
 
 export interface TopProduct {
   productId: number;
-  productName: string;
   /** @nullable */
-  description?: string | null;
+  variantId?: number | null;
+  productName: string;
   category: string;
+  /** @nullable */
+  color?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  sku?: string | null;
   totalQty: number;
   totalRevenue: number;
 }
@@ -655,11 +661,17 @@ export interface NetProfitTrendPoint {
 
 export interface SlowMovingProduct {
   id: number;
-  name: string;
   /** @nullable */
-  description?: string | null;
+  variantId?: number | null;
+  name: string;
   code: string;
   category: string;
+  /** @nullable */
+  color?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  sku?: string | null;
   stock: number;
   daysInStock: number;
   /** @nullable */
@@ -831,6 +843,7 @@ to?: string;
 export type GetDashboardTopProductsParams = {
 from?: string;
 to?: string;
+category?: string;
 };
 
 export type GetDashboardNetProfitTrendParams = {
@@ -842,6 +855,10 @@ from?: string;
  * End date (ISO 8601, e.g. 2025-12-31)
  */
 to?: string;
+};
+
+export type GetDashboardSlowMovingProductsParams = {
+category?: string;
 };
 
 export type GetReportSalesByMonthParams = {

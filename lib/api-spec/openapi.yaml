@@ -1151,7 +1151,7 @@ paths:
     get:
       operationId: getDashboardTopProducts
       tags: [dashboard]
-      summary: Top selling products
+      summary: Top selling products (by variant when applicable)
       parameters:
         - name: from
           in: query
@@ -1163,6 +1163,10 @@ paths:
           schema:
             type: string
             format: date
+        - name: category
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Top products
@@ -1205,7 +1209,12 @@ paths:
     get:
       operationId: getDashboardSlowMovingProducts
       tags: [dashboard]
-      summary: Products with low turnover (slow-moving inventory)
+      summary: Products/variants with low turnover (slow-moving inventory)
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Slow moving products
@@ -2097,12 +2106,18 @@ components:
       properties:
         productId:
           type: integer
+        variantId:
+          type: ["integer", "null"]
         productName:
           type: string
-        description:
-          type: ["string", "null"]
         category:
           type: string
+        color:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        sku:
+          type: ["string", "null"]
         totalQty:
           type: integer
         totalRevenue:
@@ -2183,14 +2198,20 @@ components:
       properties:
         id:
           type: integer
+        variantId:
+          type: ["integer", "null"]
         name:
           type: string
-        description:
-          type: ["string", "null"]
         code:
           type: string
         category:
           type: string
+        color:
+          type: ["string", "null"]
+        size:
+          type: ["string", "null"]
+        sku:
+          type: ["string", "null"]
         stock:
           type: integer
         daysInStock:

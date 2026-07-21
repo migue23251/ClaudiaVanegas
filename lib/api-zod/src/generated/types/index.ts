@@ -24,6 +24,7 @@ export * from './getDashboardExpensesVsIncomeParams';
 export * from './getDashboardNetProfitTrendParams';
 export * from './getDashboardPaymentTypeBreakdownParams';
 export * from './getDashboardSalesByCategoryParams';
+export * from './getDashboardSlowMovingProductsParams';
 export * from './getDashboardTopProductsParams';
 export * from './getReportSalesByMonthParams';
 export * from './getReportTopProductsParams';

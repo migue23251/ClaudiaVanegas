@@ -1347,18 +1347,22 @@ export const GetDashboardExpensesVsIncomeResponse = zod.array(GetDashboardExpens
 
 
 /**
- * @summary Top selling products
+ * @summary Top selling products (by variant when applicable)
  */
 export const GetDashboardTopProductsQueryParams = zod.object({
   "from": zod.date().optional(),
-  "to": zod.date().optional()
+  "to": zod.date().optional(),
+  "category": zod.coerce.string().optional()
 })
 
 export const GetDashboardTopProductsResponseItem = zod.object({
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
-  "description": zod.string().nullish(),
   "category": zod.string(),
+  "color": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "sku": zod.string().nullish(),
   "totalQty": zod.number(),
   "totalRevenue": zod.number()
 })
@@ -1383,14 +1387,21 @@ export const GetDashboardNetProfitTrendResponse = zod.array(GetDashboardNetProfi
 
 
 /**
- * @summary Products with low turnover (slow-moving inventory)
+ * @summary Products/variants with low turnover (slow-moving inventory)
  */
+export const GetDashboardSlowMovingProductsQueryParams = zod.object({
+  "category": zod.coerce.string().optional()
+})
+
 export const GetDashboardSlowMovingProductsResponseItem = zod.object({
   "id": zod.number(),
+  "variantId": zod.number().nullish(),
   "name": zod.string(),
-  "description": zod.string().nullish(),
   "code": zod.string(),
   "category": zod.string(),
+  "color": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "sku": zod.string().nullish(),
   "stock": zod.number(),
   "daysInStock": zod.number(),
   "daysSinceLastSale": zod.number().nullish(),
@@ -1446,9 +1457,12 @@ export const GetReportTopProductsQueryParams = zod.object({
 
 export const GetReportTopProductsResponseItem = zod.object({
   "productId": zod.number(),
+  "variantId": zod.number().nullish(),
   "productName": zod.string(),
-  "description": zod.string().nullish(),
   "category": zod.string(),
+  "color": zod.string().nullish(),
+  "size": zod.string().nullish(),
+  "sku": zod.string().nullish(),
   "totalQty": zod.number(),
   "totalRevenue": zod.number()
 })

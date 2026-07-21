@@ -8,10 +8,16 @@
 
 export interface TopProduct {
   productId: number;
-  productName: string;
   /** @nullable */
-  description?: string | null;
+  variantId?: number | null;
+  productName: string;
   category: string;
+  /** @nullable */
+  color?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  sku?: string | null;
   totalQty: number;
   totalRevenue: number;
 }

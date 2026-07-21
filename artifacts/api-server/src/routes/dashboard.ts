@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { gte, lte, and, eq, or, sql } from "drizzle-orm";
 import {
   db,
-  salesTable, saleItemsTable, productsTable,
+  salesTable, saleItemsTable, productsTable, productVariantsTable,
   customersTable,
   arPaymentsTable, accountsReceivableTable,
   purchaseOrdersTable,
@@ -233,27 +233,50 @@ router.get("/dashboard/top-products", requireAuth, async (req, res): Promise<voi
     start: bogotaMonthStart(y, m),
     end: bogotaMonthEnd(y, m),
   }));
+  const category = typeof req.query.category === "string" && req.query.category ? req.query.category : null;
+
+  const conditions = [
+    eq(salesTable.voided, false),
+    gte(salesTable.createdAt, start),
+    lte(salesTable.createdAt, end),
+    ...(category ? [eq(productsTable.category, category as any)] : []),
+  ];
 
   const top = await db.select({
     productId: saleItemsTable.productId,
+    variantId: saleItemsTable.variantId,
     productName: productsTable.name,
-    description: productsTable.description,
     category: productsTable.category,
+    color: productVariantsTable.color,
+    size: productVariantsTable.size,
+    sku: productVariantsTable.sku,
     totalQty: sql<number>`SUM(${saleItemsTable.qty})`,
     totalRevenue: sql<number>`SUM(${saleItemsTable.subtotal})`,
   }).from(saleItemsTable)
     .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
     .leftJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
-    .where(and(eq(salesTable.voided, false), gte(salesTable.createdAt, start), lte(salesTable.createdAt, end)))
-    .groupBy(saleItemsTable.productId, productsTable.name, productsTable.description, productsTable.category)
+    .leftJoin(productVariantsTable, eq(saleItemsTable.variantId, productVariantsTable.id))
+    .where(and(...conditions))
+    .groupBy(
+      saleItemsTable.productId,
+      saleItemsTable.variantId,
+      productsTable.name,
+      productsTable.category,
+      productVariantsTable.color,
+      productVariantsTable.size,
+      productVariantsTable.sku,
+    )
     .orderBy(sql`SUM(${saleItemsTable.qty}) DESC`)
     .limit(10);
 
   res.json(top.map(t => ({
     productId: t.productId,
+    variantId: t.variantId ?? null,
     productName: t.productName ?? "Desconocido",
-    description: t.description ?? null,
     category: t.category ?? "accesorios",
+    color: t.color ?? null,
+    size: t.size ?? null,
+    sku: t.sku ?? null,
     totalQty: Number(t.totalQty),
     totalRevenue: Number(t.totalRevenue),
   })));
@@ -477,38 +500,55 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
 
 // ─── Slow Moving Products ─────────────────────────────────────────────────────
 
-router.get("/dashboard/slow-moving-products", requireAuth, async (_req, res): Promise<void> => {
+router.get("/dashboard/slow-moving-products", requireAuth, async (req, res): Promise<void> => {
+  const category = typeof req.query.category === "string" && req.query.category ? req.query.category : null;
+  const categoryFilter = category ? sql`AND p.category = ${category}` : sql``;
+
   const result = await db.execute(sql`
     SELECT
       p.id,
+      pv.id                                                        AS variant_id,
       p.name,
-      p.description,
       p.code,
       p.category,
-      p.stock,
-      EXTRACT(epoch FROM (NOW() - p.created_at)) / 86400 AS days_in_stock,
-      MAX(s.created_at) AS last_sale_at,
+      COALESCE(pv.stock, p.stock)                                  AS stock,
+      pv.color,
+      pv.size,
+      pv.sku,
+      EXTRACT(epoch FROM (NOW() - p.created_at)) / 86400           AS days_in_stock,
+      MAX(s.created_at)                                            AS last_sale_at,
       CASE
         WHEN MAX(s.created_at) IS NOT NULL
         THEN EXTRACT(epoch FROM (NOW() - MAX(s.created_at))) / 86400
         ELSE NULL
-      END AS days_since_last_sale,
-      COUNT(si.id)::int AS sale_count
+      END                                                          AS days_since_last_sale,
+      COUNT(si.id)::int                                            AS sale_count
     FROM ${productsTable} p
-    LEFT JOIN ${saleItemsTable} si ON si.product_id = p.id
+    LEFT JOIN ${productVariantsTable} pv ON pv.product_id = p.id
+    LEFT JOIN ${saleItemsTable} si
+           ON si.product_id = p.id
+          AND (pv.id IS NULL OR si.variant_id = pv.id)
     LEFT JOIN ${salesTable} s ON s.id = si.sale_id AND s.voided = false
-    WHERE p.stock > 0
-    GROUP BY p.id, p.name, p.description, p.code, p.category, p.stock, p.created_at
+    WHERE (
+      (pv.id IS NOT NULL AND pv.stock > 0)
+      OR (pv.id IS NULL AND p.stock > 0)
+    )
+    ${categoryFilter}
+    GROUP BY p.id, pv.id, p.name, p.code, p.category, p.stock, p.created_at,
+             pv.stock, pv.color, pv.size, pv.sku
     ORDER BY days_in_stock DESC
-    LIMIT 15
+    LIMIT 10
   `);
 
   res.json((result.rows as any[]).map(r => ({
     id: r.id,
+    variantId: r.variant_id ?? null,
     name: r.name,
-    description: r.description ?? null,
     code: r.code,
     category: r.category,
+    color: r.color ?? null,
+    size: r.size ?? null,
+    sku: r.sku ?? null,
     stock: r.stock,
     daysInStock: Math.round(parseFloat(r.days_in_stock ?? "0")),
     daysSinceLastSale: r.days_since_last_sale != null ? Math.round(parseFloat(r.days_since_last_sale)) : null,

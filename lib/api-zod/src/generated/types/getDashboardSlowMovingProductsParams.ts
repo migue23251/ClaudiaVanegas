@@ -6,8 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetDashboardTopProductsParams = {
-from?: Date;
-to?: Date;
+export type GetDashboardSlowMovingProductsParams = {
 category?: string;
 };

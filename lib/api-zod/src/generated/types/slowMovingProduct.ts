@@ -8,11 +8,17 @@
 
 export interface SlowMovingProduct {
   id: number;
-  name: string;
   /** @nullable */
-  description?: string | null;
+  variantId?: number | null;
+  name: string;
   code: string;
   category: string;
+  /** @nullable */
+  color?: string | null;
+  /** @nullable */
+  size?: string | null;
+  /** @nullable */
+  sku?: string | null;
   stock: number;
   daysInStock: number;
   /** @nullable */
