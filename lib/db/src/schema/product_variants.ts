@@ -44,7 +44,7 @@ export const productVariantsTable = pgTable("product_variants", {
   id: serial("id").primaryKey(),
   productId: integer("product_id").notNull().references(() => productsTable.id, { onDelete: "cascade" }),
   color: text("color").notNull(),
-  size: text("size").notNull(),
+  size: text("size"),
   sku: text("sku").notNull().unique(),
   stock: integer("stock").notNull().default(0),
   images: jsonb("images").$type<string[]>().notNull().default([]),

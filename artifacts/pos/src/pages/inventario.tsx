@@ -71,18 +71,22 @@ function Pagination({ total, page, onChange }: { total: number; page: number; on
 
 // ── Variant row component ─────────────────────────────────────────────────────
 
+const NO_SIZE_CATEGORIES = ["bolsos", "accesorios"] as const;
+
 interface VariantRowProps {
   variant: ProductVariant;
   productId: number;
+  category: string;
   onUpdated: () => void;
 }
 
-function VariantRow({ variant, productId, onUpdated }: VariantRowProps) {
+function VariantRow({ variant, productId, category, onUpdated }: VariantRowProps) {
   const { toast } = useToast();
+  const showSize = !NO_SIZE_CATEGORIES.includes(category as any);
   const [editing, setEditing] = useState(false);
   const [editStock, setEditStock] = useState(String(variant.stock));
   const [editColor, setEditColor] = useState(variant.color);
-  const [editSize, setEditSize] = useState(variant.size);
+  const [editSize, setEditSize] = useState(variant.size ?? "");
 
   const updateVariant = useUpdateProductVariant();
   const deleteVariant = useDeleteProductVariant();
@@ -91,7 +95,7 @@ function VariantRow({ variant, productId, onUpdated }: VariantRowProps) {
     updateVariant.mutate({
       id: productId,
       variantId: variant.id,
-      data: { stock: parseInt(editStock, 10), color: editColor, size: editSize },
+      data: { stock: parseInt(editStock, 10), color: editColor, size: showSize ? editSize : null },
     }, {
       onSuccess: () => { setEditing(false); onUpdated(); },
       onError: () => toast({ title: "Error actualizando variante", variant: "destructive" }),
@@ -117,12 +121,14 @@ function VariantRow({ variant, productId, onUpdated }: VariantRowProps) {
               {VARIANT_COLORS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={editSize} onValueChange={setEditSize}>
-            <SelectTrigger className="h-7 text-xs w-20"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {showSize && (
+            <Select value={editSize} onValueChange={setEditSize}>
+              <SelectTrigger className="h-7 text-xs w-20"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Input
             type="number" min="0"
             value={editStock}
@@ -135,7 +141,7 @@ function VariantRow({ variant, productId, onUpdated }: VariantRowProps) {
       ) : (
         <>
           <span className="capitalize font-medium w-20">{variant.color}</span>
-          <span className="text-muted-foreground w-12">{variant.size}</span>
+          {showSize && <span className="text-muted-foreground w-12">{variant.size ?? "—"}</span>}
           <span className="font-mono text-xs text-muted-foreground flex-1">{variant.sku}</span>
           <Badge variant={variant.stock <= 5 ? "destructive" : "outline"} className="text-xs">
             ×{variant.stock}
@@ -154,21 +160,22 @@ function VariantRow({ variant, productId, onUpdated }: VariantRowProps) {
 
 // ── Add Variant Form ──────────────────────────────────────────────────────────
 
-function AddVariantForm({ productId, onAdded }: { productId: number; onAdded: () => void }) {
+function AddVariantForm({ productId, category, onAdded }: { productId: number; category: string; onAdded: () => void }) {
   const { toast } = useToast();
+  const showSize = !NO_SIZE_CATEGORIES.includes(category as any);
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
   const [stock, setStock] = useState("0");
   const createVariant = useCreateProductVariant();
 
   const handleAdd = () => {
-    if (!color || !size) {
-      toast({ title: "Selecciona color y talla", variant: "destructive" });
+    if (!color || (showSize && !size)) {
+      toast({ title: showSize ? "Selecciona color y talla" : "Selecciona un color", variant: "destructive" });
       return;
     }
     createVariant.mutate({
       id: productId,
-      data: { color, size, stock: parseInt(stock, 10) },
+      data: { color, size: showSize ? size : undefined, stock: parseInt(stock, 10) },
     }, {
       onSuccess: () => { setColor(""); setSize(""); setStock("0"); onAdded(); },
       onError: (err: any) => toast({ title: "Error agregando variante", description: err?.response?.data?.error, variant: "destructive" }),
@@ -193,15 +200,17 @@ function AddVariantForm({ productId, onAdded }: { productId: number; onAdded: ()
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1 w-24">
-        <label className="text-xs font-medium">Talla</label>
-        <Select value={size} onValueChange={setSize}>
-          <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Talla..." /></SelectTrigger>
-          <SelectContent>
-            {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
+      {showSize && (
+        <div className="space-y-1 w-24">
+          <label className="text-xs font-medium">Talla</label>
+          <Select value={size} onValueChange={setSize}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Talla..." /></SelectTrigger>
+            <SelectContent>
+              {VARIANT_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="space-y-1 w-16">
         <label className="text-xs font-medium">Stock</label>
         <Input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} className="h-8 text-xs" />
@@ -548,6 +557,7 @@ export default function Inventario() {
                         key={v.id}
                         variant={v}
                         productId={editingProduct.id}
+                        category={editingProduct.category}
                         onUpdated={() => {
                           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
                             const queries = queryClient.getQueriesData<Product[]>({ queryKey: getListProductsQueryKey() });
@@ -563,6 +573,7 @@ export default function Inventario() {
 
                   <AddVariantForm
                     productId={editingProduct.id}
+                    category={editingProduct.category}
                     onAdded={() => {
                       queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() }).then(() => {
                         const queries = queryClient.getQueriesData<Product[]>({ queryKey: getListProductsQueryKey() });

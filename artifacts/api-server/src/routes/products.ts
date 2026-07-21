@@ -18,8 +18,9 @@ async function nextProductCode(tx: Parameters<Parameters<typeof db.transaction>[
   return String(isNaN(current) ? 1 : current + 1);
 }
 
-function generateSku(productCode: string, color: string, size: string): string {
+function generateSku(productCode: string, color: string, size?: string | null): string {
   const colorAbbr = color.slice(0, 3).toUpperCase().replace(/\s+/g, "");
+  if (!size) return `${productCode}-${colorAbbr}`;
   const sizeAbbr = size.toUpperCase().replace(/\s+/g, "");
   return `${productCode}-${colorAbbr}-${sizeAbbr}`;
 }
@@ -107,7 +108,7 @@ router.post("/products", requireAuth, requireAdmin, async (req, res): Promise<vo
     const code = await nextProductCode(tx);
 
     // If variants are provided, initial product stock = sum of variant stocks; otherwise use provided stock
-    const variantList: { color: string; size: string; stock?: number; images?: string[] }[] = variants ?? [];
+    const variantList: { color: string; size?: string | null; stock?: number; images?: string[] }[] = variants ?? [];
     const initialStock = variantList.length > 0
       ? variantList.reduce((s: number, v: { stock?: number }) => s + (v.stock ?? 0), 0)
       : parseInt(String(stock ?? 0), 10);
@@ -224,11 +225,11 @@ router.delete("/products/:id", requireAuth, requireAdmin, async (req, res): Prom
 router.post("/products/:id/variants", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const productId = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const { color, size, stock: variantStock, images, sku: customSku } = req.body as {
-    color: string; size: string; stock?: number; images?: string[]; sku?: string;
+    color: string; size?: string | null; stock?: number; images?: string[]; sku?: string;
   };
 
-  if (!color || !size) {
-    res.status(400).json({ error: "color y size son requeridos" });
+  if (!color) {
+    res.status(400).json({ error: "color es requerido" });
     return;
   }
 
