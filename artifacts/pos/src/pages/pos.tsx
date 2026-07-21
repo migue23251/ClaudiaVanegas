@@ -119,14 +119,20 @@ export default function Pos() {
   const availableSizes = useMemo(() => {
     if (!variantPickerProduct?.variants || !pickerColor) return [];
     return variantPickerProduct.variants
-      .filter(v => v.color === pickerColor)
-      .map(v => v.size);
+      .filter(v => v.color === pickerColor && v.size)
+      .map(v => v.size!);
   }, [variantPickerProduct, pickerColor]);
 
+  const hasSizes = availableSizes.length > 0;
+
   const selectedVariant = useMemo((): ProductVariant | null => {
-    if (!variantPickerProduct?.variants || !pickerColor || !pickerSize) return null;
-    return variantPickerProduct.variants.find(v => v.color === pickerColor && v.size === pickerSize) ?? null;
-  }, [variantPickerProduct, pickerColor, pickerSize]);
+    if (!variantPickerProduct?.variants || !pickerColor) return null;
+    if (hasSizes && pickerSize)
+      return variantPickerProduct.variants.find(v => v.color === pickerColor && v.size === pickerSize) ?? null;
+    if (!hasSizes)
+      return variantPickerProduct.variants.find(v => v.color === pickerColor) ?? null;
+    return null;
+  }, [variantPickerProduct, pickerColor, pickerSize, hasSizes]);
 
   const openVariantPicker = (product: Product) => {
     setVariantPickerProduct(product);
@@ -685,8 +691,8 @@ export default function Pos() {
               </div>
             </div>
 
-            {/* Size selection (shown after color) */}
-            {pickerColor && (
+            {/* Size selection (solo cuando el color elegido tiene tallas reales) */}
+            {pickerColor && hasSizes && (
               <div className="space-y-2.5">
                 <label className="text-sm font-semibold">Talla</label>
                 <div className="flex flex-wrap gap-2">
@@ -720,7 +726,7 @@ export default function Pos() {
               <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg text-sm">
                 <span className="w-4 h-4 rounded-full border" style={{ background: COLOR_HEX[selectedVariant.color] ?? "#ccc" }} />
                 <div>
-                  <span className="font-medium capitalize">{selectedVariant.color} / {selectedVariant.size}</span>
+                  <span className="font-medium capitalize">{selectedVariant.color}{selectedVariant.size ? ` / ${selectedVariant.size}` : ""}</span>
                   <span className="text-muted-foreground ml-2">— {selectedVariant.stock} disponibles</span>
                 </div>
               </div>
