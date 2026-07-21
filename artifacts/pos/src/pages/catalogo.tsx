@@ -262,12 +262,6 @@ function ProductModal({
               <Tag className="w-3 h-3 mr-1" />
               {CATEGORY_LABELS[product.category] ?? product.category}
             </Badge>
-            {product.stock > 0 && (
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 w-fit">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                Disponible para entrega inmediata
-              </span>
-            )}
             {product.description && (
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                 {product.description}
@@ -430,12 +424,6 @@ function ProductCard({
               <span className="text-xs text-muted-foreground">+{uniqueColors.length - 8}</span>
             )}
           </div>
-        )}
-        {product.stock > 0 && (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 w-fit">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            Disponible para entrega inmediata
-          </span>
         )}
         {product.description && (
           <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
