@@ -169,12 +169,24 @@ function ProductModal({
 
   const hasVariants = product.variants && product.variants.length > 0;
   const uniqueColors = hasVariants ? [...new Set(product.variants.map(v => v.color))] : [];
+
+  // Solo incluir tallas reales (no nulas/vacías)
   const availableSizes = pickerColor
-    ? product.variants.filter(v => v.color === pickerColor).map(v => v.size)
+    ? product.variants.filter(v => v.color === pickerColor && v.size).map(v => v.size!)
     : [];
-  const selectedVariant = pickerColor && pickerSize
-    ? product.variants.find(v => v.color === pickerColor && v.size === pickerSize) ?? null
+  const hasSizes = availableSizes.length > 0;
+
+  // Si el color seleccionado no tiene tallas, la variante se resuelve solo por color
+  const selectedVariant = pickerColor
+    ? hasSizes && pickerSize
+      ? (product.variants.find(v => v.color === pickerColor && v.size === pickerSize) ?? null)
+      : !hasSizes
+        ? (product.variants.find(v => v.color === pickerColor) ?? null)
+        : null
     : null;
+
+  // El producto tiene alguna variante con talla (para mostrar el hint correcto)
+  const productHasAnySizes = hasVariants && product.variants.some(v => v.size);
 
   const canAdd = !hasVariants || !!selectedVariant;
 
@@ -289,8 +301,8 @@ function ProductModal({
                   </div>
                 </div>
 
-                {/* Size picker — shown after color is selected */}
-                {pickerColor && (
+                {/* Size picker — solo cuando el color elegido tiene tallas reales */}
+                {pickerColor && hasSizes && (
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">Talla</p>
                     <div className="flex flex-wrap gap-2">
@@ -312,7 +324,11 @@ function ProductModal({
                 )}
 
                 {!pickerColor && (
-                  <p className="text-xs text-muted-foreground">Selecciona un color para ver las tallas disponibles</p>
+                  <p className="text-xs text-muted-foreground">
+                    {productHasAnySizes
+                      ? "Selecciona un color para ver las tallas disponibles"
+                      : "Selecciona un color"}
+                  </p>
                 )}
               </div>
             )}
@@ -334,7 +350,7 @@ function ProductModal({
             >
               <ShoppingCart className="w-4 h-4" />
               {hasVariants && !canAdd
-                ? "Selecciona color y talla"
+                ? productHasAnySizes ? "Selecciona color y talla" : "Selecciona un color"
                 : cartQty > 0 ? `Añadir otro (${cartQty} en carrito)` : "Añadir al carrito"}
             </Button>
           </div>
