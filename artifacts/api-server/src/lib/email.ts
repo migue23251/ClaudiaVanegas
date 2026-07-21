@@ -7,6 +7,8 @@ interface SaleItem {
   qty: number;
   unitPrice: number;
   subtotal: number;
+  variantColor?: string | null;
+  variantSize?: string | null;
 }
 
 interface InvoiceData {
@@ -47,17 +49,21 @@ function buildInvoiceHtml(invoice: InvoiceData, storeName: string, hasCidLogo: b
     ? `<img src="cid:store-logo" alt="${storeName}" style="max-height:80px;max-width:200px;object-fit:contain;display:block;" />`
     : "";
 
-  const itemRows = invoice.items.map(item => `
+  const itemRows = invoice.items.map(item => {
+    const variantLabel = [item.variantColor, item.variantSize].filter(Boolean).join(" / ");
+    return `
     <tr style="border-bottom:1px solid #f0f0f0;">
       <td style="padding:10px 8px;vertical-align:top;">
         <div style="font-weight:600;color:#1a1a1a;">${item.productName}</div>
-        ${item.description ? `<div style="font-size:12px;color:#888;margin-top:2px;">${item.description}</div>` : ""}
+        ${variantLabel ? `<div style="font-size:12px;color:#888;margin-top:2px;">🎨 ${variantLabel}</div>` : ""}
+        ${item.description ? `<div style="font-size:12px;color:#aaa;margin-top:2px;">${item.description}</div>` : ""}
       </td>
       <td style="padding:10px 8px;text-align:center;white-space:nowrap;color:#444;">${item.qty}</td>
       <td style="padding:10px 8px;text-align:right;white-space:nowrap;color:#444;">${formatCOP(item.unitPrice)}</td>
       <td style="padding:10px 8px;text-align:right;white-space:nowrap;font-weight:600;color:#1a1a1a;">${formatCOP(item.subtotal)}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   const paymentLabel =
     invoice.paymentType === "credito" ? "Crédito" :

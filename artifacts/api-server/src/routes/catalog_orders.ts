@@ -409,8 +409,11 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
       qty: saleItemsTable.qty,
       unitPrice: saleItemsTable.unitPrice,
       subtotal: saleItemsTable.subtotal,
+      variantColor: productVariantsTable.color,
+      variantSize: productVariantsTable.size,
     }).from(saleItemsTable)
       .leftJoin(productsTable, eq(saleItemsTable.productId, productsTable.id))
+      .leftJoin(productVariantsTable, eq(saleItemsTable.variantId, productVariantsTable.id))
       .where(eq(saleItemsTable.saleId, saleId));
 
     sendInvoiceEmail({
@@ -426,6 +429,8 @@ router.post("/catalog-orders/:id/invoice", requireAuth, requireAdmin, async (req
         qty: i.qty,
         unitPrice: parseFloat(i.unitPrice),
         subtotal: parseFloat(i.subtotal),
+        variantColor: i.variantColor ?? null,
+        variantSize: i.variantSize ?? null,
       })),
       total,
       notes: notes?.trim() || order.notes || null,
