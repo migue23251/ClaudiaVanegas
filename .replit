@@ -40,12 +40,13 @@ waitForPort = 8080
 name = "POS Frontend"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=24730 pnpm --filter @workspace/pos run dev"
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5173 pnpm --filter @workspace/pos run dev"
+waitForPort = 5173
 
 [agent]
 stack = "PNPM_WORKSPACE"
