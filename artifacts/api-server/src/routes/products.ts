@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, type SQL, max, desc, inArray } from "drizzle-orm";
+import { eq, ilike, or, and, type SQL, desc, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import {
   db, productsTable, PRODUCT_CATEGORIES,
@@ -13,9 +13,12 @@ const router: IRouter = Router();
 
 async function nextProductCode(tx: Parameters<Parameters<typeof db.transaction>[0]>[0]): Promise<string> {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(987654321)`);
-  const [result] = await tx.select({ maxCode: max(productsTable.code) }).from(productsTable);
-  const current = parseInt(result?.maxCode ?? "0", 10);
-  return String(isNaN(current) ? 1 : current + 1);
+  // Use numeric MAX: text MAX gives wrong lexicographic order ("9" > "10" > "11")
+  const [result] = await tx.select({
+    maxCode: sql<number>`COALESCE(MAX(CASE WHEN code ~ '^[0-9]+$' THEN code::integer ELSE NULL END), 0)`,
+  }).from(productsTable);
+  const current = result?.maxCode ?? 0;
+  return String(current + 1);
 }
 
 function generateSku(productCode: string, color: string, size?: string | null): string {
