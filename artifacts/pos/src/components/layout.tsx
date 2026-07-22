@@ -26,7 +26,6 @@ const menuItems = [
   { icon: ClipboardList,   label: "Pedidos Catálogo",   href: "/pedidos",         roles: ["admin"] },
   { icon: Package,         label: "Inventario",         href: "/inventario",      roles: ["admin"] },
   { icon: Truck,           label: "Proveedores",        href: "/proveedores",     roles: ["admin"] },
-  { icon: FileText,        label: "Órdenes de Compra",  href: "/ordenes-compra",  roles: ["admin"] },
   { icon: Briefcase,       label: "Cuentas por Cobrar", href: "/cuentas-cobrar",  roles: ["admin"] },
   { icon: DollarSign,      label: "Cuentas por Pagar",  href: "/cuentas-pagar",   roles: ["admin"] },
   { icon: Settings,        label: "Configuración",      href: "/configuracion",   roles: ["admin"] },

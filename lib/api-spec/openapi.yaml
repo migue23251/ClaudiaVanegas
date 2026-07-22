@@ -1327,6 +1327,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/Settings"
 
+  /inventory-entries:
+    post:
+      operationId: createInventoryEntry
+      tags: [inventory]
+      summary: Receive merchandise and update stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InventoryEntryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryEntry"
+    get:
+      operationId: listInventoryEntries
+      tags: [inventory]
+      summary: List inventory entries
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of inventory entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -2295,3 +2332,50 @@ components:
           type: boolean
         sendPaymentLinkEmail:
           type: boolean
+
+    # ─── INVENTORY ENTRIES ────────────────────────────────────────────────────
+    InventoryEntryInput:
+      type: object
+      required: [productId, qty, unitCost]
+      properties:
+        productId:
+          type: integer
+        variantId:
+          type: integer
+          nullable: true
+        supplierId:
+          type: integer
+          nullable: true
+        qty:
+          type: integer
+          minimum: 1
+        unitCost:
+          type: number
+        notes:
+          type: string
+
+    InventoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        variantId:
+          type: integer
+          nullable: true
+        supplierId:
+          type: integer
+          nullable: true
+        qty:
+          type: integer
+        unitCost:
+          type: number
+        totalCost:
+          type: number
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time

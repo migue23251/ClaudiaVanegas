@@ -5,7 +5,7 @@ import {
   db, productsTable, PRODUCT_CATEGORIES,
   purchaseOrderItemsTable, purchaseOrdersTable, suppliersTable,
   saleItemsTable, salesTable, customersTable,
-  productVariantsTable,
+  productVariantsTable, inventoryEntriesTable,
 } from "@workspace/db";
 import { requireAuth, requireAdmin } from "../lib/auth";
 
@@ -312,36 +312,52 @@ router.get("/products/:id/movements", requireAuth, requireAdmin, async (req, res
   const [product] = await db.select().from(productsTable).where(eq(productsTable.id, id));
   if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
 
-  const incoming = await db.select({
-    id: purchaseOrderItemsTable.id,
-    purchaseOrderId: purchaseOrdersTable.id,
-    supplierName: suppliersTable.name,
-    qtyOrdered: purchaseOrderItemsTable.qtyOrdered,
-    qtyReceived: purchaseOrderItemsTable.qtyReceived,
-    unitCost: purchaseOrderItemsTable.unitCost,
-    date: purchaseOrdersTable.createdAt,
-  }).from(purchaseOrderItemsTable)
-    .innerJoin(purchaseOrdersTable, eq(purchaseOrderItemsTable.purchaseOrderId, purchaseOrdersTable.id))
-    .leftJoin(suppliersTable, eq(purchaseOrdersTable.supplierId, suppliersTable.id))
-    .where(and(eq(purchaseOrderItemsTable.productId, id), sql`${purchaseOrdersTable.status} != 'cancelled'`))
-    .orderBy(desc(purchaseOrdersTable.createdAt));
+  const [poIncoming, inventoryIncoming, outgoing] = await Promise.all([
+    // Legacy: purchase order items (keep for historical data)
+    db.select({
+      id: purchaseOrderItemsTable.id,
+      purchaseOrderId: purchaseOrdersTable.id,
+      supplierName: suppliersTable.name,
+      qtyOrdered: purchaseOrderItemsTable.qtyOrdered,
+      qtyReceived: purchaseOrderItemsTable.qtyReceived,
+      unitCost: purchaseOrderItemsTable.unitCost,
+      date: purchaseOrdersTable.createdAt,
+    }).from(purchaseOrderItemsTable)
+      .innerJoin(purchaseOrdersTable, eq(purchaseOrderItemsTable.purchaseOrderId, purchaseOrdersTable.id))
+      .leftJoin(suppliersTable, eq(purchaseOrdersTable.supplierId, suppliersTable.id))
+      .where(and(eq(purchaseOrderItemsTable.productId, id), sql`${purchaseOrdersTable.status} != 'cancelled'`))
+      .orderBy(desc(purchaseOrdersTable.createdAt)),
 
-  const outgoing = await db.select({
-    id: saleItemsTable.id,
-    saleId: salesTable.id,
-    customerName: customersTable.firstName,
-    customerLastName: customersTable.lastName,
-    qty: saleItemsTable.qty,
-    unitPrice: saleItemsTable.unitPrice,
-    date: salesTable.createdAt,
-  }).from(saleItemsTable)
-    .innerJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
-    .leftJoin(customersTable, eq(salesTable.customerId, customersTable.id))
-    .where(and(eq(saleItemsTable.productId, id), eq(salesTable.voided, false)))
-    .orderBy(desc(salesTable.createdAt));
+    // New: direct inventory entries
+    db.select({
+      id: inventoryEntriesTable.id,
+      supplierName: suppliersTable.name,
+      qty: inventoryEntriesTable.qty,
+      unitCost: inventoryEntriesTable.unitCost,
+      date: inventoryEntriesTable.createdAt,
+    }).from(inventoryEntriesTable)
+      .leftJoin(suppliersTable, eq(inventoryEntriesTable.supplierId, suppliersTable.id))
+      .where(eq(inventoryEntriesTable.productId, id))
+      .orderBy(desc(inventoryEntriesTable.createdAt)),
 
-  res.json({
-    incoming: incoming.map(i => ({
+    // Sales outgoing
+    db.select({
+      id: saleItemsTable.id,
+      saleId: salesTable.id,
+      customerName: customersTable.firstName,
+      customerLastName: customersTable.lastName,
+      qty: saleItemsTable.qty,
+      unitPrice: saleItemsTable.unitPrice,
+      date: salesTable.createdAt,
+    }).from(saleItemsTable)
+      .innerJoin(salesTable, eq(saleItemsTable.saleId, salesTable.id))
+      .leftJoin(customersTable, eq(salesTable.customerId, customersTable.id))
+      .where(and(eq(saleItemsTable.productId, id), eq(salesTable.voided, false)))
+      .orderBy(desc(salesTable.createdAt)),
+  ]);
+
+  const allIncoming = [
+    ...poIncoming.map(i => ({
       id: i.id,
       purchaseOrderId: i.purchaseOrderId,
       supplierName: i.supplierName ?? "Desconocido",
@@ -350,6 +366,19 @@ router.get("/products/:id/movements", requireAuth, requireAdmin, async (req, res
       unitCost: parseFloat(i.unitCost),
       date: i.date,
     })),
+    ...inventoryIncoming.map(e => ({
+      id: e.id,
+      purchaseOrderId: null,
+      supplierName: e.supplierName ?? "Sin proveedor",
+      qtyOrdered: e.qty,
+      qtyReceived: e.qty,
+      unitCost: parseFloat(e.unitCost),
+      date: e.date,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  res.json({
+    incoming: allIncoming,
     outgoing: outgoing.map(o => ({
       id: o.id,
       saleId: o.saleId,

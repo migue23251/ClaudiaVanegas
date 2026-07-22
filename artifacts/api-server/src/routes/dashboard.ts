@@ -5,7 +5,6 @@ import {
   salesTable, saleItemsTable, productsTable, productVariantsTable,
   customersTable,
   arPaymentsTable, accountsReceivableTable,
-  purchaseOrdersTable,
   apPaymentsTable, accountsPayableTable,
 } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
@@ -112,13 +111,16 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
     count: sql<number>`COUNT(*)`,
   }).from(productsTable).where(sql`${productsTable.stock} <= 5`);
 
-  // Net profit = recaudo del mes - compras del mes - gastos fijos pagados del mes
-  const [poExpensesResult] = await db.select({
-    total: sql<string>`COALESCE(SUM(${purchaseOrdersTable.total}), 0)`,
-  }).from(purchaseOrdersTable).where(and(
-    gte(purchaseOrdersTable.createdAt, startOfMonth),
-    lte(purchaseOrdersTable.createdAt, endOfMonth),
-  ));
+  // Net profit = recaudo del mes - ingresos de inventario del mes - gastos fijos pagados del mes
+  const [inventoryExpensesResult] = await db.select({
+    total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
+  }).from(apPaymentsTable)
+    .innerJoin(accountsPayableTable, eq(apPaymentsTable.accountPayableId, accountsPayableTable.id))
+    .where(and(
+      eq(accountsPayableTable.type, "inventory_entry" as any),
+      gte(apPaymentsTable.paidAt, startOfMonth),
+      lte(apPaymentsTable.paidAt, endOfMonth),
+    ));
 
   const [fixedExpensePaymentsResult] = await db.select({
     total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
@@ -131,7 +133,7 @@ router.get("/dashboard/summary", requireAuth, async (_req, res): Promise<void> =
     ));
 
   const collection = parseFloat(cashResult.total) + parseFloat(creditPaymentsResult.total);
-  const expenses = parseFloat(poExpensesResult.total) + parseFloat(fixedExpensePaymentsResult.total);
+  const expenses = parseFloat(inventoryExpensesResult.total) + parseFloat(fixedExpensePaymentsResult.total);
 
   // Pending credits = total outstanding balance on pending/partial AR records
   const [pendingCreditsResult] = await db.select({
@@ -432,8 +434,8 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
   const rangeStart = months[0].start;
   const rangeEnd = months[months.length - 1].end;
 
-  // 4 aggregate queries: cash income, AR payments income, PO expenses, fixed expense payments
-  const [cashRows, arRows, poRows, fixedExpenseRows] = await Promise.all([
+  // 4 aggregate queries: cash income, AR payments income, inventory expenses, fixed expense payments
+  const [cashRows, arRows, inventoryRows, fixedExpenseRows] = await Promise.all([
     db.select({
       month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${salesTable.createdAt}))`,
       total: sql<string>`COALESCE(SUM(${salesTable.total}), 0)`,
@@ -458,11 +460,16 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
       .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${arPaymentsTable.paidAt}))`),
 
     db.select({
-      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${purchaseOrdersTable.createdAt}))`,
-      total: sql<string>`COALESCE(SUM(${purchaseOrdersTable.total}), 0)`,
-    }).from(purchaseOrdersTable)
-      .where(and(gte(purchaseOrdersTable.createdAt, rangeStart), lte(purchaseOrdersTable.createdAt, rangeEnd)))
-      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${purchaseOrdersTable.createdAt}))`),
+      month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`,
+      total: sql<string>`COALESCE(SUM(${apPaymentsTable.amount}), 0)`,
+    }).from(apPaymentsTable)
+      .innerJoin(accountsPayableTable, eq(apPaymentsTable.accountPayableId, accountsPayableTable.id))
+      .where(and(
+        eq(accountsPayableTable.type, "inventory_entry" as any),
+        gte(apPaymentsTable.paidAt, rangeStart),
+        lte(apPaymentsTable.paidAt, rangeEnd),
+      ))
+      .groupBy(sql`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`),
 
     db.select({
       month: sql<string>`DATE_TRUNC('month', timezone('America/Bogota', ${apPaymentsTable.paidAt}))`,
@@ -480,13 +487,13 @@ router.get("/dashboard/net-profit-trend", requireAuth, async (req, res): Promise
   const toKey = (d: string | Date) => String(d).substring(0, 7);
   const cashMap = Object.fromEntries(cashRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const arMap = Object.fromEntries(arRows.map(r => [toKey(r.month), parseFloat(r.total)]));
-  const poMap = Object.fromEntries(poRows.map(r => [toKey(r.month), parseFloat(r.total)]));
+  const inventoryMap = Object.fromEntries(inventoryRows.map(r => [toKey(r.month), parseFloat(r.total)]));
   const fixedExpenseMap = Object.fromEntries(fixedExpenseRows.map(r => [toKey(r.month), parseFloat(r.total)]));
 
   const result = months.map(({ start, label }) => {
     const key = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`;
     const income = (cashMap[key] ?? 0) + (arMap[key] ?? 0);
-    const expenses = (poMap[key] ?? 0) + (fixedExpenseMap[key] ?? 0);
+    const expenses = (inventoryMap[key] ?? 0) + (fixedExpenseMap[key] ?? 0);
     return {
       month: label,
       netProfit: income - expenses,

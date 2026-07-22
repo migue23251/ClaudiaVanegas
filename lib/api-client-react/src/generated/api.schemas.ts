@@ -730,6 +730,28 @@ export interface SettingsInput {
   sendPaymentLinkEmail?: boolean;
 }
 
+export interface InventoryEntryInput {
+  productId: number;
+  variantId?: number | null;
+  supplierId?: number | null;
+  /** @minimum 1 */
+  qty: number;
+  unitCost: number;
+  notes?: string;
+}
+
+export interface InventoryEntry {
+  id?: number;
+  productId?: number;
+  variantId?: number | null;
+  supplierId?: number | null;
+  qty?: number;
+  unitCost?: number;
+  totalCost?: number;
+  notes?: string | null;
+  createdAt?: string;
+}
+
 export type ListProductsParams = {
 search?: string;
 category?: ListProductsCategory;
@@ -867,5 +889,9 @@ year?: number;
 
 export type GetReportTopProductsParams = {
 limit?: number;
+};
+
+export type ListInventoryEntriesParams = {
+productId?: number;
 };
 

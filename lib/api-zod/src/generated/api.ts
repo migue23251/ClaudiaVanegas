@@ -1533,3 +1533,52 @@ export const UpdateSettingsResponse = zod.object({
 })
 
 
+/**
+ * @summary Receive merchandise and update stock
+ */
+
+
+
+export const CreateInventoryEntryBody = zod.object({
+  "productId": zod.number(),
+  "variantId": zod.number().nullish(),
+  "supplierId": zod.number().nullish(),
+  "qty": zod.number().min(1),
+  "unitCost": zod.number(),
+  "notes": zod.string().optional()
+})
+
+export const CreateInventoryEntryResponse = zod.object({
+  "id": zod.number().optional(),
+  "productId": zod.number().optional(),
+  "variantId": zod.number().nullish(),
+  "supplierId": zod.number().nullish(),
+  "qty": zod.number().optional(),
+  "unitCost": zod.number().optional(),
+  "totalCost": zod.number().optional(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+
+
+/**
+ * @summary List inventory entries
+ */
+export const ListInventoryEntriesQueryParams = zod.object({
+  "productId": zod.coerce.number().optional()
+})
+
+export const ListInventoryEntriesResponseItem = zod.object({
+  "id": zod.number().optional(),
+  "productId": zod.number().optional(),
+  "variantId": zod.number().nullish(),
+  "supplierId": zod.number().nullish(),
+  "qty": zod.number().optional(),
+  "unitCost": zod.number().optional(),
+  "totalCost": zod.number().optional(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+export const ListInventoryEntriesResponse = zod.array(ListInventoryEntriesResponseItem)
+
+

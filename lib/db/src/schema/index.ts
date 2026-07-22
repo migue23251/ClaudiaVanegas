@@ -8,3 +8,4 @@ export * from "./sales";
 export * from "./ledger";
 export * from "./settings";
 export * from "./catalog_orders";
+export * from "./inventory_entries";

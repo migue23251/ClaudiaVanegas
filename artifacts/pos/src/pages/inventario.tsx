@@ -4,6 +4,8 @@ import {
   useSetProductVisibility,
   useGetProductMovements, getGetProductMovementsQueryKey,
   useCreateProductVariant, useUpdateProductVariant, useDeleteProductVariant,
+  useCreateInventoryEntry,
+  useListSuppliers,
   getProduct,
   ProductInput, Product, ProductVariant,
 } from "@workspace/api-client-react";
@@ -14,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Edit, Trash2, History, Eye, EyeOff, Layers, Pencil } from "lucide-react";
+import { Plus, Search, Edit, Trash2, History, Eye, EyeOff, Layers, Pencil, PackagePlus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -233,6 +235,228 @@ function AddVariantForm({ productId, category, onAdded }: { productId: number; c
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
+// ── Receive Merchandise Modal ──────────────────────────────────────────────────
+
+interface ReceiveForm {
+  productId: string;
+  variantId: string;
+  supplierId: string;
+  qty: string;
+  unitCost: string;
+  notes: string;
+}
+
+const EMPTY_RECEIVE: ReceiveForm = {
+  productId: "", variantId: "", supplierId: "", qty: "1", unitCost: "", notes: "",
+};
+
+function ReceiveMerchandiseModal({
+  products,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  products: Product[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState<ReceiveForm>(EMPTY_RECEIVE);
+  const { data: suppliers } = useListSuppliers();
+  const createEntry = useCreateInventoryEntry();
+
+  const selectedProduct = products.find(p => String(p.id) === form.productId) ?? null;
+  const variants = selectedProduct?.variants ?? [];
+  const hasVariants = variants.length > 0;
+
+  const setField = (key: keyof ReceiveForm, value: string) =>
+    setForm(f => ({ ...f, [key]: value }));
+
+  const handleProductChange = (productId: string) => {
+    const prod = products.find(p => String(p.id) === productId);
+    setForm(f => ({
+      ...f,
+      productId,
+      variantId: "",
+      unitCost: prod ? String(prod.costPrice) : "",
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.productId || !form.qty || !form.unitCost) {
+      toast({ title: "Completa producto, cantidad y costo", variant: "destructive" });
+      return;
+    }
+    if (hasVariants && !form.variantId) {
+      toast({ title: "Selecciona una variante para este producto", variant: "destructive" });
+      return;
+    }
+    createEntry.mutate({
+      data: {
+        productId: Number(form.productId),
+        variantId: form.variantId ? Number(form.variantId) : null,
+        supplierId: form.supplierId ? Number(form.supplierId) : null,
+        qty: Number(form.qty),
+        unitCost: Number(form.unitCost),
+        notes: form.notes || undefined,
+      },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Mercancía ingresada al inventario" });
+        setForm(EMPTY_RECEIVE);
+        onOpenChange(false);
+        onSuccess();
+      },
+      onError: (err: any) => {
+        toast({
+          title: "Error al ingresar mercancía",
+          description: err?.response?.data?.error ?? "Error desconocido",
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
+
+  const total = form.qty && form.unitCost
+    ? Number(form.qty) * Number(form.unitCost)
+    : null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setForm(EMPTY_RECEIVE); }}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PackagePlus className="h-5 w-5 text-primary" />
+            Recibir Mercancía
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          {/* Product */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Producto</label>
+            <Select value={form.productId} onValueChange={handleProductChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar producto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map(p => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    <span className="font-mono text-xs text-muted-foreground mr-2">{p.code}</span>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Variant — only shown when product has variants */}
+          {hasVariants && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Variante</label>
+              <Select value={form.variantId} onValueChange={v => setField("variantId", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar variante..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {variants.map(v => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} />
+                        <span className="capitalize">{v.color}</span>
+                        {v.size && <span className="text-muted-foreground">/ {v.size}</span>}
+                        <span className="font-mono text-xs text-muted-foreground ml-1">×{v.stock}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Quantity */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Cantidad</label>
+              <Input
+                type="number" min="1" required
+                value={form.qty}
+                onChange={e => setField("qty", e.target.value)}
+              />
+            </div>
+
+            {/* Supplier */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Proveedor <span className="text-muted-foreground font-normal">(opcional)</span></label>
+              <Select value={form.supplierId} onValueChange={v => setField("supplierId", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin proveedor</SelectItem>
+                  {(suppliers ?? []).map(s => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Unit Cost */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">
+              Costo unitario
+              {selectedProduct && (
+                <span className="text-xs text-muted-foreground font-normal ml-1">
+                  (anterior: {formatCurrency(selectedProduct.costPrice)})
+                </span>
+              )}
+            </label>
+            <Input
+              type="number" min="0" step="1" required
+              placeholder="0"
+              value={form.unitCost}
+              onChange={e => setField("unitCost", e.target.value)}
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Notas <span className="text-muted-foreground font-normal">(opcional)</span></label>
+            <Input
+              placeholder="Número de guía, observaciones..."
+              value={form.notes}
+              onChange={e => setField("notes", e.target.value)}
+            />
+          </div>
+
+          {/* Total preview */}
+          {total !== null && (
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3 border">
+              <span className="text-sm text-muted-foreground">Total del ingreso</span>
+              <span className="font-serif font-bold text-lg">{formatCurrency(total)}</span>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" disabled={createEntry.isPending} className="gap-2">
+              <PackagePlus className="h-4 w-4" />
+              {createEntry.isPending ? "Ingresando..." : "Ingresar mercancía"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export default function Inventario() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("all");
@@ -240,6 +464,7 @@ export default function Inventario() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
   const [movementsProduct, setMovementsProduct] = useState<Product | null>(null);
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -340,9 +565,14 @@ export default function Inventario() {
           <h1 className="text-3xl font-serif font-bold">Inventario</h1>
           <p className="text-muted-foreground mt-1">Gestión de productos y existencias</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <Plus className="h-4 w-4" /> Nuevo Producto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsReceiveModalOpen(true)} className="gap-2">
+            <PackagePlus className="h-4 w-4" /> Recibir Mercancía
+          </Button>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" /> Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 bg-card p-4 rounded-lg border shadow-sm">
@@ -666,6 +896,14 @@ export default function Inventario() {
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Receive Merchandise Modal */}
+      <ReceiveMerchandiseModal
+        products={products ?? []}
+        open={isReceiveModalOpen}
+        onOpenChange={setIsReceiveModalOpen}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })}
+      />
     </div>
   );
 }
