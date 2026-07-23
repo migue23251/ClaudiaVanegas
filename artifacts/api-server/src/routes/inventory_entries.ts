@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import {
   db,
   inventoryEntriesTable,
@@ -13,82 +13,99 @@ import { requireAuth, requireAdmin } from "../lib/auth";
 
 const router: IRouter = Router();
 
-// POST /inventory-entries — receive merchandise, update stock, record expense
+// POST /inventory-entries — receive a batch of merchandise items in one transaction
 router.post("/inventory-entries", requireAuth, requireAdmin, async (req, res): Promise<void> => {
-  const { productId, variantId, supplierId, qty, unitCost, notes } = req.body;
+  const { entries } = req.body;
 
-  if (!productId || typeof productId !== "number" || !Number.isInteger(productId)) {
-    res.status(400).json({ error: "productId inválido" }); return;
+  if (!Array.isArray(entries) || entries.length === 0) {
+    res.status(400).json({ error: "Se requiere al menos un ítem en 'entries'" }); return;
   }
-  if (!qty || typeof qty !== "number" || !Number.isInteger(qty) || qty < 1) {
-    res.status(400).json({ error: "qty debe ser un entero positivo" }); return;
-  }
-  if (unitCost == null || typeof unitCost !== "number" || unitCost <= 0) {
-    res.status(400).json({ error: "unitCost debe ser un número positivo" }); return;
-  }
-  const totalCost = qty * unitCost;
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, productId));
-  if (!product) { res.status(404).json({ error: "Producto no encontrado" }); return; }
-
-  if (variantId) {
-    const [variant] = await db.select().from(productVariantsTable).where(eq(productVariantsTable.id, variantId));
-    if (!variant || variant.productId !== productId) {
-      res.status(400).json({ error: "Variante no válida para este producto" });
-      return;
+  // Validate every row up-front
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e.productId || typeof e.productId !== "number" || !Number.isInteger(e.productId)) {
+      res.status(400).json({ error: `Fila ${i + 1}: productId inválido` }); return;
+    }
+    if (!e.qty || typeof e.qty !== "number" || !Number.isInteger(e.qty) || e.qty < 1) {
+      res.status(400).json({ error: `Fila ${i + 1}: qty debe ser un entero positivo` }); return;
+    }
+    if (e.unitCost == null || typeof e.unitCost !== "number" || e.unitCost <= 0) {
+      res.status(400).json({ error: `Fila ${i + 1}: unitCost debe ser un número positivo` }); return;
     }
   }
 
-  const entry = await db.transaction(async (tx) => {
-    // 1. Record the entry
-    const [newEntry] = await tx.insert(inventoryEntriesTable).values({
-      productId,
-      variantId: variantId ?? null,
-      supplierId: supplierId ?? null,
-      qty,
-      unitCost: String(unitCost),
-      totalCost: String(totalCost),
-      notes: notes ?? null,
-    }).returning();
+  // Load all referenced products in one query
+  const productIds = [...new Set(entries.map((e: any) => e.productId as number))];
+  const products = await db.select().from(productsTable).where(inArray(productsTable.id, productIds));
+  const productMap = Object.fromEntries(products.map(p => [p.id, p]));
 
-    // 2. Update stock
-    if (variantId) {
-      await tx.update(productVariantsTable)
-        .set({ stock: sql`${productVariantsTable.stock} + ${qty}` })
-        .where(eq(productVariantsTable.id, variantId));
-      // Sync product.stock = sum of variants
-      await tx.execute(sql`
-        UPDATE products SET stock = (
-          SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${productId}
-        ) WHERE id = ${productId}
-      `);
-    } else {
-      await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} + ${qty}` })
-        .where(eq(productsTable.id, productId));
+  for (let i = 0; i < entries.length; i++) {
+    if (!productMap[entries[i].productId]) {
+      res.status(404).json({ error: `Fila ${i + 1}: Producto no encontrado` }); return;
+    }
+  }
+
+  // Single transaction for the whole batch
+  const results = await db.transaction(async (tx) => {
+    const created = [];
+
+    for (const item of entries) {
+      const { productId, variantId, supplierId, qty, unitCost, notes } = item;
+      const totalCost = qty * unitCost;
+      const product = productMap[productId];
+
+      // 1. Record entry
+      const [newEntry] = await tx.insert(inventoryEntriesTable).values({
+        productId,
+        variantId: variantId ?? null,
+        supplierId: supplierId ?? null,
+        qty,
+        unitCost: String(unitCost),
+        totalCost: String(totalCost),
+        notes: notes ?? null,
+      }).returning();
+
+      // 2. Update stock
+      if (variantId) {
+        await tx.update(productVariantsTable)
+          .set({ stock: sql`${productVariantsTable.stock} + ${qty}` })
+          .where(eq(productVariantsTable.id, variantId));
+        await tx.execute(sql`
+          UPDATE products SET stock = (
+            SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${productId}
+          ) WHERE id = ${productId}
+        `);
+      } else {
+        await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} + ${qty}` })
+          .where(eq(productsTable.id, productId));
+      }
+
+      // 3. Create AP record (immediately paid)
+      const variantLabel = variantId ? " (variante)" : "";
+      const [ap] = await tx.insert(accountsPayableTable).values({
+        type: "inventory_entry" as any,
+        description: `Ingreso inventario: ${product.name}${variantLabel} × ${qty}`,
+        totalAmount: String(totalCost),
+        paidAmount: String(totalCost),
+        status: "paid",
+      }).returning();
+
+      // 4. Record payment
+      await tx.insert(apPaymentsTable).values({
+        accountPayableId: ap.id,
+        amount: String(totalCost),
+        notes: `Recepción mercancía — ${product.name}${variantLabel}`,
+      });
+
+      created.push(newEntry);
     }
 
-    // 3. Create accounts_payable (inventory_entry, immediately paid)
-    const variantLabel = variantId ? " (variante)" : "";
-    const [ap] = await tx.insert(accountsPayableTable).values({
-      type: "inventory_entry" as any,
-      description: `Ingreso inventario: ${product.name}${variantLabel} × ${qty}`,
-      totalAmount: String(totalCost),
-      paidAmount: String(totalCost),
-      status: "paid",
-    }).returning();
-
-    // 4. Record the payment
-    await tx.insert(apPaymentsTable).values({
-      accountPayableId: ap.id,
-      amount: String(totalCost),
-      notes: `Recepción mercancía — ${product.name}${variantLabel}`,
-    });
-
-    return newEntry;
+    return created;
   });
 
-  res.status(201).json({
+  res.status(201).json(results.map(entry => ({
     id: entry.id,
     productId: entry.productId,
     variantId: entry.variantId,
@@ -98,10 +115,10 @@ router.post("/inventory-entries", requireAuth, requireAdmin, async (req, res): P
     totalCost: parseFloat(entry.totalCost),
     notes: entry.notes,
     createdAt: entry.createdAt,
-  });
+  })));
 });
 
-// GET /inventory-entries?productId=X — list entries for movements history
+// GET /inventory-entries?productId=X
 router.get("/inventory-entries", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const productIdRaw = req.query.productId;
   const productId = productIdRaw ? parseInt(Array.isArray(productIdRaw) ? productIdRaw[0] : productIdRaw, 10) : null;

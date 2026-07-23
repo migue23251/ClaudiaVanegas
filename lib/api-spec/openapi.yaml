@@ -1331,20 +1331,22 @@ paths:
     post:
       operationId: createInventoryEntry
       tags: [inventory]
-      summary: Receive merchandise and update stock
+      summary: Receive a batch of merchandise items and update stock
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/InventoryEntryInput"
+              $ref: "#/components/schemas/InventoryEntryBatchInput"
       responses:
         "201":
-          description: Created
+          description: Created entries
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/InventoryEntry"
+                type: array
+                items:
+                  $ref: "#/components/schemas/InventoryEntry"
     get:
       operationId: listInventoryEntries
       tags: [inventory]
@@ -2334,6 +2336,16 @@ components:
           type: boolean
 
     # ─── INVENTORY ENTRIES ────────────────────────────────────────────────────
+    InventoryEntryBatchInput:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/InventoryEntryInput"
+
     InventoryEntryInput:
       type: object
       required: [productId, qty, unitCost]

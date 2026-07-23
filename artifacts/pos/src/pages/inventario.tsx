@@ -233,22 +233,24 @@ function AddVariantForm({ productId, category, onAdded }: { productId: number; c
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Receive Merchandise Modal (multi-row) ────────────────────────────────────
 
-// ── Receive Merchandise Modal ──────────────────────────────────────────────────
-
-interface ReceiveForm {
+interface EntryRow {
+  _key: string;
   productId: string;
   variantId: string;
   supplierId: string;
   qty: string;
   unitCost: string;
-  notes: string;
 }
 
-const EMPTY_RECEIVE: ReceiveForm = {
-  productId: "", variantId: "", supplierId: "", qty: "1", unitCost: "", notes: "",
-};
+const mkRow = (): EntryRow => ({
+  _key: Math.random().toString(36).slice(2),
+  productId: "", variantId: "", supplierId: "", qty: "1", unitCost: "",
+});
+
+const fmtCOP = (v: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(v);
 
 function ReceiveMerchandiseModal({
   products,
@@ -262,50 +264,74 @@ function ReceiveMerchandiseModal({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState<ReceiveForm>(EMPTY_RECEIVE);
+  const [rows, setRows] = useState<EntryRow[]>([mkRow()]);
   const { data: suppliers } = useListSuppliers();
   const createEntry = useCreateInventoryEntry();
 
-  const selectedProduct = products.find(p => String(p.id) === form.productId) ?? null;
-  const variants = selectedProduct?.variants ?? [];
-  const hasVariants = variants.length > 0;
+  // Reset rows when modal opens
+  const handleOpenChange = (o: boolean) => {
+    if (!o) setRows([mkRow()]);
+    onOpenChange(o);
+  };
 
-  const setField = (key: keyof ReceiveForm, value: string) =>
-    setForm(f => ({ ...f, [key]: value }));
+  const updateRow = (key: string, patch: Partial<EntryRow>) =>
+    setRows(prev => prev.map(r => r._key === key ? { ...r, ...patch } : r));
 
-  const handleProductChange = (productId: string) => {
+  const setProduct = (key: string, productId: string) => {
     const prod = products.find(p => String(p.id) === productId);
-    setForm(f => ({
-      ...f,
+    updateRow(key, {
       productId,
       variantId: "",
       unitCost: prod ? String(prod.costPrice) : "",
-    }));
+    });
   };
+
+  const addRow = () => setRows(prev => [...prev, mkRow()]);
+  const removeRow = (key: string) =>
+    setRows(prev => prev.length === 1 ? prev : prev.filter(r => r._key !== key));
+
+  const grandTotal = rows.reduce((sum, r) => {
+    const q = Number(r.qty) || 0;
+    const c = Number(r.unitCost) || 0;
+    return sum + q * c;
+  }, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.productId || !form.qty || !form.unitCost) {
-      toast({ title: "Completa producto, cantidad y costo", variant: "destructive" });
-      return;
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const n = i + 1;
+      if (!r.productId) {
+        toast({ title: `Fila ${n}: selecciona un producto`, variant: "destructive" }); return;
+      }
+      const prod = products.find(p => String(p.id) === r.productId);
+      if (prod && (prod.variants?.length ?? 0) > 0 && !r.variantId) {
+        toast({ title: `Fila ${n}: selecciona una variante`, variant: "destructive" }); return;
+      }
+      if (!r.qty || Number(r.qty) < 1) {
+        toast({ title: `Fila ${n}: cantidad inválida`, variant: "destructive" }); return;
+      }
+      if (!r.unitCost || Number(r.unitCost) <= 0) {
+        toast({ title: `Fila ${n}: costo inválido`, variant: "destructive" }); return;
+      }
     }
-    if (hasVariants && !form.variantId) {
-      toast({ title: "Selecciona una variante para este producto", variant: "destructive" });
-      return;
-    }
+
     createEntry.mutate({
       data: {
-        productId: Number(form.productId),
-        variantId: form.variantId ? Number(form.variantId) : null,
-        supplierId: form.supplierId ? Number(form.supplierId) : null,
-        qty: Number(form.qty),
-        unitCost: Number(form.unitCost),
-        notes: form.notes || undefined,
-      },
+        entries: rows.map(r => ({
+          productId: Number(r.productId),
+          variantId: r.variantId ? Number(r.variantId) : undefined,
+          supplierId: r.supplierId ? Number(r.supplierId) : undefined,
+          qty: Number(r.qty),
+          unitCost: Number(r.unitCost),
+        })),
+      } as any,
     }, {
       onSuccess: () => {
-        toast({ title: "Mercancía ingresada al inventario" });
-        setForm(EMPTY_RECEIVE);
+        const n = rows.length;
+        toast({ title: `${n} ${n === 1 ? "producto ingresado" : "productos ingresados"} al inventario` });
+        setRows([mkRow()]);
         onOpenChange(false);
         onSuccess();
       },
@@ -319,136 +345,171 @@ function ReceiveMerchandiseModal({
     });
   };
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(val);
-
-  const total = form.qty && form.unitCost
-    ? Number(form.qty) * Number(form.unitCost)
-    : null;
+  const supplierList = suppliers ?? [];
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setForm(EMPTY_RECEIVE); }}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[760px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <PackagePlus className="h-5 w-5 text-primary" />
             Recibir Mercancía
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Agrega uno o varios productos. Cada fila puede tener su propio proveedor.
+          </p>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-          {/* Product */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Producto</label>
-            <Select value={form.productId} onValueChange={handleProductChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar producto..." />
-              </SelectTrigger>
-              <SelectContent>
-                {products.map(p => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    <span className="font-mono text-xs text-muted-foreground mr-2">{p.code}</span>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
-          {/* Variant — only shown when product has variants */}
-          {hasVariants && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Variante</label>
-              <Select value={form.variantId} onValueChange={v => setField("variantId", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar variante..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {variants.map(v => (
-                    <SelectItem key={v.id} value={String(v.id)}>
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} />
-                        <span className="capitalize">{v.color}</span>
-                        {v.size && <span className="text-muted-foreground">/ {v.size}</span>}
-                        <span className="font-mono text-xs text-muted-foreground ml-1">×{v.stock}</span>
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+          {/* Scrollable rows */}
+          <div className="overflow-y-auto flex-1 space-y-3 pr-1 py-2">
+            {rows.map((row, idx) => {
+              const prod = products.find(p => String(p.id) === row.productId) ?? null;
+              const variants = prod?.variants ?? [];
+              const hasVariants = variants.length > 0;
+              const rowTotal = (Number(row.qty) || 0) * (Number(row.unitCost) || 0);
+
+              return (
+                <div key={row._key} className="rounded-lg border bg-card p-3 space-y-2.5 relative group">
+                  {/* Row number + delete */}
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Ítem {idx + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeRow(row._key)}
+                      disabled={rows.length === 1}
+                      className="text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Line 1: product + variant */}
+                  <div className="flex gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Select value={row.productId} onValueChange={v => setProduct(row._key, v)}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Producto..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map(p => (
+                            <SelectItem key={p.id} value={String(p.id)}>
+                              <span className="font-mono text-xs text-muted-foreground mr-1.5">{p.code}</span>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {hasVariants && (
+                      <div className="w-44 shrink-0">
+                        <Select value={row.variantId} onValueChange={v => updateRow(row._key, { variantId: v })}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Variante..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {variants.map(v => (
+                              <SelectItem key={v.id} value={String(v.id)}>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-2.5 h-2.5 rounded-full border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} />
+                                  <span className="capitalize text-sm">{v.color}</span>
+                                  {v.size && <span className="text-muted-foreground text-xs">/ {v.size}</span>}
+                                  <span className="font-mono text-xs text-muted-foreground ml-0.5">×{v.stock}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                    )}
+                  </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {/* Quantity */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Cantidad</label>
-              <Input
-                type="number" min="1" required
-                value={form.qty}
-                onChange={e => setField("qty", e.target.value)}
-              />
-            </div>
+                  {/* Line 2: supplier + qty + unit cost + row total */}
+                  <div className="flex gap-2 items-center">
+                    {/* Supplier */}
+                    <div className="flex-1 min-w-0">
+                      <Select value={row.supplierId} onValueChange={v => updateRow(row._key, { supplierId: v })}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Sin proveedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Sin proveedor</SelectItem>
+                          {supplierList.map(s => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-            {/* Supplier */}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Proveedor <span className="text-muted-foreground font-normal">(opcional)</span></label>
-              <Select value={form.supplierId} onValueChange={v => setField("supplierId", v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin proveedor</SelectItem>
-                  {(suppliers ?? []).map(s => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                    {/* Qty */}
+                    <div className="w-20 shrink-0">
+                      <Input
+                        type="number" min="1" placeholder="Cant."
+                        className="h-9 text-center"
+                        value={row.qty}
+                        onChange={e => updateRow(row._key, { qty: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Unit cost */}
+                    <div className="w-32 shrink-0">
+                      <Input
+                        type="number" min="0" step="1" placeholder="Costo unit."
+                        className="h-9"
+                        value={row.unitCost}
+                        onChange={e => updateRow(row._key, { unitCost: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Row total */}
+                    <div className="w-28 shrink-0 text-right">
+                      {rowTotal > 0
+                        ? <span className="font-mono text-sm font-medium">{fmtCOP(rowTotal)}</span>
+                        : <span className="text-muted-foreground text-sm">—</span>
+                      }
+                    </div>
+                  </div>
+
+                  {/* Prev cost hint */}
+                  {prod && (
+                    <p className="text-xs text-muted-foreground">
+                      Costo anterior: <span className="font-medium">{fmtCOP(prod.costPrice)}</span>
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Add row button */}
+            <button
+              type="button"
+              onClick={addRow}
+              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar producto
+            </button>
           </div>
 
-          {/* Unit Cost */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Costo unitario
-              {selectedProduct && (
-                <span className="text-xs text-muted-foreground font-normal ml-1">
-                  (anterior: {formatCurrency(selectedProduct.costPrice)})
-                </span>
-              )}
-            </label>
-            <Input
-              type="number" min="0" step="1" required
-              placeholder="0"
-              value={form.unitCost}
-              onChange={e => setField("unitCost", e.target.value)}
-            />
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Notas <span className="text-muted-foreground font-normal">(opcional)</span></label>
-            <Input
-              placeholder="Número de guía, observaciones..."
-              value={form.notes}
-              onChange={e => setField("notes", e.target.value)}
-            />
-          </div>
-
-          {/* Total preview */}
-          {total !== null && (
-            <div className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3 border">
-              <span className="text-sm text-muted-foreground">Total del ingreso</span>
-              <span className="font-serif font-bold text-lg">{formatCurrency(total)}</span>
+          {/* Footer: grand total + actions */}
+          <div className="shrink-0 pt-3 mt-1 border-t space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-sm text-muted-foreground">
+                {rows.length} {rows.length === 1 ? "producto" : "productos"} · Total del ingreso
+              </span>
+              <span className="font-serif font-bold text-xl">{fmtCOP(grandTotal)}</span>
             </div>
-          )}
-
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={createEntry.isPending} className="gap-2">
-              <PackagePlus className="h-4 w-4" />
-              {createEntry.isPending ? "Ingresando..." : "Ingresar mercancía"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancelar</Button>
+              <Button type="submit" disabled={createEntry.isPending} className="gap-2">
+                <PackagePlus className="h-4 w-4" />
+                {createEntry.isPending ? "Ingresando..." : "Ingresar mercancía"}
+              </Button>
+            </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

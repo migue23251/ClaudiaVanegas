@@ -1534,21 +1534,24 @@ export const UpdateSettingsResponse = zod.object({
 
 
 /**
- * @summary Receive merchandise and update stock
+ * @summary Receive a batch of merchandise items and update stock
  */
 
 
 
+
 export const CreateInventoryEntryBody = zod.object({
+  "entries": zod.array(zod.object({
   "productId": zod.number(),
   "variantId": zod.number().nullish(),
   "supplierId": zod.number().nullish(),
   "qty": zod.number().min(1),
   "unitCost": zod.number(),
   "notes": zod.string().optional()
+})).min(1)
 })
 
-export const CreateInventoryEntryResponse = zod.object({
+export const CreateInventoryEntryResponseItem = zod.object({
   "id": zod.number().optional(),
   "productId": zod.number().optional(),
   "variantId": zod.number().nullish(),
@@ -1559,6 +1562,7 @@ export const CreateInventoryEntryResponse = zod.object({
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date().optional()
 })
+export const CreateInventoryEntryResponse = zod.array(CreateInventoryEntryResponseItem)
 
 
 /**

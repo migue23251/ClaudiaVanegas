@@ -31,6 +31,7 @@ export * from './getReportTopProductsParams';
 export * from './healthStatus';
 export * from './inventoryCostPoint';
 export * from './inventoryEntry';
+export * from './inventoryEntryBatchInput';
 export * from './inventoryEntryInput';
 export * from './ledgerPayment';
 export * from './listAccountsPayableParams';

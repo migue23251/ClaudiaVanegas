@@ -740,6 +740,11 @@ export interface InventoryEntryInput {
   notes?: string;
 }
 
+export interface InventoryEntryBatchInput {
+  /** @minItems 1 */
+  entries: InventoryEntryInput[];
+}
+
 export interface InventoryEntry {
   id?: number;
   productId?: number;

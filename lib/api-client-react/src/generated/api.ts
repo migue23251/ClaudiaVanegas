@@ -42,7 +42,7 @@ import type {
   HealthStatus,
   InventoryCostPoint,
   InventoryEntry,
-  InventoryEntryInput,
+  InventoryEntryBatchInput,
   ListAccountsPayableParams,
   ListAccountsReceivableParams,
   ListCustomersParams,
@@ -4744,16 +4744,16 @@ export const getCreateInventoryEntryUrl = () => {
 }
 
 /**
- * @summary Receive merchandise and update stock
+ * @summary Receive a batch of merchandise items and update stock
  */
-export const createInventoryEntry = async (inventoryEntryInput: InventoryEntryInput, options?: RequestInit): Promise<InventoryEntry> => {
+export const createInventoryEntry = async (inventoryEntryBatchInput: InventoryEntryBatchInput, options?: RequestInit): Promise<InventoryEntry[]> => {
 
-  return customFetch<InventoryEntry>(getCreateInventoryEntryUrl(),
+  return customFetch<InventoryEntry[]>(getCreateInventoryEntryUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(inventoryEntryInput)
+    body: JSON.stringify(inventoryEntryBatchInput)
   }
 );}
 
@@ -4761,8 +4761,8 @@ export const createInventoryEntry = async (inventoryEntryInput: InventoryEntryIn
 
 
 export const getCreateInventoryEntryMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInventoryEntry>>, TError,{data: BodyType<InventoryEntryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createInventoryEntry>>, TError,{data: BodyType<InventoryEntryInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInventoryEntry>>, TError,{data: BodyType<InventoryEntryBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createInventoryEntry>>, TError,{data: BodyType<InventoryEntryBatchInput>}, TContext> => {
 
 const mutationKey = ['createInventoryEntry'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -4774,7 +4774,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInventoryEntry>>, {data: BodyType<InventoryEntryInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createInventoryEntry>>, {data: BodyType<InventoryEntryBatchInput>}> = (props) => {
           const {data} = props ?? {};
 
           return  createInventoryEntry(data,requestOptions)
@@ -4788,18 +4788,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CreateInventoryEntryMutationResult = NonNullable<Awaited<ReturnType<typeof createInventoryEntry>>>
-    export type CreateInventoryEntryMutationBody = BodyType<InventoryEntryInput>
+    export type CreateInventoryEntryMutationBody = BodyType<InventoryEntryBatchInput>
     export type CreateInventoryEntryMutationError = ErrorType<unknown>
 
     /**
- * @summary Receive merchandise and update stock
+ * @summary Receive a batch of merchandise items and update stock
  */
 export const useCreateInventoryEntry = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInventoryEntry>>, TError,{data: BodyType<InventoryEntryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createInventoryEntry>>, TError,{data: BodyType<InventoryEntryBatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createInventoryEntry>>,
         TError,
-        {data: BodyType<InventoryEntryInput>},
+        {data: BodyType<InventoryEntryBatchInput>},
         TContext
       > => {
       return useMutation(getCreateInventoryEntryMutationOptions(options));
