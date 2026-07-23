@@ -5,6 +5,7 @@
  * Claudia Vanegas POS API
  * OpenAPI spec version: 0.1.0
  */
+import type { InventoryEntryInputPaymentStatus } from './inventoryEntryInputPaymentStatus';
 
 export interface InventoryEntryInput {
   productId: number;
@@ -14,5 +15,7 @@ export interface InventoryEntryInput {
   qty: number;
   unitCost: number;
   salePrice?: number | null;
+  paymentStatus?: InventoryEntryInputPaymentStatus;
+  dueDate?: Date | null;
   notes?: string;
 }

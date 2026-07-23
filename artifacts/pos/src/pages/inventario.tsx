@@ -243,11 +243,14 @@ interface EntryRow {
   unitCost: string;
   salePrice: string;
   supplierId: string;
+  paymentStatus: "paid" | "pending";
+  dueDate: string;
 }
 
 const mkRow = (): EntryRow => ({
   _key: Math.random().toString(36).slice(2),
   productId: "", variantId: "", qty: "", unitCost: "", salePrice: "", supplierId: "",
+  paymentStatus: "paid", dueDate: "",
 });
 
 const INITIAL_ROWS = 5;
@@ -330,6 +333,8 @@ function ReceiveMerchandiseModal({
           qty: Number(r.qty),
           unitCost: Number(r.unitCost),
           salePrice: r.salePrice ? Number(r.salePrice) : undefined,
+          paymentStatus: r.paymentStatus,
+          dueDate: r.paymentStatus === "pending" && r.dueDate ? r.dueDate : undefined,
         })),
       } as any,
     }, {
@@ -355,18 +360,19 @@ function ReceiveMerchandiseModal({
   // Column header widths (must match td widths below)
   const COL = {
     num:       "w-7 shrink-0",
-    producto:  "min-w-[190px] flex-1",
-    variante:  "w-[150px] shrink-0",
-    qty:       "w-[72px] shrink-0",
-    costo:     "w-[100px] shrink-0",
-    venta:     "w-[100px] shrink-0",
-    proveedor: "w-[150px] shrink-0",
+    producto:  "min-w-[180px] flex-1",
+    variante:  "w-[130px] shrink-0",
+    qty:       "w-[68px] shrink-0",
+    costo:     "w-[95px] shrink-0",
+    venta:     "w-[95px] shrink-0",
+    proveedor: "w-[130px] shrink-0",
+    estado:    "w-[130px] shrink-0",
     del:       "w-7 shrink-0",
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-[95vw] w-[1020px] max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-[95vw] w-[1100px] max-h-[90vh] flex flex-col p-0 gap-0">
         {/* Header */}
         <div className="px-6 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg">
@@ -390,6 +396,7 @@ function ReceiveMerchandiseModal({
               <div className={`${COL.costo} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>P. Costo</div>
               <div className={`${COL.venta} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>P. Venta</div>
               <div className={`${COL.proveedor} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>Proveedor</div>
+              <div className={`${COL.estado} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>Estado pago</div>
               <div className={COL.del} />
             </div>
 
@@ -404,7 +411,7 @@ function ReceiveMerchandiseModal({
                 return (
                   <div
                     key={row._key}
-                    className={`flex items-center gap-2 px-1 py-1 rounded-md transition-colors ${isEmpty ? "opacity-60 hover:opacity-100" : "bg-muted/30"}`}
+                    className={`flex items-start gap-2 px-1 py-1 rounded-md transition-colors ${isEmpty ? "opacity-60 hover:opacity-100" : "bg-muted/30"}`}
                   >
                     {/* Row number */}
                     <div className={`${COL.num} text-xs text-muted-foreground text-center font-mono`}>
@@ -497,8 +504,36 @@ function ReceiveMerchandiseModal({
                       </Select>
                     </div>
 
+                    {/* Estado de pago */}
+                    <div className={`${COL.estado} space-y-1`}>
+                      <Select
+                        value={row.paymentStatus}
+                        onValueChange={v => updateRow(row._key, {
+                          paymentStatus: v as "paid" | "pending",
+                          dueDate: v === "paid" ? "" : row.dueDate,
+                        })}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="paid">✓ Pagado</SelectItem>
+                          <SelectItem value="pending">⏳ Pendiente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {row.paymentStatus === "pending" && (
+                        <Input
+                          type="date"
+                          className="h-7 text-xs px-2"
+                          value={row.dueDate}
+                          placeholder="Fecha límite"
+                          onChange={e => updateRow(row._key, { dueDate: e.target.value })}
+                        />
+                      )}
+                    </div>
+
                     {/* Delete / clear */}
-                    <div className={COL.del}>
+                    <div className={`${COL.del} pt-1`}>
                       <button
                         type="button"
                         onClick={() => removeRow(row._key)}

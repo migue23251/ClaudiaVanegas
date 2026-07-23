@@ -51,7 +51,8 @@ router.post("/inventory-entries", requireAuth, requireAdmin, async (req, res): P
     const created = [];
 
     for (const item of entries) {
-      const { productId, variantId, supplierId, qty, unitCost, salePrice, notes } = item;
+      const { productId, variantId, supplierId, qty, unitCost, salePrice, paymentStatus, dueDate, notes } = item;
+      const isPaid = !paymentStatus || paymentStatus === "paid";
       const totalCost = qty * unitCost;
       const product = productMap[productId];
 
@@ -87,22 +88,25 @@ router.post("/inventory-entries", requireAuth, requireAdmin, async (req, res): P
         await tx.update(productsTable).set(stockUpdate).where(eq(productsTable.id, productId));
       }
 
-      // 3. Create AP record (immediately paid)
+      // 3. Create AP record
       const variantLabel = variantId ? " (variante)" : "";
       const [ap] = await tx.insert(accountsPayableTable).values({
         type: "inventory_entry" as any,
         description: `Ingreso inventario: ${product.name}${variantLabel} × ${qty}`,
         totalAmount: String(totalCost),
-        paidAmount: String(totalCost),
-        status: "paid",
+        paidAmount: isPaid ? String(totalCost) : "0",
+        status: isPaid ? "paid" : "pending",
+        dueDate: (!isPaid && dueDate) ? dueDate : null,
       }).returning();
 
-      // 4. Record payment
-      await tx.insert(apPaymentsTable).values({
-        accountPayableId: ap.id,
-        amount: String(totalCost),
-        notes: `Recepción mercancía — ${product.name}${variantLabel}`,
-      });
+      // 4. Record payment only if paid
+      if (isPaid) {
+        await tx.insert(apPaymentsTable).values({
+          accountPayableId: ap.id,
+          amount: String(totalCost),
+          notes: `Recepción mercancía — ${product.name}${variantLabel}`,
+        });
+      }
 
       created.push(newEntry);
     }

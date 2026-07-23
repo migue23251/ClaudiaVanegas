@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useListAccountsPayable, getListAccountsPayableQueryKey, useCreateApPayment, useCreateFixedExpense } from "@workspace/api-client-react";
+import { useListAccountsPayable, getListAccountsPayableQueryKey, useCreateApPayment, useCreateFixedExpense, useUpdateAccountPayableStatus } from "@workspace/api-client-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Plus } from "lucide-react";
+import { DollarSign, Plus, RotateCcw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -34,7 +34,9 @@ export default function CuentasPagar() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isRevertOpen, setIsRevertOpen] = useState(false);
   const [selectedAp, setSelectedAp] = useState<any>(null);
+  const [revertDueDate, setRevertDueDate] = useState("");
   const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
@@ -50,6 +52,7 @@ export default function CuentasPagar() {
 
   const createPayment = useCreateApPayment();
   const createFixedExpense = useCreateFixedExpense();
+  const updateStatus = useUpdateAccountPayableStatus();
 
   const handleCreateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -96,6 +99,28 @@ export default function CuentasPagar() {
     });
   };
 
+  const handleRevertSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    updateStatus.mutate({
+      id: selectedAp.id,
+      data: { status: "pending", dueDate: revertDueDate || undefined },
+    }, {
+      onSuccess: () => {
+        toast({ title: "Cuenta revertida a pendiente" });
+        queryClient.invalidateQueries({ queryKey: getListAccountsPayableQueryKey() });
+        setIsRevertOpen(false);
+        setRevertDueDate("");
+      },
+      onError: (err: any) => {
+        toast({
+          title: "Error al revertir",
+          description: err?.response?.data?.error ?? "Error desconocido",
+          variant: "destructive",
+        });
+      },
+    });
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending': return <Badge variant="destructive">Pendiente</Badge>;
@@ -103,6 +128,20 @@ export default function CuentasPagar() {
       case 'paid': return <Badge variant="outline" className="border-emerald-500 text-emerald-600">Pagado</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  // Returns the main display name for an AP record
+  const apDisplayName = (ap: any) =>
+    ap.type === "fixed_expense" || ap.type === "inventory_entry"
+      ? ap.description
+      : (ap.supplierName ?? "Desconocido");
+
+  // Returns a subtitle for an AP record
+  const apSubtitle = (ap: any) => {
+    const due = ap.dueDate ? ` · Vence ${format(new Date(ap.dueDate), "dd/MM/yyyy")}` : "";
+    if (ap.type === "fixed_expense") return `Gasto fijo${due}`;
+    if (ap.type === "inventory_entry") return `Compra inventario${due}`;
+    return ap.guideNumber ? `Ref: ${ap.guideNumber}` : null;
   };
 
   const handleStatusChange = (v: string) => { setStatusFilter(v); setPage(1); };
@@ -139,8 +178,8 @@ export default function CuentasPagar() {
           <TableHeader>
             <TableRow>
               <TableHead>Fecha</TableHead>
-              <TableHead>Proveedor / Guía</TableHead>
-              <TableHead className="text-right">Total Deuda</TableHead>
+              <TableHead>Descripción</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-right">Abonado</TableHead>
               <TableHead className="text-right">Saldo</TableHead>
               <TableHead>Estado</TableHead>
@@ -151,21 +190,21 @@ export default function CuentasPagar() {
             {isLoading ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8">Cargando...</TableCell></TableRow>
             ) : paginated.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8">No hay cuentas por pagar</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay cuentas por pagar</TableCell></TableRow>
             ) : (
               paginated.map((ap) => {
                 const balance = ap.totalAmount - ap.paidAmount;
+                const subtitle = apSubtitle(ap);
+                const canRevert = ap.type === "inventory_entry" && (ap.status === "paid" || ap.status === "partial");
                 return (
                   <TableRow key={ap.id}>
-                    <TableCell className="text-muted-foreground text-sm">{format(new Date(ap.createdAt), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                      {format(new Date(ap.createdAt), "dd/MM/yyyy")}
+                    </TableCell>
                     <TableCell>
-                      <div className="font-medium">{ap.type === "fixed_expense" ? ap.description : ap.supplierName}</div>
-                      {ap.type === "fixed_expense" ? (
-                        <div className="text-xs text-muted-foreground">
-                          Gasto fijo{ap.dueDate ? ` · Vence ${format(new Date(ap.dueDate), "dd/MM/yyyy")}` : ""}
-                        </div>
-                      ) : (
-                        ap.guideNumber && <div className="text-xs text-muted-foreground font-mono">Ref: {ap.guideNumber}</div>
+                      <div className="font-medium">{apDisplayName(ap)}</div>
+                      {subtitle && (
+                        <div className="text-xs text-muted-foreground">{subtitle}</div>
                       )}
                     </TableCell>
                     <TableCell className="text-right font-serif">{formatCurrency(ap.totalAmount)}</TableCell>
@@ -173,15 +212,25 @@ export default function CuentasPagar() {
                     <TableCell className="text-right font-bold text-destructive">{formatCurrency(balance)}</TableCell>
                     <TableCell>{getStatusBadge(ap.status)}</TableCell>
                     <TableCell className="text-right">
-                      {balance > 0 && (
-                        <Button
-                          variant="outline" size="sm"
-                          className="h-8"
-                          onClick={() => { setSelectedAp(ap); setIsPaymentOpen(true); }}
-                        >
-                          <DollarSign className="h-3.5 w-3.5 mr-1" /> Pagar
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {balance > 0 && (
+                          <Button
+                            variant="outline" size="sm" className="h-8"
+                            onClick={() => { setSelectedAp(ap); setIsPaymentOpen(true); }}
+                          >
+                            <DollarSign className="h-3.5 w-3.5 mr-1" /> Pagar
+                          </Button>
+                        )}
+                        {canRevert && (
+                          <Button
+                            variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground"
+                            title="Pasar a pendiente"
+                            onClick={() => { setSelectedAp(ap); setRevertDueDate(""); setIsRevertOpen(true); }}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -196,20 +245,21 @@ export default function CuentasPagar() {
         )}
       </div>
 
+      {/* Register payment dialog */}
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Registrar Pago al Proveedor</DialogTitle>
+            <DialogTitle>Registrar Pago</DialogTitle>
           </DialogHeader>
           {selectedAp && (
             <form onSubmit={handlePaymentSubmit} className="space-y-4 py-4">
               <div className="bg-muted/50 p-4 rounded-md space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Proveedor:</span>
-                  <span className="font-medium">{selectedAp.supplierName}</span>
+                  <span className="text-muted-foreground">Concepto:</span>
+                  <span className="font-medium text-right max-w-[200px]">{apDisplayName(selectedAp)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Deuda actual:</span>
+                  <span className="text-muted-foreground">Saldo pendiente:</span>
                   <span className="font-bold text-destructive">{formatCurrency(selectedAp.totalAmount - selectedAp.paidAmount)}</span>
                 </div>
               </div>
@@ -241,6 +291,43 @@ export default function CuentasPagar() {
         </DialogContent>
       </Dialog>
 
+      {/* Revert to pending dialog */}
+      <Dialog open={isRevertOpen} onOpenChange={setIsRevertOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4" /> Pasar a Pendiente
+            </DialogTitle>
+          </DialogHeader>
+          {selectedAp && (
+            <form onSubmit={handleRevertSubmit} className="space-y-4 py-4">
+              <div className="bg-muted/50 p-4 rounded-md text-sm space-y-1">
+                <div className="font-medium">{apDisplayName(selectedAp)}</div>
+                <div className="text-muted-foreground">{formatCurrency(selectedAp.totalAmount)}</div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                El pago registrado se eliminará y la cuenta quedará como <strong>pendiente</strong>. Podrás registrar el pago cuando se realice.
+              </p>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Fecha límite de pago <span className="text-muted-foreground font-normal">(opcional)</span></label>
+                <Input
+                  type="date"
+                  value={revertDueDate}
+                  onChange={e => setRevertDueDate(e.target.value)}
+                />
+              </div>
+              <DialogFooter className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setIsRevertOpen(false)}>Cancelar</Button>
+                <Button type="submit" variant="destructive" disabled={updateStatus.isPending}>
+                  Pasar a pendiente
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create fixed expense dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
@@ -259,7 +346,7 @@ export default function CuentasPagar() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Fecha de Pago</label>
+              <label className="text-sm font-medium">Fecha límite de pago</label>
               <Input name="dueDate" type="date" />
             </div>
             <DialogFooter className="pt-4">

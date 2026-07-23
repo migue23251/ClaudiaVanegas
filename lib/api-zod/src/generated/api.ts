@@ -826,7 +826,7 @@ export const ListAccountsPayableQueryParams = zod.object({
 export const ListAccountsPayableResponseItem = zod.object({
   "id": zod.number(),
   "purchaseOrderId": zod.number().nullish(),
-  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "type": zod.enum(['purchase_order', 'fixed_expense', 'inventory_entry']),
   "description": zod.string().nullish(),
   "supplierName": zod.string().nullish(),
   "guideNumber": zod.string().nullish(),
@@ -857,7 +857,40 @@ export const CreateFixedExpenseBody = zod.object({
 export const CreateFixedExpenseResponse = zod.object({
   "id": zod.number(),
   "purchaseOrderId": zod.number().nullish(),
-  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "type": zod.enum(['purchase_order', 'fixed_expense', 'inventory_entry']),
+  "description": zod.string().nullish(),
+  "supplierName": zod.string().nullish(),
+  "guideNumber": zod.string().nullish(),
+  "totalAmount": zod.number(),
+  "paidAmount": zod.number(),
+  "dueDate": zod.coerce.date().nullish(),
+  "status": zod.enum(['pending', 'partial', 'paid']),
+  "payments": zod.array(zod.object({
+  "id": zod.number(),
+  "amount": zod.number(),
+  "notes": zod.string().nullish(),
+  "paidAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update status and due date of an accounts payable record
+ */
+export const UpdateAccountPayableStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateAccountPayableStatusBody = zod.object({
+  "status": zod.enum(['pending']).optional(),
+  "dueDate": zod.coerce.date().nullish()
+})
+
+export const UpdateAccountPayableStatusResponse = zod.object({
+  "id": zod.number(),
+  "purchaseOrderId": zod.number().nullish(),
+  "type": zod.enum(['purchase_order', 'fixed_expense', 'inventory_entry']),
   "description": zod.string().nullish(),
   "supplierName": zod.string().nullish(),
   "guideNumber": zod.string().nullish(),
@@ -885,7 +918,7 @@ export const GetAccountPayableParams = zod.object({
 export const GetAccountPayableResponse = zod.object({
   "id": zod.number(),
   "purchaseOrderId": zod.number().nullish(),
-  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "type": zod.enum(['purchase_order', 'fixed_expense', 'inventory_entry']),
   "description": zod.string().nullish(),
   "supplierName": zod.string().nullish(),
   "guideNumber": zod.string().nullish(),
@@ -918,7 +951,7 @@ export const CreateApPaymentBody = zod.object({
 export const CreateApPaymentResponse = zod.object({
   "id": zod.number(),
   "purchaseOrderId": zod.number().nullish(),
-  "type": zod.enum(['purchase_order', 'fixed_expense']),
+  "type": zod.enum(['purchase_order', 'fixed_expense', 'inventory_entry']),
   "description": zod.string().nullish(),
   "supplierName": zod.string().nullish(),
   "guideNumber": zod.string().nullish(),
@@ -1548,6 +1581,8 @@ export const CreateInventoryEntryBody = zod.object({
   "qty": zod.number().min(1),
   "unitCost": zod.number(),
   "salePrice": zod.number().nullish(),
+  "paymentStatus": zod.enum(['paid', 'pending']).nullish(),
+  "dueDate": zod.coerce.date().nullish(),
   "notes": zod.string().optional()
 })).min(1)
 })

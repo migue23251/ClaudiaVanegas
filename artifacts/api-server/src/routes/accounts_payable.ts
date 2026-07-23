@@ -58,6 +58,34 @@ router.post("/accounts-payable", requireAuth, requireAdmin, async (req, res): Pr
   res.status(201).json(result);
 });
 
+router.patch("/accounts-payable/:id/status", requireAuth, requireAdmin, async (req, res): Promise<void> => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
+  const { status, dueDate } = req.body as { status?: string; dueDate?: string };
+
+  const [ap] = await db.select().from(accountsPayableTable).where(eq(accountsPayableTable.id, id));
+  if (!ap) { res.status(404).json({ error: "Cuenta por pagar no encontrada" }); return; }
+
+  const updates: Record<string, any> = {};
+
+  if (status === "pending") {
+    // Revert to pending: delete existing payments and reset balance
+    await db.delete(apPaymentsTable).where(eq(apPaymentsTable.accountPayableId, id));
+    updates.status = "pending";
+    updates.paidAmount = "0";
+    if (dueDate !== undefined) updates.dueDate = dueDate || null;
+  } else if (dueDate !== undefined) {
+    updates.dueDate = dueDate || null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "Sin cambios para aplicar" }); return;
+  }
+
+  await db.update(accountsPayableTable).set(updates).where(eq(accountsPayableTable.id, id));
+  const result = await buildAPResponse(id);
+  res.json(result);
+});
+
 router.get("/accounts-payable/:id", requireAuth, requireAdmin, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   const result = await buildAPResponse(id);

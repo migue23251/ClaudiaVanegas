@@ -392,6 +392,7 @@ export type AccountPayableType = typeof AccountPayableType[keyof typeof AccountP
 export const AccountPayableType = {
   purchase_order: 'purchase_order',
   fixed_expense: 'fixed_expense',
+  inventory_entry: 'inventory_entry',
 } as const;
 
 export type AccountPayableStatus = typeof AccountPayableStatus[keyof typeof AccountPayableStatus];
@@ -421,6 +422,18 @@ export interface AccountPayable {
   status: AccountPayableStatus;
   payments: LedgerPayment[];
   createdAt: string;
+}
+
+export type AccountPayableStatusUpdateStatus = typeof AccountPayableStatusUpdateStatus[keyof typeof AccountPayableStatusUpdateStatus];
+
+
+export const AccountPayableStatusUpdateStatus = {
+  pending: 'pending',
+} as const;
+
+export interface AccountPayableStatusUpdate {
+  status?: AccountPayableStatusUpdateStatus;
+  dueDate?: string | null;
 }
 
 export interface FixedExpenseInput {
@@ -730,6 +743,14 @@ export interface SettingsInput {
   sendPaymentLinkEmail?: boolean;
 }
 
+export type InventoryEntryInputPaymentStatus = typeof InventoryEntryInputPaymentStatus[keyof typeof InventoryEntryInputPaymentStatus] | null;
+
+
+export const InventoryEntryInputPaymentStatus = {
+  paid: 'paid',
+  pending: 'pending',
+} as const;
+
 export interface InventoryEntryInput {
   productId: number;
   variantId?: number | null;
@@ -738,6 +759,8 @@ export interface InventoryEntryInput {
   qty: number;
   unitCost: number;
   salePrice?: number | null;
+  paymentStatus?: InventoryEntryInputPaymentStatus;
+  dueDate?: string | null;
   notes?: string;
 }
 

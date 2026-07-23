@@ -12,4 +12,5 @@ export type AccountPayableType = typeof AccountPayableType[keyof typeof AccountP
 export const AccountPayableType = {
   purchase_order: 'purchase_order',
   fixed_expense: 'fixed_expense',
+  inventory_entry: 'inventory_entry',
 } as const;

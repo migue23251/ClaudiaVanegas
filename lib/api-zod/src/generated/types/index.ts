@@ -8,6 +8,8 @@
 
 export * from './accountPayable';
 export * from './accountPayableStatus';
+export * from './accountPayableStatusUpdate';
+export * from './accountPayableStatusUpdateStatus';
 export * from './accountPayableType';
 export * from './accountReceivable';
 export * from './accountReceivableStatus';
@@ -33,6 +35,7 @@ export * from './inventoryCostPoint';
 export * from './inventoryEntry';
 export * from './inventoryEntryBatchInput';
 export * from './inventoryEntryInput';
+export * from './inventoryEntryInputPaymentStatus';
 export * from './ledgerPayment';
 export * from './listAccountsPayableParams';
 export * from './listAccountsPayableStatus';

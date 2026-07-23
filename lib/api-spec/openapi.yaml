@@ -758,6 +758,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/AccountPayable"
 
+  /accounts-payable/{id}/status:
+    patch:
+      operationId: updateAccountPayableStatus
+      tags: [accounts-payable]
+      summary: Update status and due date of an accounts payable record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountPayableStatusUpdate"
+      responses:
+        "200":
+          description: Updated record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountPayable"
+
   /accounts-payable/{id}:
     get:
       operationId: getAccountPayable
@@ -1898,7 +1923,7 @@ components:
           type: ["integer", "null"]
         type:
           type: string
-          enum: [purchase_order, fixed_expense]
+          enum: [purchase_order, fixed_expense, inventory_entry]
         description:
           type: ["string", "null"]
         supplierName:
@@ -1922,6 +1947,17 @@ components:
         createdAt:
           type: string
           format: date-time
+
+    AccountPayableStatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending]
+        dueDate:
+          type: string
+          format: date
+          nullable: true
 
     FixedExpenseInput:
       type: object
@@ -2365,6 +2401,14 @@ components:
           type: number
         salePrice:
           type: number
+          nullable: true
+        paymentStatus:
+          type: string
+          enum: [paid, pending]
+          nullable: true
+        dueDate:
+          type: string
+          format: date
           nullable: true
         notes:
           type: string

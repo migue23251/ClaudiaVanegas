@@ -21,6 +21,7 @@ import type {
 
 import type {
   AccountPayable,
+  AccountPayableStatusUpdate,
   AccountReceivable,
   AuthToken,
   BillingVsCollectionPoint,
@@ -2769,6 +2770,77 @@ export const useCreateFixedExpense = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateFixedExpenseMutationOptions(options));
+    }
+
+export const getUpdateAccountPayableStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/accounts-payable/${id}/status`
+}
+
+/**
+ * @summary Update status and due date of an accounts payable record
+ */
+export const updateAccountPayableStatus = async (id: number,
+    accountPayableStatusUpdate: AccountPayableStatusUpdate, options?: RequestInit): Promise<AccountPayable> => {
+
+  return customFetch<AccountPayable>(getUpdateAccountPayableStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(accountPayableStatusUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateAccountPayableStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountPayableStatus>>, TError,{id: number;data: BodyType<AccountPayableStatusUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAccountPayableStatus>>, TError,{id: number;data: BodyType<AccountPayableStatusUpdate>}, TContext> => {
+
+const mutationKey = ['updateAccountPayableStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAccountPayableStatus>>, {id: number;data: BodyType<AccountPayableStatusUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAccountPayableStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAccountPayableStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateAccountPayableStatus>>>
+    export type UpdateAccountPayableStatusMutationBody = BodyType<AccountPayableStatusUpdate>
+    export type UpdateAccountPayableStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update status and due date of an accounts payable record
+ */
+export const useUpdateAccountPayableStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAccountPayableStatus>>, TError,{id: number;data: BodyType<AccountPayableStatusUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAccountPayableStatus>>,
+        TError,
+        {id: number;data: BodyType<AccountPayableStatusUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAccountPayableStatusMutationOptions(options));
     }
 
 export const getGetAccountPayableUrl = (id: number,) => {
