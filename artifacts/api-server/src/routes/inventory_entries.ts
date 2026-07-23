@@ -51,7 +51,7 @@ router.post("/inventory-entries", requireAuth, requireAdmin, async (req, res): P
     const created = [];
 
     for (const item of entries) {
-      const { productId, variantId, supplierId, qty, unitCost, notes } = item;
+      const { productId, variantId, supplierId, qty, unitCost, salePrice, notes } = item;
       const totalCost = qty * unitCost;
       const product = productMap[productId];
 
@@ -66,20 +66,25 @@ router.post("/inventory-entries", requireAuth, requireAdmin, async (req, res): P
         notes: notes ?? null,
       }).returning();
 
-      // 2. Update stock
+      // 2. Update stock + prices
       if (variantId) {
         await tx.update(productVariantsTable)
           .set({ stock: sql`${productVariantsTable.stock} + ${qty}` })
           .where(eq(productVariantsTable.id, variantId));
-        await tx.execute(sql`
-          UPDATE products SET stock = (
-            SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${productId}
-          ) WHERE id = ${productId}
-        `);
+        // Sync product.stock = sum of variants, and update prices if provided
+        const priceUpdate: Record<string, any> = {
+          stock: sql`(SELECT COALESCE(SUM(stock), 0) FROM product_variants WHERE product_id = ${productId})`,
+        };
+        if (unitCost) priceUpdate.costPrice = String(unitCost);
+        if (salePrice) priceUpdate.salePrice = String(salePrice);
+        await tx.update(productsTable).set(priceUpdate).where(eq(productsTable.id, productId));
       } else {
-        await tx.update(productsTable)
-          .set({ stock: sql`${productsTable.stock} + ${qty}` })
-          .where(eq(productsTable.id, productId));
+        const stockUpdate: Record<string, any> = {
+          stock: sql`${productsTable.stock} + ${qty}`,
+        };
+        if (unitCost) stockUpdate.costPrice = String(unitCost);
+        if (salePrice) stockUpdate.salePrice = String(salePrice);
+        await tx.update(productsTable).set(stockUpdate).where(eq(productsTable.id, productId));
       }
 
       // 3. Create AP record (immediately paid)

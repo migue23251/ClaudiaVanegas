@@ -233,21 +233,24 @@ function AddVariantForm({ productId, category, onAdded }: { productId: number; c
   );
 }
 
-// ── Receive Merchandise Modal (multi-row) ────────────────────────────────────
+// ── Receive Merchandise Modal (table layout, 6 columns) ──────────────────────
 
 interface EntryRow {
   _key: string;
   productId: string;
   variantId: string;
-  supplierId: string;
   qty: string;
   unitCost: string;
+  salePrice: string;
+  supplierId: string;
 }
 
 const mkRow = (): EntryRow => ({
   _key: Math.random().toString(36).slice(2),
-  productId: "", variantId: "", supplierId: "", qty: "1", unitCost: "",
+  productId: "", variantId: "", qty: "", unitCost: "", salePrice: "", supplierId: "",
 });
+
+const INITIAL_ROWS = 5;
 
 const fmtCOP = (v: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(v);
@@ -264,13 +267,12 @@ function ReceiveMerchandiseModal({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<EntryRow[]>([mkRow()]);
+  const [rows, setRows] = useState<EntryRow[]>(() => Array.from({ length: INITIAL_ROWS }, mkRow));
   const { data: suppliers } = useListSuppliers();
   const createEntry = useCreateInventoryEntry();
 
-  // Reset rows when modal opens
   const handleOpenChange = (o: boolean) => {
-    if (!o) setRows([mkRow()]);
+    if (!o) setRows(Array.from({ length: INITIAL_ROWS }, mkRow));
     onOpenChange(o);
   };
 
@@ -283,55 +285,58 @@ function ReceiveMerchandiseModal({
       productId,
       variantId: "",
       unitCost: prod ? String(prod.costPrice) : "",
+      salePrice: prod ? String(prod.salePrice) : "",
     });
   };
 
   const addRow = () => setRows(prev => [...prev, mkRow()]);
   const removeRow = (key: string) =>
-    setRows(prev => prev.length === 1 ? prev : prev.filter(r => r._key !== key));
+    setRows(prev => prev.length <= INITIAL_ROWS ? prev.map(r => r._key === key ? mkRow() : r) : prev.filter(r => r._key !== key));
 
-  const grandTotal = rows.reduce((sum, r) => {
-    const q = Number(r.qty) || 0;
-    const c = Number(r.unitCost) || 0;
-    return sum + q * c;
+  // Only rows that have a product selected count
+  const filledRows = rows.filter(r => r.productId);
+
+  const grandTotal = filledRows.reduce((sum, r) => {
+    return sum + (Number(r.qty) || 0) * (Number(r.unitCost) || 0);
   }, 0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const n = i + 1;
-      if (!r.productId) {
-        toast({ title: `Fila ${n}: selecciona un producto`, variant: "destructive" }); return;
-      }
+    if (filledRows.length === 0) {
+      toast({ title: "Agrega al menos un producto", variant: "destructive" }); return;
+    }
+
+    for (const r of filledRows) {
+      const rowNum = rows.indexOf(r) + 1;
       const prod = products.find(p => String(p.id) === r.productId);
       if (prod && (prod.variants?.length ?? 0) > 0 && !r.variantId) {
-        toast({ title: `Fila ${n}: selecciona una variante`, variant: "destructive" }); return;
+        toast({ title: `Fila ${rowNum}: selecciona una variante`, variant: "destructive" }); return;
       }
       if (!r.qty || Number(r.qty) < 1) {
-        toast({ title: `Fila ${n}: cantidad inválida`, variant: "destructive" }); return;
+        toast({ title: `Fila ${rowNum}: cantidad inválida`, variant: "destructive" }); return;
       }
       if (!r.unitCost || Number(r.unitCost) <= 0) {
-        toast({ title: `Fila ${n}: costo inválido`, variant: "destructive" }); return;
+        toast({ title: `Fila ${rowNum}: precio de costo inválido`, variant: "destructive" }); return;
       }
     }
 
     createEntry.mutate({
       data: {
-        entries: rows.map(r => ({
+        entries: filledRows.map(r => ({
           productId: Number(r.productId),
           variantId: r.variantId ? Number(r.variantId) : undefined,
           supplierId: r.supplierId ? Number(r.supplierId) : undefined,
           qty: Number(r.qty),
           unitCost: Number(r.unitCost),
+          salePrice: r.salePrice ? Number(r.salePrice) : undefined,
         })),
       } as any,
     }, {
       onSuccess: () => {
-        const n = rows.length;
+        const n = filledRows.length;
         toast({ title: `${n} ${n === 1 ? "producto ingresado" : "productos ingresados"} al inventario` });
-        setRows([mkRow()]);
+        setRows(Array.from({ length: INITIAL_ROWS }, mkRow));
         onOpenChange(false);
         onSuccess();
       },
@@ -347,56 +352,75 @@ function ReceiveMerchandiseModal({
 
   const supplierList = suppliers ?? [];
 
+  // Column header widths (must match td widths below)
+  const COL = {
+    num:       "w-7 shrink-0",
+    producto:  "min-w-[190px] flex-1",
+    variante:  "w-[150px] shrink-0",
+    qty:       "w-[72px] shrink-0",
+    costo:     "w-[100px] shrink-0",
+    venta:     "w-[100px] shrink-0",
+    proveedor: "w-[150px] shrink-0",
+    del:       "w-7 shrink-0",
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[760px] max-h-[90vh] flex flex-col">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-[95vw] w-[1020px] max-h-[90vh] flex flex-col p-0 gap-0">
+        {/* Header */}
+        <div className="px-6 pt-5 pb-3 border-b shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-lg">
             <PackagePlus className="h-5 w-5 text-primary" />
             Recibir Mercancía
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Agrega uno o varios productos. Cada fila puede tener su propio proveedor.
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Las filas vacías se ignoran. Cada fila puede tener su propio proveedor.
           </p>
-        </DialogHeader>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-          {/* Scrollable rows */}
-          <div className="overflow-y-auto flex-1 space-y-3 pr-1 py-2">
-            {rows.map((row, idx) => {
-              const prod = products.find(p => String(p.id) === row.productId) ?? null;
-              const variants = prod?.variants ?? [];
-              const hasVariants = variants.length > 0;
-              const rowTotal = (Number(row.qty) || 0) * (Number(row.unitCost) || 0);
+          {/* Table */}
+          <div className="overflow-auto flex-1 px-4 py-3">
+            {/* Column headers */}
+            <div className="flex items-center gap-2 px-1 pb-1.5 border-b mb-1">
+              <div className={COL.num} />
+              <div className={`${COL.producto} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>Producto</div>
+              <div className={`${COL.variante} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>Variante</div>
+              <div className={`${COL.qty} text-xs font-semibold text-muted-foreground uppercase tracking-wide text-center`}>Cant.</div>
+              <div className={`${COL.costo} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>P. Costo</div>
+              <div className={`${COL.venta} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>P. Venta</div>
+              <div className={`${COL.proveedor} text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>Proveedor</div>
+              <div className={COL.del} />
+            </div>
 
-              return (
-                <div key={row._key} className="rounded-lg border bg-card p-3 space-y-2.5 relative group">
-                  {/* Row number + delete */}
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Ítem {idx + 1}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeRow(row._key)}
-                      disabled={rows.length === 1}
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+            {/* Data rows */}
+            <div className="space-y-1">
+              {rows.map((row, idx) => {
+                const prod = products.find(p => String(p.id) === row.productId) ?? null;
+                const variants = prod?.variants ?? [];
+                const hasVariants = variants.length > 0;
+                const isEmpty = !row.productId;
 
-                  {/* Line 1: product + variant */}
-                  <div className="flex gap-2">
-                    <div className="flex-1 min-w-0">
+                return (
+                  <div
+                    key={row._key}
+                    className={`flex items-center gap-2 px-1 py-1 rounded-md transition-colors ${isEmpty ? "opacity-60 hover:opacity-100" : "bg-muted/30"}`}
+                  >
+                    {/* Row number */}
+                    <div className={`${COL.num} text-xs text-muted-foreground text-center font-mono`}>
+                      {idx + 1}
+                    </div>
+
+                    {/* Producto */}
+                    <div className={COL.producto}>
                       <Select value={row.productId} onValueChange={v => setProduct(row._key, v)}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Producto..." />
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Seleccionar..." />
                         </SelectTrigger>
                         <SelectContent>
                           {products.map(p => (
                             <SelectItem key={p.id} value={String(p.id)}>
-                              <span className="font-mono text-xs text-muted-foreground mr-1.5">{p.code}</span>
+                              <span className="font-mono text-xs text-muted-foreground mr-1">{p.code}</span>
                               {p.name}
                             </SelectItem>
                           ))}
@@ -404,36 +428,65 @@ function ReceiveMerchandiseModal({
                       </Select>
                     </div>
 
-                    {hasVariants && (
-                      <div className="w-44 shrink-0">
-                        <Select value={row.variantId} onValueChange={v => updateRow(row._key, { variantId: v })}>
-                          <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Variante..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {variants.map(v => (
-                              <SelectItem key={v.id} value={String(v.id)}>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-2.5 h-2.5 rounded-full border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} />
-                                  <span className="capitalize text-sm">{v.color}</span>
-                                  {v.size && <span className="text-muted-foreground text-xs">/ {v.size}</span>}
-                                  <span className="font-mono text-xs text-muted-foreground ml-0.5">×{v.stock}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
+                    {/* Variante */}
+                    <div className={COL.variante}>
+                      <Select
+                        value={row.variantId}
+                        onValueChange={v => updateRow(row._key, { variantId: v })}
+                        disabled={!hasVariants}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder={hasVariants ? "Variante..." : "—"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {variants.map(v => (
+                            <SelectItem key={v.id} value={String(v.id)}>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full border shrink-0" style={{ background: COLOR_HEX[v.color] ?? "#ccc" }} />
+                                <span className="capitalize">{v.color}</span>
+                                {v.size && <span className="text-muted-foreground text-xs">/{v.size}</span>}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                  {/* Line 2: supplier + qty + unit cost + row total */}
-                  <div className="flex gap-2 items-center">
-                    {/* Supplier */}
-                    <div className="flex-1 min-w-0">
+                    {/* Cantidad */}
+                    <div className={COL.qty}>
+                      <Input
+                        type="number" min="1" placeholder="0"
+                        className="h-8 text-sm text-center px-1"
+                        value={row.qty}
+                        onChange={e => updateRow(row._key, { qty: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Precio de costo */}
+                    <div className={COL.costo}>
+                      <Input
+                        type="number" min="0" step="1" placeholder="0"
+                        className="h-8 text-sm px-2"
+                        value={row.unitCost}
+                        onChange={e => updateRow(row._key, { unitCost: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Precio de venta */}
+                    <div className={COL.venta}>
+                      <Input
+                        type="number" min="0" step="1" placeholder="0"
+                        className="h-8 text-sm px-2"
+                        value={row.salePrice}
+                        onChange={e => updateRow(row._key, { salePrice: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Proveedor */}
+                    <div className={COL.proveedor}>
                       <Select value={row.supplierId} onValueChange={v => updateRow(row._key, { supplierId: v })}>
-                        <SelectTrigger className="h-9">
-                          <SelectValue placeholder="Sin proveedor" />
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Sin prov." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">Sin proveedor</SelectItem>
@@ -444,71 +497,48 @@ function ReceiveMerchandiseModal({
                       </Select>
                     </div>
 
-                    {/* Qty */}
-                    <div className="w-20 shrink-0">
-                      <Input
-                        type="number" min="1" placeholder="Cant."
-                        className="h-9 text-center"
-                        value={row.qty}
-                        onChange={e => updateRow(row._key, { qty: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Unit cost */}
-                    <div className="w-32 shrink-0">
-                      <Input
-                        type="number" min="0" step="1" placeholder="Costo unit."
-                        className="h-9"
-                        value={row.unitCost}
-                        onChange={e => updateRow(row._key, { unitCost: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Row total */}
-                    <div className="w-28 shrink-0 text-right">
-                      {rowTotal > 0
-                        ? <span className="font-mono text-sm font-medium">{fmtCOP(rowTotal)}</span>
-                        : <span className="text-muted-foreground text-sm">—</span>
-                      }
+                    {/* Delete / clear */}
+                    <div className={COL.del}>
+                      <button
+                        type="button"
+                        onClick={() => removeRow(row._key)}
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                        title={rows.length > INITIAL_ROWS ? "Eliminar fila" : "Limpiar fila"}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Prev cost hint */}
-                  {prod && (
-                    <p className="text-xs text-muted-foreground">
-                      Costo anterior: <span className="font-medium">{fmtCOP(prod.costPrice)}</span>
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Add row button */}
+            {/* Add row */}
             <button
               type="button"
               onClick={addRow}
-              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+              className="mt-2 w-full flex items-center justify-center gap-2 py-1.5 rounded-md border border-dashed text-sm text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
             >
-              <Plus className="h-4 w-4" />
-              Agregar producto
+              <Plus className="h-3.5 w-3.5" />
+              Agregar fila
             </button>
           </div>
 
-          {/* Footer: grand total + actions */}
-          <div className="shrink-0 pt-3 mt-1 border-t space-y-3">
-            <div className="flex items-center justify-between px-1">
+          {/* Footer */}
+          <div className="shrink-0 px-6 py-4 border-t flex items-center justify-between gap-4">
+            <div className="flex items-baseline gap-2">
               <span className="text-sm text-muted-foreground">
-                {rows.length} {rows.length === 1 ? "producto" : "productos"} · Total del ingreso
+                {filledRows.length} {filledRows.length === 1 ? "producto" : "productos"} · Total
               </span>
               <span className="font-serif font-bold text-xl">{fmtCOP(grandTotal)}</span>
             </div>
-            <DialogFooter>
+            <div className="flex gap-2">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>Cancelar</Button>
               <Button type="submit" disabled={createEntry.isPending} className="gap-2">
                 <PackagePlus className="h-4 w-4" />
                 {createEntry.isPending ? "Ingresando..." : "Ingresar mercancía"}
               </Button>
-            </DialogFooter>
+            </div>
           </div>
         </form>
       </DialogContent>

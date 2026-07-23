@@ -1547,6 +1547,7 @@ export const CreateInventoryEntryBody = zod.object({
   "supplierId": zod.number().nullish(),
   "qty": zod.number().min(1),
   "unitCost": zod.number(),
+  "salePrice": zod.number().nullish(),
   "notes": zod.string().optional()
 })).min(1)
 })

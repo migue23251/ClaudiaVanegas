@@ -2363,6 +2363,9 @@ components:
           minimum: 1
         unitCost:
           type: number
+        salePrice:
+          type: number
+          nullable: true
         notes:
           type: string
 

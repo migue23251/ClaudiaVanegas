@@ -13,5 +13,6 @@ export interface InventoryEntryInput {
   /** @minimum 1 */
   qty: number;
   unitCost: number;
+  salePrice?: number | null;
   notes?: string;
 }
